@@ -58,6 +58,38 @@ system has to be hardened enough that hosting it on a public cloud host, reached
 over plain HTTPS, is a sound default. Security is part of the product, not an
 exercise left to the operator's network setup.
 
+## Trust boundaries
+
+### Senders are trusted, and they are the operator's own applications
+
+logaffe is a central log store for applications the operator runs themselves. It
+is not a drop-off point for arbitrary third-party tools of unclear provenance,
+and it is not a hosted logging service for other people's software. Every sender
+holds an ingest token the operator issued for a project the operator created.
+
+Abuse protection on the ingestion endpoint — rate limits, payload size caps,
+per-project quotas — therefore exists to keep an unauthenticated flood or a
+misbehaving deployment from filling the store, not to defend against the sending
+applications themselves.
+
+### Log content is untrusted data
+
+The sender being trusted says nothing about what a log line contains.
+Applications routinely log text that originated outside them: usernames from
+failed logins, requested paths, headers, user agents, malformed request bodies.
+An outsider needs no access to the operator's systems for their text to end up
+verbatim in the log store — an HTTP request to any exposed application is
+enough.
+
+Because that stored text is later read by an AI agent operating with god-mode
+access, log content is a prompt-injection surface, and for this product it is
+the normal case rather than an edge case. Two consequences follow:
+
+- Agent access over MCP is **read-only by default**.
+- Log data is presented to agents as **untrusted data, never as instructions**,
+  and the agent interface is designed so that content cannot be mistaken for
+  direction from the operator.
+
 ## Guided setup and the installation claim
 
 A fresh installation is **unclaimed**. Setup is a guided flow in the web UI
@@ -149,6 +181,9 @@ proxy, and reconnect problems on a publicly exposed deployment.
   delivered.
 - **No large-scale log platform.** Massive retention windows, billions of
   entries, and horizontal scale-out are explicitly out of scope.
+- **Not a logging service for third parties.** logaffe stores logs from the
+  operator's own applications, not from arbitrary foreign tools or other
+  people's software.
 - **No requirement of full OpenTelemetry adoption** in the applications that
   send logs.
 - **No multi-user features.** No user management, roles, permissions, teams,
