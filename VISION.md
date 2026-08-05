@@ -2,9 +2,10 @@
 
 ## In one sentence
 
-logaffe is a self-hostable, central logging tool that collects logs from many
-applications, keeps them separated by project, and makes them accessible both to
-humans through a web UI and to AI agents through a machine-facing interface.
+logaffe is a self-hostable, central logging tool for a single operator and their
+AI agent: it collects logs from many applications, keeps them separated by
+project, and makes them accessible through a web UI and through MCP — safe
+enough to expose directly to the public internet.
 
 ## Problem
 
@@ -20,7 +21,8 @@ first rebuilding how their applications log.
 
 ## Target users and scenario
 
-- Operators and developers of a handful of self-hosted backend services.
+- One operator running a handful of self-hosted backend services — plus their
+  AI agent.
 - Primarily .NET backend applications that today log to local files.
 - A single deployment hosting on the order of 10–30 projects, each with a
   deliberately limited retention window.
@@ -28,6 +30,53 @@ first rebuilding how their applications log.
 logaffe is not designed for multi-year log archives or billions of rows. Log
 volume per project is intentionally capped, and short retention is the expected
 mode of operation.
+
+## The operator model
+
+logaffe is a **single-operator, god-mode** system. There is exactly one human
+account, and it can see and do everything. There are no additional users, no
+roles, no permissions, no teams, no sharing, no invitations. The audience is one
+person and the AI agent working on their behalf.
+
+This is a deliberate simplification, not a stage on the way to multi-tenancy. It
+removes an entire dimension of complexity from the data model, the UI, and the
+agent interface, and it is what makes the rest of the product small enough to
+stay simple.
+
+## Publicly reachable by design
+
+A logaffe instance is meant to be put on the open internet and be safe there.
+Three surfaces are publicly exposed:
+
+- the **web UI**,
+- the **MCP endpoint** for AI-agent access,
+- the **ingestion endpoint** for applications shipping logs.
+
+Requiring a VPN, Tailscale, an SSH tunnel, or a reverse-proxy auth layer in front
+of logaffe is explicitly *not* an acceptable answer to security questions. The
+system has to be hardened enough that hosting it on a public cloud host, reached
+over plain HTTPS, is a sound default. Security is part of the product, not an
+exercise left to the operator's network setup.
+
+## Guided setup and the installation claim
+
+A fresh installation is **unclaimed**. Setup is a guided flow in the web UI
+through which the operator claims the instance and establishes their account:
+
+- credentials,
+- two-factor authentication as part of the guided setup, not an optional extra
+  buried in settings,
+- backup codes, presented and confirmed during setup.
+
+While an installation is unclaimed, **anyone who can reach it may start the
+claim** — there is nothing to protect yet, so this is not a risk in itself. The
+risk is an installation that is spun up and then forgotten: it would sit
+unclaimed and claimable indefinitely.
+
+Therefore the claim window is **time-limited**. If nobody claims the instance
+within that window, claiming over the network is no longer possible and the
+operator has to intervene locally on the host to re-enable it. An abandoned
+installation must not remain an open door.
 
 ## Core capabilities
 
@@ -49,9 +98,13 @@ The first supported ingestion path is .NET backend applications.
 ### 2. AI-agent access to logs
 
 Making the log data accessible to AI agents is the second core capability, on
-equal footing with the web UI. Agents should be able to query and read project
+equal footing with the web UI. Access is provided over **MCP**, publicly
+reachable and authenticated. Agents should be able to query and read project
 logs so that log analysis, troubleshooting, and summarization can be delegated
 rather than done by hand in a search box.
+
+The agent acts on the operator's behalf and is, alongside the operator, the
+second first-class consumer of the system.
 
 ### 3. Multi-project separation
 
@@ -76,6 +129,11 @@ filtering logs, with project separation reflected throughout the interface.
   entries, and horizontal scale-out are explicitly out of scope.
 - **No requirement of full OpenTelemetry adoption** in the applications that
   send logs.
+- **No multi-user features.** No user management, roles, permissions, teams,
+  sharing, or invitations. One operator, full access.
+- **No reliance on network-level protection.** logaffe does not assume it sits
+  behind a VPN, Tailscale, or an authenticating reverse proxy, and it will not
+  treat "run it on a private network" as a security answer.
 
 ## Technical direction
 
@@ -84,8 +142,11 @@ filtering logs, with project separation reflected throughout the interface.
 - **Storage:** PostgreSQL, tuned for high log-row counts through appropriate
   indexing and schema design — sized for a moderate, bounded data set rather
   than unbounded growth
+- **Agent interface:** MCP, exposed publicly and authenticated
 - **Deployment:** containerized, runnable with Docker Compose as the standard
-  way to operate it
+  way to operate it — including on a public cloud host
+- **Authentication:** a single operator account with two-factor authentication
+  and backup codes, established through the guided claim flow
 - **Distribution:** the project is intended to be released as open source
 
 ## Guiding principles
@@ -99,3 +160,9 @@ filtering logs, with project separation reflected throughout the interface.
    are designed for machine consumption, not only for a human-facing UI.
 4. **Bounded by design.** Limited retention and moderate volume are deliberate
    constraints that keep the system simple to run.
+5. **One operator, no user model.** Every feature is designed for a single
+   god-mode account; anything that would only make sense with multiple users is
+   out of scope by definition.
+6. **Safe on the open internet.** Every publicly exposed surface — UI, MCP,
+   ingestion — is designed to withstand being reachable by anyone, without a
+   network-level safety net in front of it.
