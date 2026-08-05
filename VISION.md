@@ -95,6 +95,22 @@ implementation detail.
 
 The first supported ingestion path is .NET backend applications.
 
+**Transport.** The primitive is a plain HTTP endpoint accepting a batch of log
+entries as JSON. It is language-neutral and simple enough to drive with `curl`,
+so any runtime can deliver logs without a dedicated client. Full OpenTelemetry /
+OTLP is deliberately not the primary path — requiring it would contradict the
+premise that applications have not adopted it.
+
+On top of that primitive, .NET applications get convenience packages: a Serilog
+sink and an `ILoggerProvider`, so that switching an existing file-logging
+application over is a configuration change rather than a rewrite.
+
+**Authentication.** Each project has its own ingest token. Tokens are
+write-only — they permit delivering logs and grant no read access whatsoever —
+and can be rotated by the operator. Projects are created explicitly by the
+operator; there is no implicit project creation on first delivery. In practice
+the token *is* the project as far as a sending application is concerned.
+
 ### 2. AI-agent access to logs
 
 Making the log data accessible to AI agents is the second core capability, on
@@ -119,6 +135,12 @@ Multi-project capability is built in from the start, not retrofitted:
 A single-page web application is the human entry point: browsing, searching, and
 filtering logs, with project separation reflected throughout the interface.
 
+**Following logs live** is done by polling — refreshing the current view every
+few seconds, on the order of five. Push-based streaming (SSE, WebSockets) is
+deliberately not used: with a single operator there is at most one open view at
+a time, so polling is cheap and avoids a whole class of connection-lifecycle,
+proxy, and reconnect problems on a publicly exposed deployment.
+
 ## Non-goals
 
 - **No content filtering or scrubbing before ingestion.** logaffe does not
@@ -134,6 +156,10 @@ filtering logs, with project separation reflected throughout the interface.
 - **No reliance on network-level protection.** logaffe does not assume it sits
   behind a VPN, Tailscale, or an authenticating reverse proxy, and it will not
   treat "run it on a private network" as a security answer.
+- **No push-based live streaming.** Following logs live is polling, not SSE or
+  WebSockets.
+- **No OTLP as the primary ingestion path.** Applications are not expected to
+  speak OpenTelemetry to talk to logaffe.
 
 ## Technical direction
 
@@ -142,7 +168,11 @@ filtering logs, with project separation reflected throughout the interface.
 - **Storage:** PostgreSQL, tuned for high log-row counts through appropriate
   indexing and schema design — sized for a moderate, bounded data set rather
   than unbounded growth
+- **Ingestion:** HTTP endpoint taking JSON batches, authenticated with
+  per-project write-only tokens; Serilog sink and `ILoggerProvider` packages for
+  .NET on top
 - **Agent interface:** MCP, exposed publicly and authenticated
+- **Live updates:** polling on the order of five seconds, no push streaming
 - **Deployment:** containerized, runnable with Docker Compose as the standard
   way to operate it — including on a public cloud host
 - **Authentication:** a single operator account with two-factor authentication
