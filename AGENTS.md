@@ -12,6 +12,9 @@ language a contributor speaks: source code, identifiers, comments, docs,
 ## Repository and contributions
 
 - **Host**: GitHub — `datavisionzero/logaffe`.
+- **Layout**: where the code lives, which project holds what, and which way the
+  dependencies point is [`docs/codebase.md`](docs/codebase.md). Read it before
+  adding a file.
 - Contributions arrive as pull requests from forks. Maintainers may push to
   `main` directly.
 - Commit and push only when asked to.

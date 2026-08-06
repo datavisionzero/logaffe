@@ -262,9 +262,11 @@ proxy, and reconnect problems on a publicly exposed deployment.
 ## Technical direction
 
 Why the non-obvious ones were chosen over their alternatives is recorded as ADRs
-in [`docs/adr/`](./docs/adr/).
+in [`docs/adr/`](./docs/adr/), and how the repository is laid out around them is
+[`docs/codebase.md`](./docs/codebase.md).
 
-- **Backend:** .NET 10
+- **Backend:** .NET 10, in four layers. See
+  [`docs/codebase.md`](./docs/codebase.md)
 - **Frontend:** React, as a single-page application. See
   [`docs/ui.md`](./docs/ui.md)
 - **Storage:** PostgreSQL, tuned for high log-row counts through appropriate
