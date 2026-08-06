@@ -110,6 +110,14 @@ within that window, claiming over the network is no longer possible and the
 operator has to intervene locally on the host to re-enable it. An abandoned
 installation must not remain an open door.
 
+**There is always a way back in from the host.** With a single account protected
+by two-factor authentication and exposed to the public internet, losing the
+second factor and the backup codes would otherwise mean losing the installation.
+Whoever has access to the machine logaffe runs on can therefore reset the
+operator's authentication and re-arm an expired claim window. This is the same
+escape hatch for both cases, and it is deliberately host-local: it is reachable
+from the Docker host, never over the network.
+
 ## Core capabilities
 
 ### 1. Low-friction log ingestion
@@ -126,6 +134,15 @@ implementation detail.
   logaffe" should be short and low-risk.
 
 The first supported ingestion path is .NET backend applications.
+
+**logaffe is additive, not a replacement.** An application keeps its local file
+logging and delivers to logaffe in addition. Nothing has to be switched off to
+try logaffe out, and an application that loses its connection to logaffe still
+has its logs where it always had them. This is what keeps delivery simple:
+shipping logs is fire-and-forget, must never block or slow down the sending
+application, and does not require durable client-side buffering or delivery
+guarantees. Central logging is a convenience layer on top of local logging, not
+the system of record.
 
 **Transport.** The primitive is a plain HTTP endpoint accepting a batch of log
 entries as JSON. It is language-neutral and simple enough to drive with `curl`,
@@ -154,13 +171,26 @@ rather than done by hand in a search box.
 The agent acts on the operator's behalf and is, alongside the operator, the
 second first-class consumer of the system.
 
+**Agent access is operator-initiated.** The agent looks into the logs because
+the operator asks it to — while fixing a bug, or on a request such as "check
+project *mysupertestapp* and tell me whether there were critical errors in the
+last three days". The agent does not watch the log stream on its own and does
+not act unprompted. Passive, continuously running agent monitoring is not part
+of the product.
+
 ### 3. Multi-project separation
 
 Multi-project capability is built in from the start, not retrofitted:
 
 - Logs are assigned to a project at ingestion time.
 - Projects are kept separate in storage, in the web UI, and in agent access.
-- Retention and volume limits are applied per project.
+- Retention is configured per project.
+
+**Retention is time-based.** A project keeps its logs for a configured period,
+after which they are removed. Time is the only limit; there are no size or row
+quotas, no "drop oldest when full", and no interaction between different limits.
+Keeping this logic trivially simple is a deliberate choice — retention is a
+detail the operator should be able to reason about in one sentence.
 
 ### 4. Web UI
 
@@ -191,6 +221,10 @@ proxy, and reconnect problems on a publicly exposed deployment.
 - **No reliance on network-level protection.** logaffe does not assume it sits
   behind a VPN, Tailscale, or an authenticating reverse proxy, and it will not
   treat "run it on a private network" as a security answer.
+- **No alerting.** logaffe does not send notifications, evaluate alert rules, or
+  page anyone, and no agent watches the logs in the background to do it either.
+  Looking into the logs always starts with the operator. Alerting may be
+  revisited later; it is not part of the initial product.
 - **No push-based live streaming.** Following logs live is polling, not SSE or
   WebSockets.
 - **No OTLP as the primary ingestion path.** Applications are not expected to
@@ -214,6 +248,32 @@ proxy, and reconnect problems on a publicly exposed deployment.
   and backup codes, established through the guided claim flow
 - **Distribution:** the project is intended to be released as open source
 
+## Operating an instance: upgrades and backup
+
+Self-hosted software is only as good as its operational story, so upgrades and
+backup are part of the product rather than an afterthought.
+
+**Upgrades** are `docker compose pull` followed by `docker compose up`. Schema
+migrations apply themselves on startup; there is no separate migration step for
+the operator to run and no manual sequence to follow between versions.
+
+**Backup is the operator's responsibility** — logaffe does not run backups,
+schedule them, or ship snapshots anywhere. What logaffe owes the operator is
+that backing up is *simple to do and clearly documented*:
+
+- Any state that does not live in the database — configuration, secrets — is
+  kept on the host in a mounted volume, never inside the container image. A
+  container can be thrown away and recreated without losing anything.
+- The documentation explains how to back up the PostgreSQL database, as a
+  procedure the operator can follow and automate.
+
+**Not everything is equally worth saving.** Logs are expendable: they are
+short-lived by design, they are additive to the applications' own local logs,
+and losing them costs little. The operator account and the configuration are
+not — losing those means losing access to the installation. A backup strategy
+that covers only the small, slow-changing part is a legitimate choice, and the
+documentation should say so.
+
 ## Guiding principles
 
 1. **Ingestion friction is the adoption barrier.** Every decision about the
@@ -231,3 +291,8 @@ proxy, and reconnect problems on a publicly exposed deployment.
 6. **Safe on the open internet.** Every publicly exposed surface — UI, MCP,
    ingestion — is designed to withstand being reachable by anyone, without a
    network-level safety net in front of it.
+7. **Additive, not authoritative.** logaffe sits on top of the applications'
+   existing local logging instead of replacing it. That keeps delivery
+   fire-and-forget and keeps the cost of losing log data low.
+8. **Nothing happens unasked.** Every look into the logs — by the operator or by
+   their agent — is initiated by the operator.
