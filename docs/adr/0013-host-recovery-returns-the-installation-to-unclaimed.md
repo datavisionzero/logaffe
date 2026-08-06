@@ -22,7 +22,10 @@ boot. That is the same exposure, accepted for the same reason and bounded by the
 same 30-minute window — and the operator running the command is at the keyboard,
 which is the best moment the product ever gets for that window to be open.
 
-There is deliberately no second, gentler mechanism — no host-side password reset,
-no way to re-enrol a second factor while keeping the account. A second path into
-an account is a second thing to secure, and this one is only as safe as it is
-because it can do nothing that the claim flow does not already do in the open.
+There is deliberately no second, gentler mechanism **on the host** — no host-side
+password reset, and no host-side way to re-enrol a second factor while keeping
+the account. A second unauthenticated path into an account is a second thing to
+secure, and this one is only as safe as it is because it can do nothing that the
+claim flow does not already do in the open. A signed-in operator re-enrolling
+their own second factor is a different act behind the full credential, and
+[ADR 0016](./0016-the-second-factor-is-totp.md) provides for it.

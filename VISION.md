@@ -275,8 +275,9 @@ in [`docs/adr/`](./docs/adr/).
 - **Live updates:** polling on the order of five seconds, no push streaming
 - **Deployment:** containerized, runnable with Docker Compose as the standard
   way to operate it — including on a public cloud host
-- **Authentication:** a single operator account with two-factor authentication
-  and backup codes, established through the guided claim flow
+- **Authentication:** a single operator account with a password, a TOTP second
+  factor and backup codes, established through the guided claim flow, with no
+  username and no email address. See [`docs/sign-in.md`](./docs/sign-in.md)
 - **Distribution:** the project is intended to be released as open source
 
 ## Operating an installation: upgrades and backup

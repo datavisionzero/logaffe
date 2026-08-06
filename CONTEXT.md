@@ -47,6 +47,18 @@ made over the network. Once it lapses, claiming is only re-enabled from the host
 the installation runs on.
 _Avoid_: Grace period, trial, timeout, expiry
 
+**Second Factor**:
+The time-based one-time code from an authenticator app that an operator gives
+alongside their password. It is enrolled during the claim, can be re-enrolled by
+a signed-in operator, and cannot be turned off.
+_Avoid_: 2FA, MFA, OTP, passkey, authenticator
+
+**Session**:
+One signed-in browser's standing permission to act as the operator. Several exist
+at once, each is listed and separately revocable, and each expires on its own
+after a period of disuse.
+_Avoid_: Login, token, cookie, device, connection
+
 **Backup Code**:
 One of a set of single-use codes shown once during the claim and confirmed there,
 which stands in for the second factor when it is unavailable. A fresh set can be

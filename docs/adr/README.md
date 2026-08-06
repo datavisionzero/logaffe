@@ -39,3 +39,5 @@ material value to understanding the decision.
 - [0013 – Host Recovery returns the installation to unclaimed](./0013-host-recovery-returns-the-installation-to-unclaimed.md)
 - [0014 – The claim is atomic and holds nothing](./0014-the-claim-is-atomic-and-holds-nothing.md)
 - [0015 – The operator has no username and no email](./0015-the-operator-has-no-username-and-no-email.md)
+- [0016 – The second factor is TOTP](./0016-the-second-factor-is-totp.md)
+- [0017 – A wrong password never locks the account](./0017-a-wrong-password-never-locks-the-account.md)

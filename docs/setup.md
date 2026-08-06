@@ -51,7 +51,8 @@ for the answer.
 The flow establishes, in order:
 
 1. a **password**,
-2. a **second factor**, enrolled during setup rather than offered afterwards,
+2. a **second factor** — a TOTP authenticator, enrolled during setup rather than
+   offered afterwards,
 3. **backup codes**, shown once and confirmed by typing one back.
 
 **It is atomic.** The installation stays unclaimed until the last step completes,
@@ -64,9 +65,13 @@ no longer unclaimed
 
 The second factor cannot be turned off later. `VISION.md` puts it in the guided
 setup precisely so it is not an optional extra, and a single god-mode account on
-the public internet is not a place where that is negotiable afterwards. Backup
-codes are single-use, and a fresh set can be generated at any time, which
-replaces the old set entirely.
+the public internet is not a place where that is negotiable afterwards. It can be
+re-enrolled by a signed-in operator, which is how a replaced phone stays an
+ordinary event. Backup codes are single-use, and a fresh set can be generated at
+any time, which replaces the old set entirely.
+
+How the operator gets back in on an ordinary day, from whatever machine they are
+at, is [Signing in and sessions](./sign-in.md).
 
 ## The operator has no name and no address
 
@@ -126,10 +131,12 @@ one place a record of it can survive the reset it performs.
 ## Abuse protection on this surface
 
 The claim and the sign-in are public, pre-authentication and reachable by anyone,
-so they carry the rate limits `VISION.md` requires of every exposed endpoint, and
-sign-in carries a lockout that costs an attacker more than a person who mistyped.
-A rate limit on the claim does not stop somebody who wins the race honestly — it
-stops the automated attempt at the password afterwards.
+so they carry the rate limits `VISION.md` requires of every exposed endpoint.
+Failed sign-ins are throttled by their source and **never lock the account**,
+because with one account a lockout is a weapon pointed at its owner
+([ADR 0017](./adr/0017-a-wrong-password-never-locks-the-account.md)). A rate
+limit on the claim does not stop somebody who wins the race honestly — it stops
+the automated attempt at the password afterwards.
 
 ## What is deliberately not here
 
