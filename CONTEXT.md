@@ -178,6 +178,13 @@ filter no index serves — deliberately, because a stack trace is kilobytes wher
 message is a line.
 _Avoid_: Stack trace search, error filter, exception search, trace filter
 
+**Log View**:
+The single screen on which the operator reads one project: the filters, the
+entries they leave, and the detail of one of them. It is where nearly all use of
+the web UI happens, it holds one project at a time, and the filters that make it
+up are in its address.
+_Avoid_: Dashboard, search page, console, explorer, stream
+
 **Live Tail**:
 The mode in which a view keeps itself current by asking, every few seconds, what
 has arrived since it last asked. It follows receipt time while the view it feeds

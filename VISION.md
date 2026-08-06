@@ -219,7 +219,8 @@ rather than a hope about how it is configured. See
 A single-page web application is the human entry point: browsing, searching, and
 filtering logs, with project separation reflected throughout the interface. It
 reads through the same query surface the agent uses, rather than a richer one of
-its own — see [`docs/querying.md`](./docs/querying.md).
+its own — see [`docs/querying.md`](./docs/querying.md). What the operator
+actually sees, and how it behaves, is [`docs/ui.md`](./docs/ui.md).
 
 **Following logs live** is done by polling — refreshing the current view every
 few seconds, on the order of five. Push-based streaming (SSE, WebSockets) is
@@ -264,7 +265,8 @@ Why the non-obvious ones were chosen over their alternatives is recorded as ADRs
 in [`docs/adr/`](./docs/adr/).
 
 - **Backend:** .NET 10
-- **Frontend:** React, as a single-page application
+- **Frontend:** React, as a single-page application. See
+  [`docs/ui.md`](./docs/ui.md)
 - **Storage:** PostgreSQL, tuned for high log-row counts through appropriate
   indexing and schema design — sized for a moderate, bounded data set rather
   than unbounded growth. See [`docs/storage.md`](./docs/storage.md)

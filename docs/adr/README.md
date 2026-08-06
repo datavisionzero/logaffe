@@ -52,3 +52,4 @@ material value to understanding the decision.
 - [0026 – A read has five seconds](./0026-a-read-has-five-seconds.md)
 - [0027 – Repeated text is stored, not interned](./0027-repeated-text-is-stored-not-interned.md)
 - [0028 – The exception is its own filter](./0028-the-exception-is-its-own-filter.md)
+- [0029 – Filter values come from the entries, not from a list](./0029-filter-values-come-from-the-entries-not-from-a-list.md)
