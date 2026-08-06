@@ -1,0 +1,51 @@
+# Postgres for working on logaffe, and nothing else. The two toolchains run side
+# by side in development — `dotnet run` in src/Logaffe.Api and `npm run dev` in
+# src/web — so this file brings up only what neither of them can be.
+#
+#   docker compose -f deploy/docker-compose.dev.yml up -d
+#
+# The port and the credentials are what appsettings.Development.json expects.
+# The server settings are the ones the storage prototype measured against: the
+# small public cloud host VISION.md targets, not a laptop.
+
+name: logaffe-dev
+
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: logaffe
+      POSTGRES_USER: logaffe
+      POSTGRES_PASSWORD: logaffe
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    ports:
+      - "55432:5432"
+    volumes:
+      - logaffe-dev-db:/var/lib/postgresql
+    mem_limit: 4g
+    cpus: 2
+    shm_size: 512mb
+    command:
+      - postgres
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=3GB
+      - -c
+      - work_mem=32MB
+      - -c
+      - maintenance_work_mem=384MB
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - track_io_timing=on
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logaffe -d logaffe"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  logaffe-dev-db:

@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/dist/
+src/Logaffe.Api/wwwroot/
+.git/
+.github/
+docs/
+tests/
+volume/
+*.md

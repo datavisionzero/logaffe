@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # Seconds, and no Docker. Domain rules and use cases against substituted ports.
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore Logaffe.slnx
+      - run: dotnet build Logaffe.slnx -c Release --no-restore
+      - run: dotnet test tests/Logaffe.UnitTests -c Release --no-build
+
+  # The parts no substitute can vouch for: the migrations, and what the schema
+  # actually does on the Postgres an installation runs.
+  integration:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore Logaffe.slnx
+      - run: dotnet build Logaffe.slnx -c Release --no-restore
+      - run: dotnet test tests/Logaffe.IntegrationTests -c Release --no-build
+
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: src/web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build -- --outDir dist --emptyOutDir
+
+  # ADR 0001 accepts that the frontend shares no types with the backend and asks
+  # for a contract kept honest by tests rather than by the compiler. This is that
+  # test: the document the running installation serves has to be the one that is
+  # checked in.
+  contract:
+    name: OpenAPI contract
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:18
+        env:
+          POSTGRES_DB: logaffe
+          POSTGRES_USER: logaffe
+          POSTGRES_PASSWORD: logaffe
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U logaffe -d logaffe"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Start the installation
+        run: dotnet run --project src/Logaffe.Api -c Release --no-launch-profile &
+        env:
+          ConnectionStrings__Postgres: Host=localhost;Port=5432;Database=logaffe;Username=logaffe;Password=logaffe
+          Logaffe__VolumePath: ${{ runner.temp }}/volume
+          ASPNETCORE_HTTP_PORTS: "5142"
+
+      - name: Capture the contract
+        run: |
+          for _ in $(seq 1 45); do
+            curl --fail --silent http://localhost:5142/openapi/v1.json -o /tmp/openapi.json && break
+            sleep 2
+          done
+          python3 -m json.tool --indent 2 /tmp/openapi.json > docs/api/openapi.json
+
+      - name: The checked-in contract is the one being served
+        run: git diff --exit-code -- docs/api/openapi.json
+
+  image:
+    name: Image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build (not pushed)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

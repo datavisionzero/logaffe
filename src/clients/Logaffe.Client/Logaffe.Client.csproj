@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- The applications that ship logs are the ones that exist today, not the
+         ones on the newest runtime. LTS is the floor; net10.0 consumes it. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <PackageId>Logaffe.Client</PackageId>
+    <Description>
+      Delivery of log entries to a logaffe installation: a bounded in-memory
+      queue that drops the oldest entries when full, never throws into the
+      calling application and never blocks it.
+    </Description>
+    <PackageTags>logging;logaffe;clef</PackageTags>
+  </PropertyGroup>
+
+</Project>

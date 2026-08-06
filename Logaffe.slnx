@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Logaffe.Api/Logaffe.Api.csproj" />
+    <Project Path="src/Logaffe.Application/Logaffe.Application.csproj" />
+    <Project Path="src/Logaffe.Domain/Logaffe.Domain.csproj" />
+    <Project Path="src/Logaffe.Infrastructure/Logaffe.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/clients/">
+    <Project Path="src/clients/Logaffe.Client/Logaffe.Client.csproj" />
+    <Project Path="src/clients/Logaffe.Extensions.Logging/Logaffe.Extensions.Logging.csproj" />
+    <Project Path="src/clients/Logaffe.Serilog/Logaffe.Serilog.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Logaffe.IntegrationTests/Logaffe.IntegrationTests.csproj" />
+    <Project Path="tests/Logaffe.UnitTests/Logaffe.UnitTests.csproj" />
+  </Folder>
+</Solution>

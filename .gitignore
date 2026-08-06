@@ -1,2 +1,26 @@
 # Personal, machine-local agent instructions
 CLAUDE.local.md
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+artifacts/
+
+# The SPA is built into the image, never committed
+src/Logaffe.Api/wwwroot/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+
+# Local secrets and the host volume of a development installation
+.env
+volume/
+
+# macOS
+.DS_Store

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <UserSecretsId>logaffe-api</UserSecretsId>
+    <!-- docs/operations.md invokes this as `docker compose exec logaffe logaffe
+         backup`, so the binary is named for the verb line it appears in. -->
+    <AssemblyName>logaffe</AssemblyName>
+    <RootNamespace>Logaffe.Api</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Logaffe.Application/Logaffe.Application.csproj" />
+    <ProjectReference Include="../Logaffe.Infrastructure/Logaffe.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <!-- The OpenAPI document is served at /openapi/v1.json and captured into
+       docs/api/ by CI, which has a database to start against. Generating it at
+       build time was tried and dropped: the tooling starts the host, so every
+       build would have run the migrations on startup. -->
+
+</Project>

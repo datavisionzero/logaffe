@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="../Logaffe.Domain/Logaffe.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

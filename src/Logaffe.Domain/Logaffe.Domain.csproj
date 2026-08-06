@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The innermost layer. It carries no ProjectReference and no
+       PackageReference, and that emptiness is the cheapest check that nothing
+       has leaked into it (ADR 0030). Adding either is a decision. -->
+
+</Project>

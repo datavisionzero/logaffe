@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>true</IsPackable>
+    <PackageId>Logaffe.Serilog</PackageId>
+    <Description>
+      A Serilog sink delivering to a logaffe installation. Because the wire
+      format is CLEF, the sink is configuration rather than a mapping layer.
+    </Description>
+    <PackageTags>logging;logaffe;serilog;sink;clef</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Logaffe.Client/Logaffe.Client.csproj" />
+  </ItemGroup>
+
+</Project>

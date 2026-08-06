@@ -1,0 +1,52 @@
+# The way an installation is run. Upgrading is `docker compose pull` followed by
+# `docker compose up`: migrations apply themselves on startup, and there is no
+# separate step and no sequence to follow between versions.
+#
+# Set POSTGRES_PASSWORD in a .env file beside this one before the first start.
+
+name: logaffe
+
+services:
+  logaffe:
+    image: ghcr.io/datavisionzero/logaffe:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Postgres: >-
+        Host=db;Port=5432;Database=logaffe;Username=logaffe;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      # Both stores are needed, and a database alone is not a backup: the key
+      # that makes stored tokens readable lives here.
+      - logaffe-volume:/var/lib/logaffe
+    ports:
+      - "8080:8080"
+    healthcheck:
+      # Answers 200 or 503 and nothing else; it reports ready when the database
+      # is reachable and migrations are complete.
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 30s
+
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: logaffe
+      POSTGRES_USER: logaffe
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - logaffe-db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logaffe -d logaffe"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  logaffe-volume:
+  logaffe-db:

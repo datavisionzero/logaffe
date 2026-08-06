@@ -1,0 +1,32 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "logaffe",
+    "description": "The read and write surface of one logaffe installation. Every installation is at its own address.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Whether the installation can serve.",
+        "operationId": "Health",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "logaffe"
+    }
+  ]
+}
