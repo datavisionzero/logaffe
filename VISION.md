@@ -177,7 +177,8 @@ Making the log data accessible to AI agents is the second core capability, on
 equal footing with the web UI. Access is provided over **MCP**, publicly
 reachable and authenticated. Agents should be able to query and read project
 logs so that log analysis, troubleshooting, and summarization can be delegated
-rather than done by hand in a search box.
+rather than done by hand in a search box. The agent queries through the same
+surface as the web UI — see [`docs/querying.md`](./docs/querying.md).
 
 The agent acts on the operator's behalf and is, alongside the operator, the
 second first-class consumer of the system.
@@ -206,7 +207,9 @@ detail the operator should be able to reason about in one sentence.
 ### 4. Web UI
 
 A single-page web application is the human entry point: browsing, searching, and
-filtering logs, with project separation reflected throughout the interface.
+filtering logs, with project separation reflected throughout the interface. It
+reads through the same query surface the agent uses, rather than a richer one of
+its own — see [`docs/querying.md`](./docs/querying.md).
 
 **Following logs live** is done by polling — refreshing the current view every
 few seconds, on the order of five. Push-based streaming (SSE, WebSockets) is

@@ -124,6 +124,30 @@ retention counts from, because it is the only one of the two clocks a sender
 cannot get wrong.
 _Avoid_: Ingested at, server time, stored at, created at
 
+**Filter**:
+One narrowing of the entries a project holds — a time range, a level threshold,
+an instance, a logger name, a trace, or a search text. Filters only ever remove
+entries, and those set together all apply at once.
+_Avoid_: Query, condition, facet, clause, rule
+
+**Search Text**:
+The filter matched as a case-insensitive substring of an entry's rendered
+message, anywhere in it and including inside a word. It is the product's only
+free-text narrowing and it behaves like `grep` rather than like a search engine.
+_Avoid_: Query, keyword, term, phrase, full-text search
+
+**Live Tail**:
+The mode in which a view keeps itself current by asking, every few seconds, what
+has arrived since it last asked. It follows receipt time while the view it feeds
+stays ordered by event time.
+_Avoid_: Stream, follow mode, real-time view, watch, subscription
+
+**Count**:
+The number of entries matching a set of filters, optionally grouped by level,
+logger name, instance or time bucket, and answered without returning the entries
+themselves. It is always asked for deliberately and never accompanies a page.
+_Avoid_: Total, hits, results, statistics, metric
+
 **Retention Window**:
 The period a project keeps its entries, counted from receipt time, after which
 they are removed. Time is the only limit a project has — there is no size cap, no

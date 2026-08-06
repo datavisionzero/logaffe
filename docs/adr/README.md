@@ -32,3 +32,7 @@ material value to understanding the decision.
 - [0006 – A batch is accepted in part](./0006-a-batch-is-accepted-in-part.md)
 - [0007 – The sender orders, the receipt expires](./0007-the-sender-orders-the-receipt-expires.md)
 - [0008 – An over-long message is truncated, not refused](./0008-an-over-long-message-is-truncated-not-refused.md)
+- [0009 – The tail follows the receipt, the view keeps the order of events](./0009-the-tail-follows-the-receipt-the-view-keeps-the-order-of-events.md)
+- [0010 – Search is a substring match, not a full-text query](./0010-search-is-a-substring-match-not-a-full-text-query.md)
+- [0011 – Filters only narrow, and only with AND](./0011-filters-only-narrow-and-only-with-and.md)
+- [0012 – Log content reaches an agent as data, never as prose](./0012-log-content-reaches-an-agent-as-data-never-as-prose.md)
