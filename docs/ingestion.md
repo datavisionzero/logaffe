@@ -190,7 +190,7 @@ model says the record already is.
   no confirmation semantic, no receipt to store, and no way for an application to
   learn later whether an entry landed.
 - **No scrubbing, filtering or classification on the way in.** Settled in
-  `VISION.md`: log lines are stored as delivered, and the only modification on
+  `VISION.md`: log entries are stored as delivered, and the only modification on
   this path is the declared truncation above.
 - **No implicit project creation.** Settled in `VISION.md`: a token exists
   because the operator created a project and issued it.

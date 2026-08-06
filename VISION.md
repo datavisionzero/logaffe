@@ -45,7 +45,7 @@ stay simple.
 
 ## Publicly reachable by design
 
-A logaffe instance is meant to be put on the open internet and be safe there.
+A logaffe installation is meant to be put on the open internet and be safe there.
 Three surfaces are publicly exposed:
 
 - the **web UI**,
@@ -74,7 +74,7 @@ applications themselves.
 
 ### Log content is untrusted data
 
-The sender being trusted says nothing about what a log line contains.
+The sender being trusted says nothing about what a log entry contains.
 Applications routinely log text that originated outside them: usernames from
 failed logins, requested paths, headers, user agents, malformed request bodies.
 An outsider needs no access to the operator's systems for their text to end up
@@ -93,7 +93,7 @@ the normal case rather than an edge case. Two consequences follow:
 ## Guided setup and the installation claim
 
 A fresh installation is **unclaimed**. Setup is a guided flow in the web UI
-through which the operator claims the instance and establishes their account:
+through which the operator claims the installation and establishes their account:
 
 - credentials,
 - two-factor authentication as part of the guided setup, not an optional extra
@@ -105,7 +105,7 @@ claim** — there is nothing to protect yet, so this is not a risk in itself. Th
 risk is an installation that is spun up and then forgotten: it would sit
 unclaimed and claimable indefinitely.
 
-Therefore the claim window is **time-limited**. If nobody claims the instance
+Therefore the claim window is **time-limited**. If nobody claims the installation
 within that window, claiming over the network is no longer possible and the
 operator has to intervene locally on the host to re-enable it. An abandoned
 installation must not remain an open door.
@@ -218,7 +218,7 @@ proxy, and reconnect problems on a publicly exposed deployment.
 
 - **No content filtering or scrubbing before ingestion.** logaffe does not
   inspect log data for sensitive or otherwise problematic content and does not
-  require callers to strip anything out beforehand. Log lines are stored as
+  require callers to strip anything out beforehand. Log entries are stored as
   delivered, with exactly one exception: a message or exception that exceeds its
   size cap is cut at the cap and visibly flagged as truncated, because the
   entries that overrun a cap are the large stack traces an operator went looking
@@ -273,7 +273,7 @@ in [`docs/adr/`](./docs/adr/).
   and backup codes, established through the guided claim flow
 - **Distribution:** the project is intended to be released as open source
 
-## Operating an instance: upgrades and backup
+## Operating an installation: upgrades and backup
 
 Self-hosted software is only as good as its operational story, so upgrades and
 backup are part of the product rather than an afterthought.

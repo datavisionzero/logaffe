@@ -6,7 +6,7 @@ outside the container. Self-ingestion is the obvious move for a logging product
 and is rejected on the merits: the failures worth diagnosing are the ones where
 logaffe is the thing that broke — the database unreachable, a migration failing
 at startup, the ingestion endpoint refusing batches — and in exactly those
-moments a self-ingesting instance records nothing, so the log of the outage is
+moments a self-ingesting installation records nothing, so the log of the outage is
 the log that is missing. A file needs no database, no claimed installation, no
 project and no ingest token, which is also why it is the only sink available
 during startup and during the guided claim. Serilog rather than a bare
@@ -15,7 +15,7 @@ package: the product uses the library it asks its users to use.
 
 ## Consequences
 
-A **second** logaffe instance may later be added as an additional sink, and that
+A **second** logaffe installation may later be added as an additional sink, and that
 is the additive model the product sells — an application keeps its local file
 logging and delivers to logaffe on top. It is an addition, never a replacement:
 the file log stays, because it is what survives the failure that takes the

@@ -3,11 +3,11 @@
 A message or exception exceeding its size cap is cut at the cap and the entry is
 flagged as truncated, rather than the entry being rejected. This is the single
 modification logaffe makes to stored data, and `VISION.md` names it as the one
-exception to "log lines are stored as delivered". It is recorded here because the
-alternative is the obvious reading of that sentence and would select precisely
-the wrong victims: the entries that overrun a cap are the four-megabyte stack
-traces and the dumped payloads, which is to say the entries an operator is most
-likely to have gone looking for.
+exception to "log entries are stored as delivered". It is recorded here because
+the alternative is the obvious reading of that sentence and would select
+precisely the wrong victims: the entries that overrun a cap are the
+four-megabyte stack traces and the dumped payloads, which is to say the entries
+an operator is most likely to have gone looking for.
 
 ## Consequences
 
