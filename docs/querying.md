@@ -105,6 +105,24 @@ number and a grouping, not by forty thousand rows. It is the same request for
 both consumers — the agent calls it to answer a question, and the operator calls
 it when a number is what they want rather than a page.
 
+## A read has five seconds
+
+Every query on this surface is cut off after five seconds, in every installation
+and with no setting that raises it
+([ADR 0026](./adr/0026-a-read-has-five-seconds.md)). The number comes from the
+live tail: a read that takes longer than the interval which refreshes the view
+has already stopped being an interface.
+
+Nothing measured at ten million entries came near it — the slowest ordinary query
+was a third of a second — so the limit is there for the queries nobody
+anticipated rather than for the ones above. The **count** is the likeliest to
+meet it, because it is the one operation that cannot stop early, and the
+narrowing that helps it is the time range. A read that expires says what to
+narrow rather than reporting a database error.
+
+The limit binds this surface. The retention sweep and the rest of an
+installation's background work are not reads and are not held to it.
+
 ## The agent's view
 
 The agent gets the filters above, the count, and the entries, **read-only**.
