@@ -24,6 +24,8 @@ A query is a set of filters. There is no query language
   framework noise from application output.
 - **Trace**, gathering the entries of one request.
 - **Search text**, matched against the rendered message.
+- **Exception text**, matched against the exception, on its own
+  ([ADR 0028](./adr/0028-the-exception-is-its-own-filter.md)).
 
 ### They only narrow, and only with AND
 
@@ -41,9 +43,9 @@ wherever it occurs in the rendered message, including inside a word, matched
 case-insensitively ([ADR 0010](./adr/0010-search-is-a-substring-match-not-a-full-text-query.md)).
 
 This is what makes the searches an operator actually types work:
-`203.0.113.7`, `/api/orders/4711`, `api-7c4f`, and `nullreference` finding
-`NullReferenceException`. A word-based full-text index would tokenize the first
-three apart and would not find the fourth at all.
+`203.0.113.7`, `/api/orders/4711`, `api-7c4f`, and — in the exception filter
+below — `nullreference` finding `NullReferenceException`. A word-based full-text
+index would tokenize the first three apart and would not find the fourth at all.
 
 **A search text is at least three characters**, and a shorter one is refused
 rather than run. A trigram index matches in three-character pieces and cannot
@@ -61,6 +63,29 @@ enricher attached, is stored and displayed but **not searchable**. That is a
 deliberate limit and not an oversight: a second index on the largest table, plus
 an answer to whether `42` and `"42"` are the same filter value, buys less than it
 costs on a store this size.
+
+## The exception is searched on its own
+
+The search text matches the rendered message and nothing else. The **exception**
+has a filter of its own, matched the same way — case-insensitive substring,
+anywhere in the text, three characters minimum
+([ADR 0028](./adr/0028-the-exception-is-its-own-filter.md)).
+
+They are separate because the exception is where the bytes are. A stack trace is
+kilobytes where a message is a line, and one index over both would make every
+ordinary search pay for the rare one. So the exception is unindexed and is
+narrowed by the filters an operator hunting a stack trace has already set —
+`Error and above`, in a time window — which is what makes it cheap in the case it
+is actually used in.
+
+It is therefore **the one filter that can be slow**, deliberately: a second act
+rather than a tax on every search. Run across a whole project with nothing else
+set, it meets the five-second limit like any other read.
+
+This is also where `nullreference` finds `NullReferenceException`. In a normal
+.NET application the exception type is in the exception and not in the sentence,
+so that search — the one ADR 0010 uses to justify substring matching in the first
+place — is typed into this filter rather than the search box.
 
 ## Order and paging
 

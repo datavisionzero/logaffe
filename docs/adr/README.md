@@ -51,3 +51,4 @@ material value to understanding the decision.
 - [0025 – A search text is at least three characters](./0025-a-search-text-is-at-least-three-characters.md)
 - [0026 – A read has five seconds](./0026-a-read-has-five-seconds.md)
 - [0027 – Repeated text is stored, not interned](./0027-repeated-text-is-stored-not-interned.md)
+- [0028 – The exception is its own filter](./0028-the-exception-is-its-own-filter.md)

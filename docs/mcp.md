@@ -66,8 +66,8 @@ lately" is the cheapest possible health question.
 
 **`search_entries`** — a project, the filters from [Querying](./querying.md), a
 verbosity, and a cursor. The filters are exactly the operator's: a time range on
-event time, a level threshold, an instance, a logger name, a trace, and a search
-text, all combining with AND and nothing else
+event time, a level threshold, an instance, a logger name, a trace, a search
+text, and an exception text, all combining with AND and nothing else
 ([ADR 0011](./adr/0011-filters-only-narrow-and-only-with-and.md)).
 
 **`count_entries`** — the same filters, answered as a number, optionally grouped

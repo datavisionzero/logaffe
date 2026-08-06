@@ -172,6 +172,21 @@ The other thresholds are not indexed. Asking for `Error and above` uses this
 index and filters; asking for `Debug and above` is nearly every entry and is
 better served by the plain paging index.
 
+## The exception carries no index
+
+`exception` is stored as delivered and is **not indexed**, though it has a filter
+of its own ([ADR 0028](./adr/0028-the-exception-is-its-own-filter.md)). A stack
+trace is kilobytes where a rendered message is a line, so a trigram index over it
+would be the largest object in the database by a wide margin — estimated at
+around a gigabyte per ten million entries, and never measured — and every
+ordinary search would pay for it on every write.
+
+The filter instead rechecks whatever the other filters have already narrowed. An
+operator hunting a stack trace has set `Error and above` and a time window, which
+the partial index above serves, and exceptions live overwhelmingly on exactly
+those entries. Unnarrowed, the filter is a scan, and the five seconds of ADR 0026
+are what make that a safe thing to leave unindexed.
+
 ## Properties are JSONB and carry no index
 
 Properties arrive as a JSON object and are stored as one — scalars or a single

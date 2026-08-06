@@ -159,8 +159,8 @@ _Avoid_: Ingested at, server time, stored at, created at
 
 **Filter**:
 One narrowing of the entries a project holds — a time range, a level threshold,
-an instance, a logger name, a trace, or a search text. Filters only ever remove
-entries, and those set together all apply at once.
+an instance, a logger name, a trace, a search text, or an exception text. Filters
+only ever remove entries, and those set together all apply at once.
 _Avoid_: Query, condition, facet, clause, rule
 
 **Search Text**:
@@ -169,6 +169,14 @@ message, anywhere in it and including inside a word. It is the product's only
 free-text narrowing, it behaves like `grep` rather than like a search engine, and
 it is at least three characters long — a shorter one is refused rather than run.
 _Avoid_: Query, keyword, term, phrase, full-text search
+
+**Exception Text**:
+The filter matched as a case-insensitive substring of an entry's exception, and
+the only narrowing that reaches a field the search text does not. It follows the
+same three-character minimum and the same `grep` behaviour, and it is the one
+filter no index serves — deliberately, because a stack trace is kilobytes where a
+message is a line.
+_Avoid_: Stack trace search, error filter, exception search, trace filter
 
 **Live Tail**:
 The mode in which a view keeps itself current by asking, every few seconds, what
