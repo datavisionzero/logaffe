@@ -27,3 +27,8 @@ material value to understanding the decision.
 - [0001 – The frontend is React, not Blazor](./0001-the-frontend-is-react-not-blazor.md)
 - [0002 – logaffe logs to files, not into itself](./0002-logaffe-logs-to-files-not-into-itself.md)
 - [0003 – EF Core owns the schema, the log path goes around it](./0003-ef-core-owns-the-schema-the-log-path-goes-around-it.md)
+- [0004 – The ingestion format is CLEF, and the server renders](./0004-the-ingestion-format-is-clef-and-the-server-renders.md)
+- [0005 – The rendered message is stored, not recomputed](./0005-the-rendered-message-is-stored-not-recomputed.md)
+- [0006 – A batch is accepted in part](./0006-a-batch-is-accepted-in-part.md)
+- [0007 – The sender orders, the receipt expires](./0007-the-sender-orders-the-receipt-expires.md)
+- [0008 – An over-long message is truncated, not refused](./0008-an-over-long-message-is-truncated-not-refused.md)

@@ -125,15 +125,26 @@ from the Docker host, never over the network.
 Getting logs into logaffe must be easy — this is a primary product goal, not an
 implementation detail.
 
+- **Structured logging is assumed** — but only as an envelope. An entry arrives
+  as a discrete event carrying a timestamp, a level and a message, which is what
+  every .NET logging framework already produces. logaffe does not read log files
+  and does not parse text into fields.
+- **Structured messages are not assumed.** A plain sentence with no named
+  properties is a complete entry, not a degraded one, and no application has to
+  rewrite its log statements into message templates to start delivering.
+  Applications that already write templated messages get their properties stored
+  and searchable; that is a reward, never a requirement.
 - Applications are **not** expected to have adopted OpenTelemetry properly.
-- Classic, mostly unstructured log output (a level, a timestamp, a text message)
-  is a first-class input, not a degraded fallback.
-- Richer structured input is supported where an application already provides it,
-  but it is never a precondition for using logaffe.
 - The migration path from "we write log files locally" to "we ship logs to
-  logaffe" should be short and low-risk.
+  logaffe" should be short and low-risk — it adds a sink to the logging the
+  application already does, and takes nothing away.
 
-The first supported ingestion path is .NET backend applications.
+The first supported ingestion path is .NET backend applications, and **Serilog is
+the best-supported one of those**. The wire format is Serilog's own compact
+format, so a Serilog application is a configuration change rather than an
+integration. Applications on `Microsoft.Extensions.Logging` are supported to the
+same depth through an `ILoggerProvider`, and any other runtime can deliver with
+`curl`.
 
 **logaffe is additive, not a replacement.** An application keeps its local file
 logging and delivers to logaffe in addition. Nothing has to be switched off to
@@ -208,7 +219,11 @@ proxy, and reconnect problems on a publicly exposed deployment.
 - **No content filtering or scrubbing before ingestion.** logaffe does not
   inspect log data for sensitive or otherwise problematic content and does not
   require callers to strip anything out beforehand. Log lines are stored as
-  delivered.
+  delivered, with exactly one exception: a message or exception that exceeds its
+  size cap is cut at the cap and visibly flagged as truncated, because the
+  entries that overrun a cap are the large stack traces an operator went looking
+  for. Nothing is ever dropped, reformatted or altered on account of what it
+  says. See [`docs/ingestion.md`](./docs/ingestion.md).
 - **No large-scale log platform.** Massive retention windows, billions of
   entries, and horizontal scale-out are explicitly out of scope.
 - **Not a logging service for third parties.** logaffe stores logs from the
@@ -243,9 +258,10 @@ in [`docs/adr/`](./docs/adr/).
 - **Data access:** EF Core owns the schema and the self-applying migrations, and
   serves everything except the log entries; the log path writes through Npgsql's
   binary `COPY` and reads through hand-written SQL with Dapper
-- **Ingestion:** HTTP endpoint taking JSON batches, authenticated with
-  per-project write-only tokens; Serilog sink and `ILoggerProvider` packages for
-  .NET on top
+- **Ingestion:** HTTP endpoint taking batches of newline-delimited CLEF,
+  authenticated with per-project write-only tokens; Serilog sink and
+  `ILoggerProvider` packages for .NET on top. See
+  [`docs/ingestion.md`](./docs/ingestion.md)
 - **logaffe's own logs:** Serilog to rolling files on the mounted host volume.
   logaffe does not log into itself — the failures worth diagnosing are the ones
   in which it could not record anything
@@ -288,8 +304,10 @@ documentation should say so.
 1. **Ingestion friction is the adoption barrier.** Every decision about the
    ingestion path is judged by how easy it is for an existing file-logging
    application to switch.
-2. **Meet applications where they are.** Unstructured text logs are a supported
-   reality, not a problem to be fixed first.
+2. **Meet applications where they are.** An application must log through a
+   logging framework, and that is the whole of what is asked. Message text that
+   was never structured stays a supported reality rather than a problem to be
+   fixed first.
 3. **Agents are first-class consumers.** The log data model and query surface
    are designed for machine consumption, not only for a human-facing UI.
 4. **Bounded by design.** Limited retention and moderate volume are deliberate
