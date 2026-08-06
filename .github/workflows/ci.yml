@@ -12,7 +12,7 @@ jobs:
   # Seconds, and no Docker. Domain rules and use cases against substituted ports.
   unit:
     name: Unit tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, logaffe]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -26,7 +26,7 @@ jobs:
   # actually does on the Postgres an installation runs.
   integration:
     name: Integration tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, logaffe]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -38,7 +38,7 @@ jobs:
 
   web:
     name: Web
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, logaffe]
     defaults:
       run:
         working-directory: src/web
@@ -60,7 +60,7 @@ jobs:
   # checked in.
   contract:
     name: OpenAPI contract
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, logaffe]
     services:
       db:
         image: postgres:18
@@ -101,7 +101,7 @@ jobs:
 
   image:
     name: Image
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, logaffe]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
