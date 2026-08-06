@@ -267,7 +267,7 @@ in [`docs/adr/`](./docs/adr/).
 - **Frontend:** React, as a single-page application
 - **Storage:** PostgreSQL, tuned for high log-row counts through appropriate
   indexing and schema design — sized for a moderate, bounded data set rather
-  than unbounded growth
+  than unbounded growth. See [`docs/storage.md`](./docs/storage.md)
 - **Data access:** EF Core owns the schema and the self-applying migrations, and
   serves everything except the log entries; the log path writes through Npgsql's
   binary `COPY` and reads through hand-written SQL with Dapper
