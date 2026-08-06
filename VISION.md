@@ -101,9 +101,11 @@ through which the operator claims the installation and establishes their account
 - backup codes, presented and confirmed during setup.
 
 While an installation is unclaimed, **anyone who can reach it may start the
-claim** — there is nothing to protect yet, so this is not a risk in itself. The
-risk is an installation that is spun up and then forgotten: it would sit
-unclaimed and claimable indefinitely.
+claim**. There is no data to take yet, but the installation itself can be taken,
+so the exposure is real rather than nil — it is accepted because it is narrow and
+because it is recoverable, not because it is absent. The larger risk is an
+installation that is spun up and then forgotten: it would sit unclaimed and
+claimable indefinitely.
 
 Therefore the claim window is **time-limited**. If nobody claims the installation
 within that window, claiming over the network is no longer possible and the
@@ -113,10 +115,11 @@ installation must not remain an open door.
 **There is always a way back in from the host.** With a single account protected
 by two-factor authentication and exposed to the public internet, losing the
 second factor and the backup codes would otherwise mean losing the installation.
-Whoever has access to the machine logaffe runs on can therefore reset the
-operator's authentication and re-arm an expired claim window. This is the same
-escape hatch for both cases, and it is deliberately host-local: it is reachable
-from the Docker host, never over the network.
+Whoever has access to the machine logaffe runs on can therefore run **Host
+Recovery**, which returns the installation to unclaimed and arms a fresh claim
+window while keeping its projects, tokens and entries. It is one operation for
+both cases, and it is deliberately host-local: it is reachable from the Docker
+host, never over the network. See [`docs/setup.md`](./docs/setup.md).
 
 ## Core capabilities
 

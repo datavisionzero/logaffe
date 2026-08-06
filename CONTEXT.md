@@ -47,6 +47,19 @@ made over the network. Once it lapses, claiming is only re-enabled from the host
 the installation runs on.
 _Avoid_: Grace period, trial, timeout, expiry
 
+**Backup Code**:
+One of a set of single-use codes shown once during the claim and confirmed there,
+which stands in for the second factor when it is unavailable. A fresh set can be
+generated at any time and replaces the previous one entirely.
+_Avoid_: Recovery code, one-time password, fallback, emergency key
+
+**Host Recovery**:
+The command run inside the running container that returns an installation to
+unclaimed and arms a fresh claim window, keeping its projects, tokens and
+entries. It is reachable from the host and never over the network, and it is the
+only route back into a claimed installation.
+_Avoid_: Password reset, admin override, rescue mode, break-glass, escape hatch
+
 **Project**:
 The unit of separation: every log entry belongs to exactly one, the operator
 creates them explicitly, and separation holds in storage, in the UI and in agent

@@ -36,3 +36,6 @@ material value to understanding the decision.
 - [0010 – Search is a substring match, not a full-text query](./0010-search-is-a-substring-match-not-a-full-text-query.md)
 - [0011 – Filters only narrow, and only with AND](./0011-filters-only-narrow-and-only-with-and.md)
 - [0012 – Log content reaches an agent as data, never as prose](./0012-log-content-reaches-an-agent-as-data-never-as-prose.md)
+- [0013 – Host Recovery returns the installation to unclaimed](./0013-host-recovery-returns-the-installation-to-unclaimed.md)
+- [0014 – The claim is atomic and holds nothing](./0014-the-claim-is-atomic-and-holds-nothing.md)
+- [0015 – The operator has no username and no email](./0015-the-operator-has-no-username-and-no-email.md)
