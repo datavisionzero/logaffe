@@ -232,14 +232,23 @@ proxy, and reconnect problems on a publicly exposed deployment.
 
 ## Technical direction
 
+Why the non-obvious ones were chosen over their alternatives is recorded as ADRs
+in [`docs/adr/`](./docs/adr/).
+
 - **Backend:** .NET 10
 - **Frontend:** React, as a single-page application
 - **Storage:** PostgreSQL, tuned for high log-row counts through appropriate
   indexing and schema design — sized for a moderate, bounded data set rather
   than unbounded growth
+- **Data access:** EF Core owns the schema and the self-applying migrations, and
+  serves everything except the log entries; the log path writes through Npgsql's
+  binary `COPY` and reads through hand-written SQL with Dapper
 - **Ingestion:** HTTP endpoint taking JSON batches, authenticated with
   per-project write-only tokens; Serilog sink and `ILoggerProvider` packages for
   .NET on top
+- **logaffe's own logs:** Serilog to rolling files on the mounted host volume.
+  logaffe does not log into itself — the failures worth diagnosing are the ones
+  in which it could not record anything
 - **Agent interface:** MCP, exposed publicly and authenticated
 - **Live updates:** polling on the order of five seconds, no push streaming
 - **Deployment:** containerized, runnable with Docker Compose as the standard
