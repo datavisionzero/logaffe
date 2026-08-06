@@ -1,0 +1,60 @@
+# PROTOTYPE — throwaway Postgres for the storage benchmark. Not a deployment
+# artifact; the real Compose file is a separate concern.
+name: logaffe-storage-prototype
+
+services:
+  db:
+    image: postgres:18
+    container_name: logaffe-proto-db
+    environment:
+      POSTGRES_PASSWORD: prototype
+      POSTGRES_DB: logaffe_prototype
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    ports:
+      - "55432:5432"
+    volumes:
+      # Mounting the parent directory keeps this working across the postgres:18
+      # PGDATA relocation.
+      - PROTOTYPE_wipe_me:/var/lib/postgresql
+    # Sized for the small public cloud host VISION.md targets, not for a laptop.
+    mem_limit: 4g
+    cpus: 2
+    shm_size: 512mb
+    command:
+      - postgres
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - effective_cache_size=3GB
+      - -c
+      - work_mem=32MB
+      - -c
+      - maintenance_work_mem=384MB
+      - -c
+      - max_wal_size=8GB
+      - -c
+      - min_wal_size=1GB
+      - -c
+      - checkpoint_timeout=15min
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - random_page_cost=1.1
+      - -c
+      - effective_io_concurrency=200
+      - -c
+      - max_parallel_workers_per_gather=1
+      - -c
+      - track_io_timing=on
+      - -c
+      - autovacuum_naptime=10s
+      - -c
+      - log_autovacuum_min_duration=0
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d logaffe_prototype"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  PROTOTYPE_wipe_me:
