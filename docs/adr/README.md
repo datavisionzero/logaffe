@@ -48,3 +48,4 @@ material value to understanding the decision.
 - [0022 – A token is recoverable, and encrypted rather than hashed](./0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)
 - [0023 – Retention deletes rows rather than dropping partitions](./0023-retention-deletes-rows-rather-than-dropping-partitions.md)
 - [0024 – A backup is one artifact holding both halves](./0024-a-backup-is-one-artifact-holding-both-halves.md)
+- [0025 – A search text is at least three characters](./0025-a-search-text-is-at-least-three-characters.md)

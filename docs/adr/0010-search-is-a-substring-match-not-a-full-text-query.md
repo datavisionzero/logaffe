@@ -18,9 +18,11 @@ themselves. That is affordable only because volume is capped and retention is
 short, and it is another place where the product leans on being deliberately
 bounded.
 
-A search under three characters cannot use the index and falls back to a scan. It
-is allowed anyway rather than refused, because a minimum length is a rule the
-operator has to learn at the moment they are busy.
+A search under three characters cannot use the index and falls back to a scan.
+This was originally allowed rather than refused, on the grounds that a minimum
+length is a rule the operator has to learn at the moment they are busy;
+[ADR 0025](./0025-a-search-text-is-at-least-three-characters.md) reverses that
+after measuring what the scan costs.
 
 **Properties are searchable only through the rendered message.** A value that a
 placeholder collected is in the sentence and is found; a property attached by an

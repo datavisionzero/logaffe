@@ -166,7 +166,8 @@ _Avoid_: Query, condition, facet, clause, rule
 **Search Text**:
 The filter matched as a case-insensitive substring of an entry's rendered
 message, anywhere in it and including inside a word. It is the product's only
-free-text narrowing and it behaves like `grep` rather than like a search engine.
+free-text narrowing, it behaves like `grep` rather than like a search engine, and
+it is at least three characters long — a shorter one is refused rather than run.
 _Avoid_: Query, keyword, term, phrase, full-text search
 
 **Live Tail**:

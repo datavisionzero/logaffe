@@ -45,10 +45,13 @@ This is what makes the searches an operator actually types work:
 `NullReferenceException`. A word-based full-text index would tokenize the first
 three apart and would not find the fourth at all.
 
-Searches shorter than three characters are permitted and are slower, because a
-trigram index cannot serve them and the store has to be scanned. On a product
-with bounded volume and short retention that is a cost worth paying to avoid
-refusing an input.
+**A search text is at least three characters**, and a shorter one is refused
+rather than run. A trigram index matches in three-character pieces and cannot
+serve anything shorter, so a two-character search scans the whole project — which
+was measured at 75 seconds over ten million entries and is a way to occupy the
+installation with one request
+([ADR 0025](./adr/0025-a-search-text-is-at-least-three-characters.md)). The rule
+applies to the query surface, so the operator and the agent meet the same one.
 
 **Property values come along for free where the template used them.** Because the
 rendered message is stored (ADR 0005), an entry whose template read
