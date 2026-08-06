@@ -80,8 +80,9 @@ _Avoid_: Application, service, tenant, stream, bucket, source, workspace
 
 **Ingest Token**:
 The write-only secret that admits a delivery to one project. It permits writing
-and grants no read access of any kind, it is what identifies the project, and the
-operator can hold two at once while rotating.
+and grants no read access of any kind, it is what identifies the project, it
+records when it was last used, and a project holds one of them — or two while it
+is being rotated.
 _Avoid_: API key, password, credential, project id, access token
 
 **Sender**:
@@ -175,6 +176,7 @@ _Avoid_: Total, hits, results, statistics, metric
 
 **Retention Window**:
 The period a project keeps its entries, counted from receipt time, after which
-they are removed. Time is the only limit a project has — there is no size cap, no
-row quota, and no interaction between limits.
+they are removed. The operator sets it up to a ceiling no installation can raise,
+and time is the only limit a project has — there is no size cap, no row quota,
+and no interaction between limits.
 _Avoid_: Retention policy, TTL, expiry, archive, quota

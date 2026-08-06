@@ -207,6 +207,11 @@ quotas, no "drop oldest when full", and no interaction between different limits.
 Keeping this logic trivially simple is a deliberate choice — retention is a
 detail the operator should be able to reason about in one sentence.
 
+The period is the operator's to set **up to a ceiling the installation cannot
+raise**, so that "not a multi-year archive" stays a property of the product
+rather than a hope about how it is configured. See
+[`docs/projects.md`](./docs/projects.md).
+
 ### 4. Web UI
 
 A single-page web application is the human entry point: browsing, searching, and

@@ -41,3 +41,6 @@ material value to understanding the decision.
 - [0015 – The operator has no username and no email](./0015-the-operator-has-no-username-and-no-email.md)
 - [0016 – The second factor is TOTP](./0016-the-second-factor-is-totp.md)
 - [0017 – A wrong password never locks the account](./0017-a-wrong-password-never-locks-the-account.md)
+- [0018 – Projects and tokens are never reachable over MCP](./0018-projects-and-tokens-are-never-reachable-over-mcp.md)
+- [0019 – A project is deleted at once and its entries follow](./0019-a-project-is-deleted-at-once-and-its-entries-follow.md)
+- [0020 – Retention has a maximum](./0020-retention-has-a-maximum.md)
