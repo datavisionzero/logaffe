@@ -33,10 +33,12 @@ whole model: the token *is* the project as far as a sending application is
 concerned, and there is nothing to name, list or manage beyond it.
 
 The token is **write-only**, admitting delivery and granting no read access of
-any kind. It is shown **once**, when it is issued, and kept afterwards only as a
-hash — an operator who lost it rotates rather than looks it up. It carries a
-recognizable prefix, which costs nothing and means an accidental appearance in a
-repository or a log is something a scanner can find. That second case is not
+any kind. The operator can **read it back at any time** — it is stored encrypted
+rather than hashed, so mislaying it means looking it up rather than rotating and
+redeploying
+([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)).
+It carries a recognizable prefix, which costs nothing and means an accidental
+appearance in a repository or a log is something a scanner can find. That second case is not
 hypothetical: applications log the configuration they started with, and a token
 that ends up in a log entry ends up here.
 
@@ -109,8 +111,9 @@ end one, or mint a credential.
 
 - **No implicit project creation.** Settled in `VISION.md`.
 - **No per-sender tokens.** Covered above.
-- **No read token.** Tokens are write-only, and an agent or a person reading logs
-  signs in or authenticates to MCP instead.
+- **No ingest token that reads.** An ingest token writes to its project and does
+  nothing else. Reading is a person with a session or an agent with an agent
+  token ([MCP](./mcp.md)), and neither of those is issued per project.
 - **No undelete, and no archive.** A deleted project is gone, and the product has
   no notion of a project that is kept but inactive.
 - **No size or row quota on a project.** Time is the only limit.

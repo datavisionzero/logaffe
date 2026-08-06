@@ -181,7 +181,9 @@ equal footing with the web UI. Access is provided over **MCP**, publicly
 reachable and authenticated. Agents should be able to query and read project
 logs so that log analysis, troubleshooting, and summarization can be delegated
 rather than done by hand in a search box. The agent queries through the same
-surface as the web UI — see [`docs/querying.md`](./docs/querying.md).
+surface as the web UI — see [`docs/querying.md`](./docs/querying.md) for what it
+can ask and [`docs/mcp.md`](./docs/mcp.md) for how it connects and what it
+cannot.
 
 The agent acts on the operator's behalf and is, alongside the operator, the
 second first-class consumer of the system.

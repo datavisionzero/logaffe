@@ -85,6 +85,13 @@ records when it was last used, and a project holds one of them — or two while 
 is being rotated.
 _Avoid_: API key, password, credential, project id, access token
 
+**Agent Token**:
+The read-only secret an agent presents to MCP, issued and named by the operator,
+readable again at any time, recording when it was last used, and revocable on its
+own. Several exist at once, and it reads every project while granting no write of
+any kind.
+_Avoid_: API key, session, connected agent, read token, credential
+
 **Sender**:
 An application delivering log entries to a project. It is trusted because the
 operator runs it themselves, which says nothing about the content it delivers.

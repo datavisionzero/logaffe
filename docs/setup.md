@@ -88,9 +88,9 @@ it has the same answer: the host.
 
 ## After the claim
 
-What follows the claim is a **guide, not a stage**: it offers the first project,
-shows the ingest token once, and hands over a copy-paste snippet for a Serilog
-sink pointed at this installation. It can be skipped, it holds no state, and
+What follows the claim is a **guide, not a stage**: it offers the first project
+and hands over a copy-paste snippet for a Serilog sink pointed at this
+installation, with the ingest token already in it. It can be skipped, it holds no state, and
 nothing is half-configured if it is abandoned — the installation is fully claimed
 the moment the claim completed.
 

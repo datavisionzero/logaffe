@@ -44,3 +44,5 @@ material value to understanding the decision.
 - [0018 – Projects and tokens are never reachable over MCP](./0018-projects-and-tokens-are-never-reachable-over-mcp.md)
 - [0019 – A project is deleted at once and its entries follow](./0019-a-project-is-deleted-at-once-and-its-entries-follow.md)
 - [0020 – Retention has a maximum](./0020-retention-has-a-maximum.md)
+- [0021 – An agent token is a copied secret](./0021-an-agent-token-is-a-copied-secret.md)
+- [0022 – A token is recoverable, and encrypted rather than hashed](./0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)

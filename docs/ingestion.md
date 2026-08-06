@@ -152,9 +152,10 @@ why it wins over refusing the entry.
 ## Authentication
 
 The ingest token travels as `Authorization: Bearer <token>`. It is a
-high-entropy random value and is kept server-side as a **SHA-256 hash only** — a
-slow KDF would buy nothing against a secret with full entropy, and the operator
-sees a token once, at issue.
+high-entropy random value, stored **encrypted rather than hashed**, with the key
+on the host volume and never in the database — so the operator can read a token
+back whenever they need it, and a stolen database backup yields nothing usable
+([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)).
 
 **Rotation overlaps.** A project can hold two valid tokens at the same time, so
 the operator issues the new one, rolls the deployments over, and revokes the old
