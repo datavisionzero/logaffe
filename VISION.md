@@ -303,8 +303,11 @@ that backing up is *simple to do and clearly documented*:
 - Any state that does not live in the database — configuration, secrets — is
   kept on the host in a mounted volume, never inside the container image. A
   container can be thrown away and recreated without losing anything.
-- The documentation explains how to back up the PostgreSQL database, as a
-  procedure the operator can follow and automate.
+- **Both stores are needed, and a database alone is not a backup**: the key that
+  makes stored tokens readable lives on the volume. logaffe therefore provides a
+  command that writes both halves into one artifact, which the operator runs,
+  places and schedules themselves. See
+  [`docs/operations.md`](./docs/operations.md).
 
 **Not everything is equally worth saving.** Logs are expendable: they are
 short-lived by design, they are additive to the applications' own local logs,

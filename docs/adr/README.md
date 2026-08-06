@@ -46,3 +46,5 @@ material value to understanding the decision.
 - [0020 – Retention has a maximum](./0020-retention-has-a-maximum.md)
 - [0021 – An agent token is a copied secret](./0021-an-agent-token-is-a-copied-secret.md)
 - [0022 – A token is recoverable, and encrypted rather than hashed](./0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)
+- [0023 – Retention deletes rows rather than dropping partitions](./0023-retention-deletes-rows-rather-than-dropping-partitions.md)
+- [0024 – A backup is one artifact holding both halves](./0024-a-backup-is-one-artifact-holding-both-halves.md)
