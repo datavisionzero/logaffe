@@ -63,6 +63,14 @@ it, rotation is finished when the old token's last-used stops moving.
 The sequence is therefore: issue the second token, move the applications over,
 watch the old one go quiet, revoke it. Revocation takes effect immediately.
 
+The timestamp is kept to within **five minutes**, not to the second: a use writes
+it only when the stored value is absent or older than that, because writing it on
+every delivery is a database write per batch on the hottest path in the product,
+bought for a precision this reading does not need
+([ADR 0033](./adr/0033-the-last-use-of-a-token-is-written-coarsely.md)). The
+first use always writes, so a token that was issued and never deployed stays
+distinguishable from one that has gone quiet.
+
 A sender presenting a revoked or unknown token is answered `401`, and by
 `VISION.md`'s design it neither retries nor notices — it keeps writing its own
 local file, which is where its logs were before logaffe existed. A rotation done

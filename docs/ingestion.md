@@ -166,6 +166,13 @@ compared in constant time
 row and a secret that mismatches are made to cost the same, so the `401` above
 stays as silent about which it was as it is about everything else.
 
+**A delivery that is admitted records that the token was used**, and does so at
+most once every five minutes rather than on every batch — the operator watching a
+rotation finish reads this in hours, and an `UPDATE` in front of every `COPY`
+would be the price of a precision nobody asks for
+([ADR 0033](./adr/0033-the-last-use-of-a-token-is-written-coarsely.md)). A
+delivery that is refused records nothing.
+
 **Rotation overlaps.** A project can hold two valid tokens at the same time, so
 the operator issues the new one, rolls the deployments over, and revokes the old
 one afterwards. A rotation with a hard cutover would put a gap into delivery for

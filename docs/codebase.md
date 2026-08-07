@@ -54,14 +54,17 @@ in ADR 0030: **anything the documents already state as a rule.** A retention
 window that can be constructed above ninety days, or a search text that can be
 constructed with two characters, is a rule that escaped.
 
-**`Logaffe.Application` holds the use cases and the ports.** Ingesting a batch,
-searching, counting, fetching one entry, the project and token acts, the claim
-and the sign-in, the retention sweep, the backup and the recovery. Every one of
-them is reachable from more than one adapter or is a candidate to become so, and
-none of them knows what it is being called by. Beside them sit the ports —
-a writer and a reader for entries, stores for the small relational rows, the
-token cipher, the id source, the clock, the TOTP — which is the whole of what
-this layer asks the world for.
+**`Logaffe.Application` holds the use cases and the ports.** Authenticating a
+presented token, ingesting a batch, searching, counting, fetching one entry, the
+project and token acts, the claim and the sign-in, the retention sweep, the
+backup and the recovery. Every one of them is reachable from more than one
+adapter or is a candidate to become so, and none of them knows what it is being
+called by — the first is called by both public endpoints and is the plainest
+case. Beside them sit the ports — a writer and a reader for entries, stores for
+the small relational rows, the token cipher, the id source, the TOTP — which is
+the whole of what this layer asks the world for. The clock is not among them:
+`TimeProvider` is in the base class libraries, and a port over it would be an
+abstraction over an abstraction.
 
 **`Logaffe.Infrastructure` answers those ports.** EF Core declares every table
 and owns the self-applying migrations, including the entry table's, so that there

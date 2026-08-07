@@ -26,6 +26,7 @@ public static class InfrastructureServices
 
         services.AddScoped<IDatabaseProbe, DatabaseProbe>();
         services.AddScoped<ISealedSecrets, SealedSecrets>();
+        services.AddScoped<ITokens, Tokens>();
         services.AddScoped<SchemaMigrator>();
 
         // One key for the installation, read from the volume the first time a

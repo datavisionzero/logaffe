@@ -40,8 +40,15 @@ builder.Services.AddLogaffeInfrastructure(builder.Configuration);
 
 // The composition root is where the use cases are registered; the layers below
 // know nothing about the container they are resolved from.
+builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<CheckReadiness>();
 builder.Services.AddScoped<CheckTheKeyFits>();
+builder.Services.AddScoped<AuthenticateToken>();
+
+// One for the installation and sealed on first use: a token refused because its
+// identifier named no row is compared against this, so that the miss costs what
+// a mismatch costs (ADR 0031).
+builder.Services.AddSingleton<DummySecret>();
 
 // Order is start order: the schema first, because the check below reads tables a
 // migration may be about to create.

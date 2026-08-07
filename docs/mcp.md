@@ -42,7 +42,9 @@ client is a block the operator does not have to assemble.
 desktop agent should be able to retire one without disturbing the other. The
 name, the issue date and the last use are what make that list worth having: a
 token that has not been used in months is one to revoke, and the list is the only
-place that fact is visible.
+place that fact is visible. The last use is accurate to within five minutes and
+is not shown as though it were finer
+([ADR 0033](./adr/0033-the-last-use-of-a-token-is-written-coarsely.md)).
 
 **The two token kinds carry different prefixes**, and neither is accepted at the
 other's endpoint. Pasting an ingest token into an agent configuration is a
