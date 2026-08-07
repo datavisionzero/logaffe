@@ -35,6 +35,13 @@ public sealed class PostgresFixture : IAsyncLifetime
         return new NpgsqlConnectionStringBuilder(_container.GetConnectionString())
         {
             Database = name,
+
+            // Npgsql pools per connection string and a database of its own makes
+            // a connection string of its own, so a pooled run leaves one idle
+            // pool per test behind for five minutes and the run walks into
+            // `too many clients already` on the way through. Nothing here opens
+            // a connection often enough for a pool to be worth that.
+            Pooling = false,
         }.ConnectionString;
     }
 }

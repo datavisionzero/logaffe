@@ -14,12 +14,14 @@ namespace Logaffe.Application.Operations;
 /// projects are still receiving deliveries.
 /// </para>
 /// <para>
-/// <b>The tokens go with the row and the entries do not yet.</b> The cascade on
-/// the foreign key is what removes the tokens, so a sender holding one is
-/// answered <c>401</c> from its next delivery and, being fire-and-forget, keeps
-/// writing locally without noticing — the same experience as a rotation done
-/// carelessly. The entry table does not exist yet; when it does, the sweep hangs
-/// here, and until then there is nothing left behind.
+/// <b>The tokens go with the row and the entries are left behind.</b> The
+/// cascade on the foreign key is what removes the tokens, so a sender holding
+/// one is answered <c>401</c> from its next delivery and, being fire-and-forget,
+/// keeps writing locally without noticing — the same experience as a rotation
+/// done carelessly. The entries carry no such key, deliberately: a cascade would
+/// put millions of rows back inside this request. Nothing can reach them —
+/// every query runs inside a project and this one is gone — and the sweep that
+/// removes them hangs here once it exists.
 /// </para>
 /// <para>
 /// <b>The confirmation is not here.</b> Deleting is confirmed by typing the

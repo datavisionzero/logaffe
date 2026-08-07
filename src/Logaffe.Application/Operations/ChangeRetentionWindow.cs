@@ -17,9 +17,11 @@ namespace Logaffe.Application.Operations;
 /// <b>Lowering it removes entries, and this does not yet say how many.</b>
 /// <c>docs/projects.md</c> requires the operator be told what the new window
 /// puts outside it before it takes effect, because a settings field that
-/// silently destroys data is a bad settings field. That count is over the entry
-/// table, which does not exist yet; the warning is a screen in front of this act
-/// rather than a change to it, and it arrives with the entries.
+/// silently destroys data is a bad settings field. That count is one query on
+/// the receipt-time index, asked for a window that has not been applied, and
+/// the table it reads is now there. It is not asked here: the warning is a
+/// screen in front of this act rather than a change to it, so that this stays a
+/// write with no reading behaviour in it.
 /// </para>
 /// <para>
 /// Nothing is swept here. The window is what the sweep reads, so lowering it

@@ -1,3 +1,4 @@
+using Logaffe.Domain.Entries;
 using Logaffe.Domain.Operators;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
@@ -10,9 +11,12 @@ namespace Logaffe.Infrastructure.Persistence;
 /// </summary>
 /// <remarks>
 /// EF Core owns every table and the migrations that apply themselves on
-/// startup — including the log entry table's, once its shape is settled — and it
-/// serves everything except the log entries themselves, which are written with
-/// Npgsql's binary <c>COPY</c> and read with hand-written SQL (ADR 0003).
+/// startup — including the log entry table's — and it serves everything except
+/// the log entries themselves, which are written with Npgsql's binary
+/// <c>COPY</c> and read with hand-written SQL (ADR 0003). That is why
+/// <see cref="LogEntry"/> is configured and has no set below: it is declared
+/// here and served nowhere, and a <c>DbSet</c> over it would be an invitation
+/// to the idiom that ADR keeps off this path.
 /// </remarks>
 public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options) : DbContext(options)
 {
@@ -40,6 +44,14 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
     /// </summary>
     public DbSet<ClaimWindow> ClaimWindows => Set<ClaimWindow>();
 
-    protected override void OnModelCreating(ModelBuilder modelBuilder) =>
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // The two the trigram index over the rendered message needs, declared
+        // where the migration can create them: pg_trgm for the operator class,
+        // btree_gin so the same GIN index can lead with the project.
+        modelBuilder.HasPostgresExtension("btree_gin");
+        modelBuilder.HasPostgresExtension("pg_trgm");
+
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LogaffeDbContext).Assembly);
+    }
 }

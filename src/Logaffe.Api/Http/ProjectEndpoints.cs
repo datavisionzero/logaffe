@@ -174,7 +174,8 @@ public static class ProjectEndpoints
 
                 // Lowering it puts entries outside the window and the sweep
                 // removes them. What the operator is told first — how many —
-                // is a count over the entry table, which does not exist yet.
+                // is a read of its own in front of this one, and it is not
+                // here yet.
                 return await change.ExecuteAsync(id, retention, cancellationToken)
                     ? Results.NoContent()
                     : Results.NotFound();
