@@ -42,6 +42,14 @@ appearance in a repository or a log is something a scanner can find. That second
 hypothetical: applications log the configuration they started with, and a token
 that ends up in a log entry ends up here.
 
+Between the prefix and the secret sits a **non-secret identifier naming the row
+that holds the token**, so that a delivery is authenticated by one indexed lookup
+and one comparison rather than by trying the installation's tokens in turn
+([ADR 0031](./adr/0031-a-token-names-its-own-row.md)). It is the price of storing
+a token encrypted instead of hashed: a randomized ciphertext cannot be looked up
+by the value presented. The identifier admits nothing on its own — the secret is
+the part after it.
+
 ### Rotation, and knowing when it is done
 
 Every token records **when it was last used**. Without that, rotation is

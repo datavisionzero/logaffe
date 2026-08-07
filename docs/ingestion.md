@@ -151,11 +151,20 @@ why it wins over refusing the entry.
 
 ## Authentication
 
-The ingest token travels as `Authorization: Bearer <token>`. It is a
+The ingest token travels as `Authorization: Bearer <token>`. Its secret part is a
 high-entropy random value, stored **encrypted rather than hashed**, with the key
 on the host volume and never in the database — so the operator can read a token
 back whenever they need it, and a stolen database backup yields nothing usable
 ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)).
+
+A presented token is not searched for by its value, because an encrypted one
+cannot be. It is `<prefix>_<identifier>_<secret>`: the prefix says which of the
+two token kinds it is and is refused at the wrong endpoint before anything else
+happens, the identifier names the row, and the secret is decrypted once and
+compared in constant time
+([ADR 0031](./adr/0031-a-token-names-its-own-row.md)). An identifier matching no
+row and a secret that mismatches are made to cost the same, so the `401` above
+stays as silent about which it was as it is about everything else.
 
 **Rotation overlaps.** A project can hold two valid tokens at the same time, so
 the operator issues the new one, rolls the deployments over, and revokes the old

@@ -47,7 +47,9 @@ place that fact is visible.
 **The two token kinds carry different prefixes**, and neither is accepted at the
 other's endpoint. Pasting an ingest token into an agent configuration is a
 mistake that will happen, and it should fail immediately and legibly rather than
-send someone looking in the wrong place.
+send someone looking in the wrong place. The prefix is read before the token is
+looked up at all, so the wrong kind is turned away without the database being
+asked anything ([ADR 0031](./adr/0031-a-token-names-its-own-row.md)).
 
 An agent token is ended by revoking it, or by
 [Host Recovery](./setup.md#host-recovery) removing the account it belongs to. A

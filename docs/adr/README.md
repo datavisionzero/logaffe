@@ -54,3 +54,4 @@ material value to understanding the decision.
 - [0028 – The exception is its own filter](./0028-the-exception-is-its-own-filter.md)
 - [0029 – Filter values come from the entries, not from a list](./0029-filter-values-come-from-the-entries-not-from-a-list.md)
 - [0030 – The solution is four layers, not one project](./0030-the-solution-is-four-layers-not-one-project.md)
+- [0031 – A token names its own row](./0031-a-token-names-its-own-row.md)

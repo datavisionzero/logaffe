@@ -92,6 +92,14 @@ own. Several exist at once, and it reads every project while granting no write o
 any kind.
 _Avoid_: API key, session, connected agent, read token, credential
 
+**Token Identifier**:
+The non-secret part a token carries between its prefix and its secret, naming the
+row that holds it so that a presented token is found by one lookup rather than by
+trying every token in turn. It admits nothing on its own, it is not what tells
+the two token kinds apart — the prefix is — and it is not the name an agent
+token carries for the operator's list.
+_Avoid_: Key id, token name, project id, prefix, handle, public key
+
 **Sender**:
 An application delivering log entries to a project. It is trusted because the
 operator runs it themselves, which says nothing about the content it delivers.
