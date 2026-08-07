@@ -55,6 +55,22 @@ builder.Services.AddScoped<SignIn>();
 builder.Services.AddScoped<AuthenticateSession>();
 builder.Services.AddScoped<SignOut>();
 
+// The list, and the ways a session ends that are not a sign-out. With no email
+// anywhere in the product the list is the only way the operator can ever notice
+// a session that is not theirs (ADR 0015), which makes these a security surface
+// rather than a convenience.
+builder.Services.AddScoped<ListSessions>();
+builder.Services.AddScoped<RevokeSession>();
+builder.Services.AddScoped<EndEveryOtherSession>();
+builder.Services.AddScoped<RemoveExpiredSessions>();
+
+// The operator's own credentials. Each of these requires the password again,
+// and two of them end every other session.
+builder.Services.AddScoped<ChangePassword>();
+builder.Services.AddScoped<IssueBackupCodes>();
+builder.Services.AddScoped<BeginReEnrolment>();
+builder.Services.AddScoped<ReEnrolTheSecondFactor>();
+
 // The unit everything else hangs off. Nothing creates one implicitly — a token
 // that names nothing admits nothing — so these four acts are the only way a
 // project comes about, changes or ends.
@@ -90,6 +106,10 @@ builder.Services.AddHostedService<KeyFitsService>();
 // window it will never serve.
 builder.Services.AddHostedService<ClaimWindowService>();
 
+// After the migrations, whose service has finished before this one starts: the
+// first pass reads a table a migration may have been about to create.
+builder.Services.AddHostedService<ExpiredSessionService>();
+
 builder.Services.AddLogaffeRequestSource(builder.Configuration);
 builder.Services.AddLogaffeSessionAuthentication();
 builder.Services.AddLogaffeRateLimits();
@@ -112,6 +132,7 @@ app.MapOpenApi();
 app.MapHealth();
 app.MapClaim();
 app.MapSessions();
+app.MapOperator();
 app.MapProjects();
 app.MapTokens();
 

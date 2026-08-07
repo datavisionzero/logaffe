@@ -249,6 +249,10 @@ confirmed by typing the project's name ([Projects and tokens](./projects.md)).
 Per installation: the sessions with where and when each was last used and the
 means to end them ([Signing in](./sign-in.md)), re-enrolment of the second
 factor, a fresh set of backup codes, and the **agent tokens** ([MCP](./mcp.md)).
+The session list marks the browser being read from, which the server says and
+nothing else could — without it "end all others" is a guess. It shows the last
+use to the minute rather than to the second, because that is how accurately it is
+recorded ([ADR 0033](./adr/0033-the-last-use-of-a-token-is-written-coarsely.md)).
 The agent tokens live here rather than inside a project because an agent token
 reads every project — putting it under one of them would say something untrue
 about what it can do.

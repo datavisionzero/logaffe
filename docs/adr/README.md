@@ -59,3 +59,4 @@ material value to understanding the decision.
 - [0033 – The last use of a token is written coarsely](./0033-the-last-use-of-a-token-is-written-coarsely.md)
 - [0034 – The claim window is a row in the database](./0034-the-claim-window-is-a-row-in-the-database.md)
 - [0035 – The claim hands its enrolment back sealed](./0035-the-claim-hands-its-enrolment-back-sealed.md)
+- [0036 – A re-enrolment carries its own sealed ticket](./0036-a-re-enrolment-carries-its-own-sealed-ticket.md)

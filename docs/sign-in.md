@@ -118,6 +118,37 @@ A session ends when it is signed out, when it is revoked from that list, when th
 password changes, when the second factor is re-enrolled, when it goes 30 days
 untouched, or when Host Recovery removes the account it belonged to.
 
+**The list says which row is this browser**, because nothing else can: it carries
+no secret and the cookie carries nothing but one, so there is nothing the
+interface could compare. Without it "end all others" is a guess and ending a row
+signs the operator out of the screen they are on. Ending the current one from the
+list is allowed and is a sign-out by another name.
+
+**A session that has expired is not on the list** — it admits nothing, so putting
+it there would be asking the operator to recognize a browser they cannot be
+signed in from. The row itself is removed by a **daily sweep**
+([Operations](./operations.md#housekeeping-that-runs-on-a-timer)), which is
+housekeeping rather than a security measure: expiry is what refuses the session,
+and the sweep is what keeps the list from filling with rows that cannot act.
+
+## Replacing the second factor, and reprinting the sheet
+
+**Re-enrolment is the claim's enrolment for an account that already exists.** The
+installation draws a new secret and a fresh sheet of backup codes, shows both,
+and hands back a sealed ticket carrying them
+([ADR 0036](./adr/0036-a-re-enrolment-carries-its-own-sealed-ticket.md)); nothing
+is stored until the confirming request, so the authenticator in the operator's
+pocket keeps working until the moment it is replaced. That request asks for the
+password, the second factor in use — the current code, or a backup code, which is
+the case of the phone that is already gone — and a code from the app just
+enrolled, which is what proves the enrolment took. It ends every other session,
+and the fresh sheet replaces the previous one wholesale.
+
+**A fresh sheet can also be asked for on its own**, which replaces the previous
+set entirely, spent codes and unspent alike. It requires the password, because
+ten of these are ten ways past the second factor. It ends no session: replacing
+the way back in says nothing about the browsers already signed in.
+
 ## A wrong password never locks the account
 
 Failed sign-ins are throttled **by where they come from**, with the delay growing

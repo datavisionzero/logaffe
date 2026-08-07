@@ -37,8 +37,47 @@ public sealed record SignInRequest(
 public sealed record SignInResponse(int? BackupCodesRemaining);
 
 /// <summary>
-/// The two ends of a session.
+/// One of the operator's signed-in browsers, as they see it in the list.
 /// </summary>
+/// <remarks>
+/// It carries no secret and nothing that could be presented: a session is
+/// admitted by the value in the cookie, and the row holds only a fast hash of it
+/// (ADR 0032).
+/// </remarks>
+/// <param name="LastSeenFrom">
+/// The address it last acted from, or <c>unknown</c> where there was none to
+/// read. With no email anywhere in the product (ADR 0015) this column is the
+/// only way the operator can ever notice a session that is not theirs.
+/// </param>
+/// <param name="LastUsedAt">
+/// When it last acted, accurate to within five minutes (ADR 0033) and not to be
+/// shown as though it were finer.
+/// </param>
+/// <param name="IsCurrent">
+/// Whether this is the browser asking. The server says so because nothing else
+/// can: the list carries no secret and the cookie carries nothing but one, so
+/// there is nothing the interface could compare — and without it "end all
+/// others" is a guess and revoking a row signs the operator out of the screen
+/// they are on.
+/// </param>
+public sealed record ListedSessionResponse(
+    Guid Id,
+    string LastSeenFrom,
+    DateTimeOffset StartedAt,
+    DateTimeOffset LastUsedAt,
+    DateTimeOffset ExpiresAt,
+    bool IsCurrent);
+
+/// <summary>
+/// A session, its list, and the ways it ends that are not a sign-out.
+/// </summary>
+/// <remarks>
+/// <b>Ending a session is removing the row, never marking it.</b> The list is
+/// what the operator acts on, and one they ended has to be gone from it rather
+/// than greyed out (<c>docs/sign-in.md</c>). It takes effect on the next
+/// request, because the session authentication reads the row every time and
+/// holds no cache in front of it.
+/// </remarks>
 public static class SessionEndpoints
 {
     public static IEndpointRouteBuilder MapSessions(this IEndpointRouteBuilder endpoints)
@@ -93,6 +132,77 @@ public static class SessionEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status401Unauthorized);
 
+        endpoints.MapTheList();
+
         return endpoints;
+    }
+
+    private static void MapTheList(this IEndpointRouteBuilder endpoints)
+    {
+        var operatorSurface = endpoints
+            .MapGroup(string.Empty)
+            .RequireAuthorization()
+            .RequireRateLimiting(PublicRateLimits.Operator);
+
+        operatorSurface.MapGet("/sessions", async (
+                ListSessions list, HttpContext context, CancellationToken cancellationToken) =>
+            {
+                var current = context.OperatorSession();
+                var held = await list.ExecuteAsync(cancellationToken);
+
+                return Results.Ok(held.Select(session => new ListedSessionResponse(
+                    session.Id,
+                    session.LastSeenFrom,
+                    session.StartedAt,
+                    session.LastUsedAt,
+                    session.ExpiresAt,
+                    session.Id == current.Id)));
+            })
+            .WithName("ListSessions")
+            .WithSummary("The operator's signed-in browsers.")
+            .Produces<IEnumerable<ListedSessionResponse>>();
+
+        operatorSurface.MapDelete("/sessions/others", async (
+                EndEveryOtherSession endOthers,
+                HttpContext context,
+                CancellationToken cancellationToken) =>
+            {
+                // Every other, never every one: the browser doing this stays
+                // signed in, or securing the installation would sign the
+                // operator out of the screen they secured it from.
+                await endOthers.ExecuteAsync(context.OperatorSession(), cancellationToken);
+
+                return Results.NoContent();
+            })
+            .WithName("EndEveryOtherSession")
+            .WithSummary("Ends every session but this one.")
+            .Produces(StatusCodes.Status204NoContent);
+
+        operatorSurface.MapDelete("/sessions/{id:guid}", async (
+                Guid id,
+                RevokeSession revoke,
+                HttpContext context,
+                CancellationToken cancellationToken) =>
+            {
+                if (!await revoke.ExecuteAsync(id, cancellationToken))
+                {
+                    // Already gone: a second click, another tab, or a sweep.
+                    return Results.NotFound();
+                }
+
+                // Ending your own from the list is a sign-out by another name,
+                // and the cookie has to go with it — otherwise the browser keeps
+                // presenting a secret whose row is not there any more.
+                if (id == context.OperatorSession().Id)
+                {
+                    SessionCookie.Clear(context.Response);
+                }
+
+                return Results.NoContent();
+            })
+            .WithName("RevokeSession")
+            .WithSummary("Ends one session, immediately.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
     }
 }

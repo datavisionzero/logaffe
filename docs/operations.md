@@ -91,6 +91,26 @@ Three things make that safe to promise:
   log, which is where every other failure of this kind is already written
   ([ADR 0002](./adr/0002-logaffe-logs-to-files-not-into-itself.md)).
 
+## Housekeeping that runs on a timer
+
+Some of what the product does is a job on an interval rather than an answer to a
+request. **Sessions that went thirty days untouched are removed once a day.**
+They admit nothing from the moment they expire — that is what refuses them, and
+it needs no job — so this is housekeeping: it keeps the table, and the list the
+operator reads for a browser that is not theirs, from filling with rows that
+cannot act ([Signing in](./sign-in.md#sessions)).
+
+**A pass that fails does not end the job or the installation.** It is logged as
+an error into the file log ([ADR 0002](./adr/0002-logaffe-logs-to-files-not-into-itself.md))
+and the next interval is the retry; what a failed pass leaves behind is rows that
+live a day longer than they had to.
+
+Each job runs on its own timer rather than all of them on one. The two this
+product has are not the same shape — a session sweep is one statement a day, and
+retention below is bounded portions paced against the largest table in the
+database — and one timer for both would make the interval of one the interval of
+the other.
+
 ## Retention as a running job
 
 Retention deletes rows. A background job removes entries whose **receipt time**

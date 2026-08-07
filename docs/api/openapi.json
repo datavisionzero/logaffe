@@ -172,6 +172,205 @@
         }
       }
     },
+    "/sessions": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "The operator's signed-in browsers.",
+        "operationId": "ListSessions",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ListedSessionResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sessions/others": {
+      "delete": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Ends every session but this one.",
+        "operationId": "EndEveryOtherSession",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/sessions/{id}": {
+      "delete": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Ends one session, immediately.",
+        "operationId": "RevokeSession",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/password": {
+      "put": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Takes a new password, and ends every other session.",
+        "operationId": "ChangePassword",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/backup-codes": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Replaces the backup codes with a fresh set, shown once.",
+        "operationId": "IssueBackupCodes",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueBackupCodesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackupCodesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/second-factor/enrolment": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Draws a second factor and a sheet of backup codes, and stores neither.",
+        "operationId": "BeginReEnrolment",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolmentResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/second-factor": {
+      "put": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Replaces the second factor, issues fresh backup codes, and ends every other session.",
+        "operationId": "ReEnrolSecondFactor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReEnrolSecondFactorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects": {
       "post": {
         "tags": [
@@ -708,6 +907,41 @@
   },
   "components": {
     "schemas": {
+      "BackupCodesResponse": {
+        "required": [
+          "codes"
+        ],
+        "type": "object",
+        "properties": {
+          "codes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ChangePasswordRequest": {
+        "required": [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "newPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ClaimRequest": {
         "required": [
           "password",
@@ -876,6 +1110,20 @@
           }
         }
       },
+      "IssueBackupCodesRequest": {
+        "required": [
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "IssuedAgentTokenResponse": {
         "required": [
           "id",
@@ -1027,6 +1275,41 @@
           }
         }
       },
+      "ListedSessionResponse": {
+        "required": [
+          "id",
+          "lastSeenFrom",
+          "startedAt",
+          "lastUsedAt",
+          "expiresAt",
+          "isCurrent"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "lastSeenFrom": {
+            "type": "string"
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastUsedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "isCurrent": {
+            "type": "boolean"
+          }
+        }
+      },
       "ProjectResponse": {
         "required": [
           "id",
@@ -1054,6 +1337,48 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ReEnrolSecondFactorRequest": {
+        "required": [
+          "password",
+          "secondFactorCode",
+          "backupCode",
+          "newSecondFactorCode",
+          "ticket"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secondFactorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "backupCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "newSecondFactorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ticket": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
