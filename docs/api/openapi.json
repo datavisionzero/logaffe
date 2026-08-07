@@ -23,6 +23,101 @@
         }
       }
     },
+    "/claim": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Whether this installation has an operator, and whether it can be claimed.",
+        "operationId": "CheckTheClaim",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimStateResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Gives this installation an operator, and signs them in.",
+        "operationId": "Claim",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/claim/enrolment": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Draws a second factor and a sheet of backup codes, and stores neither.",
+        "operationId": "BeginEnrolment",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnrolmentResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
     "/sign-in": {
       "post": {
         "tags": [
@@ -383,6 +478,90 @@
   },
   "components": {
     "schemas": {
+      "ClaimRequest": {
+        "required": [
+          "password",
+          "ticket",
+          "secondFactorCode",
+          "backupCode"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ticket": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secondFactorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "backupCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ClaimStateResponse": {
+        "required": [
+          "isClaimed",
+          "windowIsOpen",
+          "closesAt"
+        ],
+        "type": "object",
+        "properties": {
+          "isClaimed": {
+            "type": "boolean"
+          },
+          "windowIsOpen": {
+            "type": "boolean"
+          },
+          "closesAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "EnrolmentResponse": {
+        "required": [
+          "secondFactorSecret",
+          "enrolmentUri",
+          "backupCodes",
+          "ticket"
+        ],
+        "type": "object",
+        "properties": {
+          "secondFactorSecret": {
+            "type": "string"
+          },
+          "enrolmentUri": {
+            "type": "string"
+          },
+          "backupCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ticket": {
+            "type": "string"
+          }
+        }
+      },
       "HttpValidationProblemDetails": {
         "type": "object",
         "properties": {

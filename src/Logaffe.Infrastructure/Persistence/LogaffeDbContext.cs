@@ -33,6 +33,13 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
 
     public DbSet<BackupCode> BackupCodes => Set<BackupCode>();
 
+    /// <summary>
+    /// The one row an installation holds about itself: when it last became
+    /// claimable. It is written by the start that created the schema and by
+    /// Host Recovery, and by nothing else (ADR 0034).
+    /// </summary>
+    public DbSet<ClaimWindow> ClaimWindows => Set<ClaimWindow>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LogaffeDbContext).Assembly);
 }

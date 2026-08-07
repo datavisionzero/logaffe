@@ -18,6 +18,22 @@ public static class PublicRateLimits
     public const string SignIn = "sign-in";
 
     /// <summary>
+    /// The throttle in front of the two acts that take an installation. It does
+    /// not stop somebody who wins the race honestly — nothing can, and
+    /// <c>VISION.md</c> accepts that — it stops the automated attempt at the
+    /// password afterwards, and it keeps drawing enrolments from being free.
+    /// </summary>
+    public const string Claim = "claim";
+
+    /// <summary>
+    /// The throttle on the one question an unclaimed installation answers for
+    /// nothing: whether it has an operator. It is a single row read and it says
+    /// what the screen says, so it is limited to keep it from being a free
+    /// heartbeat rather than because the answer is worth anything.
+    /// </summary>
+    public const string ClaimState = "claim-state";
+
+    /// <summary>
     /// The throttle on everything behind the operator's session. It is generous,
     /// because the only repeating request the interface makes is the tail of the
     /// view being watched (<c>docs/ui.md</c>) — it is here so that a stolen
@@ -33,6 +49,13 @@ public static class PublicRateLimits
 
     /// <summary>How many requests a signed-in browser gets per minute.</summary>
     private const int OperatorPerMinute = 300;
+
+    /// <summary>
+    /// How often the claim screen may ask whether the installation is still
+    /// unclaimed. It is generous because it is a page load rather than a poll —
+    /// the screen is given a deadline and counts down to it in the browser.
+    /// </summary>
+    private const int ClaimStatePerMinute = 60;
 
     /// <summary>
     /// What the bucket refills at once the burst is gone, which is what turns
@@ -68,6 +91,32 @@ public static class PublicRateLimits
                     QueueLimit = Waiting,
                     QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                     AutoReplenishment = true,
+                }));
+
+            // The same bucket the sign-in gets, and a separate one rather than
+            // the same policy: the two never compete — an unclaimed
+            // installation has nobody to sign in and a claimed one cannot be
+            // claimed — so sharing a partition would only mean one surface
+            // spending the other's budget on the day they overlap.
+            limiter.AddPolicy(Claim, context => RateLimitPartition.GetTokenBucketLimiter(
+                context.SeenFrom() ?? "unknown",
+                _ => new TokenBucketRateLimiterOptions
+                {
+                    TokenLimit = Burst,
+                    TokensPerPeriod = 1,
+                    ReplenishmentPeriod = Refill,
+                    QueueLimit = Waiting,
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    AutoReplenishment = true,
+                }));
+
+            limiter.AddPolicy(ClaimState, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.SeenFrom() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = ClaimStatePerMinute,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
                 }));
 
             // Partitioned by source here as well rather than by session, so that

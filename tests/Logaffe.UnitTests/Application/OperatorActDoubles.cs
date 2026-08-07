@@ -90,6 +90,53 @@ internal sealed class InMemoryOperators : IOperators
 }
 
 /// <summary>
+/// The one row an installation holds about itself, in memory. It behaves as the
+/// real store does in the one way the acts turn on: the first run is written
+/// once, and every start after it reads what is there.
+/// </summary>
+internal sealed class InMemoryInstallation : IInstallation
+{
+    private ClaimWindow? _window;
+
+    /// <summary>How many statements the store was asked to write.</summary>
+    public int Writes { get; private set; }
+
+    public Task<ClaimWindow?> ReadClaimWindowAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(_window);
+
+    public Task<ClaimWindow> OpenClaimWindowAsync(
+        DateTimeOffset firstRunAt, CancellationToken cancellationToken)
+    {
+        if (_window is not null)
+        {
+            return Task.FromResult(_window);
+        }
+
+        _window = ClaimWindow.OpenedOnFirstRun(firstRunAt);
+        Writes++;
+
+        return Task.FromResult(_window);
+    }
+
+    public Task<ClaimWindow> ArmClaimWindowAsync(
+        DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        if (_window is null)
+        {
+            _window = ClaimWindow.OpenedOnFirstRun(at);
+        }
+        else
+        {
+            _window.ArmAt(at);
+        }
+
+        Writes++;
+
+        return Task.FromResult(_window);
+    }
+}
+
+/// <summary>
 /// The operator's signed-in browsers, in memory. The real store reads the table
 /// whole because authenticating one compares against all of them, and this does
 /// the same.

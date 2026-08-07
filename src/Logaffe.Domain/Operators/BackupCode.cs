@@ -76,16 +76,50 @@ public sealed class BackupCode
     public static MintedBackupCodes MintSet(Guid operatorId, DateTimeOffset issuedAt)
     {
         var shown = new List<BackupCodeText>(SetSize);
-        var stored = new List<BackupCode>(SetSize);
-
         for (var index = 0; index < SetSize; index++)
         {
-            var code = BackupCodeText.Mint();
-            shown.Add(code);
-            stored.Add(new BackupCode(Guid.CreateVersion7(), operatorId, code.Hash, issuedAt));
+            shown.Add(BackupCodeText.Mint());
         }
 
-        return new MintedBackupCodes(shown, stored);
+        return new MintedBackupCodes(
+            shown, SetOf(operatorId, [.. shown.Select(code => code.Hash)], issuedAt));
+    }
+
+    /// <summary>
+    /// The rows for a set that was drawn before there was an operator to hang
+    /// them on, which is the claim: the sheet is shown and one code confirmed
+    /// while the installation is still unclaimed, and what carries the set
+    /// across those two requests is its hashes (ADR 0035).
+    /// </summary>
+    /// <exception cref="ArgumentException">
+    /// Not a set this product draws — the wrong number of codes, something that
+    /// is not one of these hashes, or one hash twice. It is refused here because
+    /// the values have come back through a browser, and a set that is short by a
+    /// duplicate is one the operator would discover was short at the worst
+    /// possible moment.
+    /// </exception>
+    public static IReadOnlyList<BackupCode> SetOf(
+        Guid operatorId, IReadOnlyList<byte[]> hashes, DateTimeOffset issuedAt)
+    {
+        if (hashes.Count != SetSize)
+        {
+            throw new ArgumentException(
+                $"A set of backup codes is {SetSize} of them.", nameof(hashes));
+        }
+
+        if (hashes.Any(hash => hash.Length != HashLength))
+        {
+            throw new ArgumentException(
+                $"A backup code is stored as {HashLength} bytes.", nameof(hashes));
+        }
+
+        if (hashes.Select(Convert.ToHexString).Distinct().Count() != SetSize)
+        {
+            throw new ArgumentException("A set holds no code twice.", nameof(hashes));
+        }
+
+        return [.. hashes.Select(hash =>
+            new BackupCode(Guid.CreateVersion7(), operatorId, hash, issuedAt))];
     }
 
     /// <summary>

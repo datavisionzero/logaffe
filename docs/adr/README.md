@@ -57,3 +57,5 @@ material value to understanding the decision.
 - [0031 – A token names its own row](./0031-a-token-names-its-own-row.md)
 - [0032 – Each operator secret is stored for what it is](./0032-each-operator-secret-is-stored-for-what-it-is.md)
 - [0033 – The last use of a token is written coarsely](./0033-the-last-use-of-a-token-is-written-coarsely.md)
+- [0034 – The claim window is a row in the database](./0034-the-claim-window-is-a-row-in-the-database.md)
+- [0035 – The claim hands its enrolment back sealed](./0035-the-claim-hands-its-enrolment-back-sealed.md)

@@ -44,7 +44,15 @@ against a scanner's patience.
 When the window lapses, claiming over the network is over. The installation says
 so plainly and names the host command that re-opens it, because an operator
 meeting this screen is already having a bad minute and does not need to search
-for the answer.
+for the answer. The container log says the same thing on every start, since an
+operator bringing an installation up for the first time is watching it.
+
+The instant the window hangs off lives **in the database**, which makes the first
+run the run that created the schema
+([ADR 0034](./adr/0034-the-claim-window-is-a-row-in-the-database.md)). One
+consequence is worth knowing in advance: an installation restored from a backup
+taken *before* it was claimed comes back with that old window, which has long
+since lapsed, and is opened again with the host command below.
 
 ## The claim is one act
 
@@ -62,6 +70,14 @@ walk the flow, and whoever confirms their backup codes first has the
 installation, while the other's final step fails against an installation that is
 no longer unclaimed
 ([ADR 0014](./adr/0014-the-claim-is-atomic-and-holds-nothing.md)).
+
+Because nothing is stored before the last step, the secret and the codes have to
+survive between the screen that shows them and the request that completes the
+claim — and they survive **in the browser**, alongside a sealed copy the
+installation drew and only the installation can read
+([ADR 0035](./adr/0035-the-claim-hands-its-enrolment-back-sealed.md)). That is
+what keeps "the installation drew these at full entropy" a fact rather than a
+hope, without a half-claimed row anywhere.
 
 The second factor cannot be turned off later. `VISION.md` puts it in the guided
 setup precisely so it is not an optional extra, and a single god-mode account on
@@ -106,6 +122,11 @@ anything is reached on a Docker host:
 ```
 docker compose exec logaffe logaffe recover
 ```
+
+**It says what it does and waits to be told to do it.** Somebody reading the
+command name will expect the smaller thing — a password reset — so it prints
+what it removes and asks for the word `recover` before touching anything. A
+caller with no terminal passes `--yes`.
 
 It **returns the installation to unclaimed** and arms a fresh claim window
 ([ADR 0013](./adr/0013-host-recovery-returns-the-installation-to-unclaimed.md)).

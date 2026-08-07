@@ -9,7 +9,7 @@ using Serilog;
 // else is the server.
 if (Verbs.TryRead(args, out var verb))
 {
-    return await Verbs.RunAsync(verb);
+    return await Verbs.RunAsync(verb, args);
 }
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,13 +28,7 @@ var volumePath = builder.Configuration["Logaffe:VolumePath"]
 builder.Host.UseSerilog((context, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
     .WriteTo.Console()
-    .WriteTo.File(
-        Path.Combine(volumePath, "logs", "logaffe-.log"),
-        rollingInterval: RollingInterval.Day,
-        rollOnFileSizeLimit: true,
-        fileSizeLimitBytes: 32L * 1024 * 1024,
-        retainedFileCountLimit: 14,
-        shared: true));
+    .WriteTo.WriteToLogaffeFile(volumePath));
 
 builder.Services.AddLogaffeInfrastructure(builder.Configuration);
 
@@ -44,6 +38,15 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<CheckReadiness>();
 builder.Services.AddScoped<CheckTheKeyFits>();
 builder.Services.AddScoped<AuthenticateToken>();
+
+// The claim, which is the whole reachable surface of an installation nobody
+// owns. `Recover` is the other half of the same window and is registered by the
+// command line rather than here, because it is host-local and never reachable
+// over the network (ADR 0013).
+builder.Services.AddScoped<OpenTheClaimWindow>();
+builder.Services.AddScoped<CheckTheClaim>();
+builder.Services.AddScoped<BeginEnrolment>();
+builder.Services.AddScoped<ClaimTheInstallation>();
 
 // The operator's door. Authenticating a session is the counterpart of
 // authenticating a token — one credential a person carries, one a machine does —
@@ -73,6 +76,10 @@ builder.Services.AddSingleton<DummySecret>();
 builder.Services.AddHostedService<SchemaMigrationService>();
 builder.Services.AddHostedService<KeyFitsService>();
 
+// Last, so that an installation about to refuse to start does not first arm a
+// window it will never serve.
+builder.Services.AddHostedService<ClaimWindowService>();
+
 builder.Services.AddLogaffeRequestSource(builder.Configuration);
 builder.Services.AddLogaffeSessionAuthentication();
 builder.Services.AddLogaffeRateLimits();
@@ -93,6 +100,7 @@ app.UseAuthorization();
 
 app.MapOpenApi();
 app.MapHealth();
+app.MapClaim();
 app.MapSessions();
 app.MapTokens();
 

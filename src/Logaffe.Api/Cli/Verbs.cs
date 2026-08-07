@@ -29,10 +29,10 @@ public static class Verbs
         return verb is "backup" or "recover";
     }
 
-    public static Task<int> RunAsync(string verb) => verb switch
+    public static Task<int> RunAsync(string verb, string[] args) => verb switch
     {
         "backup" => BackupCommand.RunAsync(),
-        "recover" => RecoverCommand.RunAsync(),
+        "recover" => RecoverCommand.RunAsync(args),
         _ => Task.FromResult(NotImplemented),
     };
 }

@@ -1,17 +1,11 @@
-using System.Buffers.Binary;
 using System.Net;
 using System.Net.Http.Json;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
-using Logaffe.Domain.Operators;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
-using Logaffe.Infrastructure.Secrets;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Logaffe.IntegrationTests;
 
@@ -40,16 +34,11 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
 {
     private const string TheirPassword = "a passphrase they typed";
 
-    /// <inheritdoc cref="SignInActsTests"/>
-    private const string SecondFactorSecret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
-
-    private static readonly byte[] SecondFactorKey =
-        Encoding.UTF8.GetBytes("12345678901234567890");
-
     private readonly string _volume = Directory.CreateTempSubdirectory("logaffe-volume-").FullName;
 
     private string _connectionString = null!;
     private WebApplicationFactory<Program> _installation = null!;
+    private string _secondFactorSecret = null!;
 
     public async ValueTask InitializeAsync()
     {
@@ -237,7 +226,11 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
 
         using var response = await client.PostAsJsonAsync(
             "/sign-in",
-            new { password = TheirPassword, secondFactorCode = CodeNow() },
+            new
+            {
+                password = TheirPassword,
+                secondFactorCode = Authenticator.CodeFor(_secondFactorSecret),
+            },
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -249,25 +242,31 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
     }
 
     /// <summary>
-    /// Puts the installation in the state a completed claim leaves it in. The
-    /// claim itself is not written yet, so this is the store doing what it will
-    /// do.
+    /// Puts the installation in the state a completed claim leaves it in, by
+    /// claiming it — the flow <see cref="ClaimEndpointTests"/> covers, walked
+    /// here for its result rather than for itself.
     /// </summary>
     private async Task ClaimAsync()
     {
-        await using var context = ContextFor(_connectionString);
+        using var client = _installation.CreateClient();
 
-        var now = DateTimeOffset.UtcNow;
-        var theOperator = Operator.Claim(
-            new FrameworkPasswordHasher().Hash(Password.Create(TheirPassword)),
-            new AesGcmSecretCipher(new HostVolumeKey(_volume, NullLogger<HostVolumeKey>.Instance))
-                .Encrypt(SecondFactorSecret),
-            now);
+        var enrolment = await ReadAsync<Enrolment>(await client.PostAsync(
+            "/claim/enrolment", null, TestContext.Current.CancellationToken));
 
-        Assert.True(await new Operators(context).TryClaimAsync(
-            theOperator,
-            BackupCode.MintSet(theOperator.Id, now).Stored,
-            TestContext.Current.CancellationToken));
+        _secondFactorSecret = enrolment.SecondFactorSecret;
+
+        using var claimed = await client.PostAsJsonAsync(
+            "/claim",
+            new
+            {
+                password = TheirPassword,
+                ticket = enrolment.Ticket,
+                secondFactorCode = Authenticator.CodeFor(enrolment.SecondFactorSecret),
+                backupCode = enrolment.BackupCodes[0],
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, claimed.StatusCode);
     }
 
     private async Task<Guid> ProjectAsync(string name)
@@ -297,22 +296,11 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         }
     }
 
-    /// <inheritdoc cref="SignInActsTests"/>
-    private static string CodeNow()
-    {
-        Span<byte> counter = stackalloc byte[8];
-        BinaryPrimitives.WriteInt64BigEndian(
-            counter, DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 30);
-
-        var mac = HMACSHA1.HashData(SecondFactorKey, counter);
-        var offset = mac[^1] & 0x0F;
-        var truncated = BinaryPrimitives.ReadUInt32BigEndian(mac.AsSpan(offset, 4)) & 0x7FFFFFFF;
-
-        return (truncated % 1_000_000).ToString("D6");
-    }
-
     private static LogaffeDbContext ContextFor(string connectionString) =>
         new(new DbContextOptionsBuilder<LogaffeDbContext>().UseNpgsql(connectionString).Options);
+
+    private sealed record Enrolment(
+        string SecondFactorSecret, IReadOnlyList<string> BackupCodes, string Ticket);
 
     private sealed record IssuedIngestToken(Guid Id, string Token, DateTimeOffset IssuedAt);
 
