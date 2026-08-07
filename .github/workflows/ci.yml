@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # So that a run can be started without inventing a commit to carry it.
+  workflow_dispatch:
 
 permissions:
   contents: read
