@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Logaffe.Domain.Projects;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Npgsql;
 
 namespace Logaffe.IntegrationTests;
 
@@ -34,10 +35,12 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : IAsyncLifet
 
     private WebApplicationFactory<Program> _installation = null!;
     private string _secondFactorSecret = null!;
+    private string _connectionString = null!;
 
     public async ValueTask InitializeAsync()
     {
         var connectionString = await postgres.CreateDatabaseAsync();
+        _connectionString = connectionString;
 
         Environment.SetEnvironmentVariable("ConnectionStrings__Postgres", connectionString);
         Environment.SetEnvironmentVariable("Logaffe__VolumePath", _volume);
@@ -62,6 +65,7 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : IAsyncLifet
     [InlineData("GET", $"/projects/{NoSuchProject}")]
     [InlineData("PATCH", $"/projects/{NoSuchProject}")]
     [InlineData("PUT", $"/projects/{NoSuchProject}/retention")]
+    [InlineData("GET", $"/projects/{NoSuchProject}/retention/outside?retentionDays=7")]
     [InlineData("DELETE", $"/projects/{NoSuchProject}")]
     public async Task Every_project_endpoint_is_behind_the_operator_s_session(
         string method, string path)
@@ -76,6 +80,123 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : IAsyncLifet
             request, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_lower_window_says_what_it_would_remove_before_it_is_applied()
+    {
+        using var client = await SignedInAsync();
+
+        var project = await ReadAsync<ProjectBody>(await client.PostAsJsonAsync(
+            "/projects",
+            new { name = "api", retentionDays = 90 },
+            TestContext.Current.CancellationToken));
+        var other = await ReadAsync<ProjectBody>(await client.PostAsJsonAsync(
+            "/projects",
+            new { name = "web", retentionDays = 90 },
+            TestContext.Current.CancellationToken));
+
+        var now = DateTimeOffset.UtcNow;
+        await StoreEntryAsync(1, project.Id, now.AddDays(-30));
+        await StoreEntryAsync(2, project.Id, now.AddDays(-10));
+        await StoreEntryAsync(3, project.Id, now.AddDays(-1));
+        // Another project's entries, well outside the window being asked about.
+        // Nothing in this product reads across projects, and a number that did
+        // would frighten an operator into keeping data they meant to drop.
+        await StoreEntryAsync(4, other.Id, now.AddDays(-60));
+
+        var outside = await ReadAsync<EntriesOutsideBody>(await client.GetAsync(
+            $"/projects/{project.Id}/retention/outside?retentionDays=7",
+            TestContext.Current.CancellationToken));
+
+        Assert.Equal(7, outside.RetentionDays);
+        Assert.Equal(2, outside.Entries);
+
+        // And the reading applied nothing: the project is still on ninety days,
+        // and all three of its entries are still there.
+        var read = await ReadAsync<ProjectBody>(await client.GetAsync(
+            $"/projects/{project.Id}", TestContext.Current.CancellationToken));
+        Assert.Equal(90, read.RetentionDays);
+
+        var unchanged = await ReadAsync<EntriesOutsideBody>(await client.GetAsync(
+            $"/projects/{project.Id}/retention/outside?retentionDays=7",
+            TestContext.Current.CancellationToken));
+        Assert.Equal(2, unchanged.Entries);
+    }
+
+    [Fact]
+    public async Task Raising_a_window_removes_nothing_and_says_so()
+    {
+        using var client = await SignedInAsync();
+
+        var project = await ReadAsync<ProjectBody>(await client.PostAsJsonAsync(
+            "/projects",
+            new { name = "api", retentionDays = 7 },
+            TestContext.Current.CancellationToken));
+
+        await StoreEntryAsync(1, project.Id, DateTimeOffset.UtcNow.AddDays(-1));
+
+        var outside = await ReadAsync<EntriesOutsideBody>(await client.GetAsync(
+            $"/projects/{project.Id}/retention/outside?retentionDays=30",
+            TestContext.Current.CancellationToken));
+
+        // Nought is the ordinary answer and it is not a warning. Raising a
+        // window brings nothing back either — what was swept is gone — so this
+        // says only that the change costs nothing.
+        Assert.Equal(0, outside.Entries);
+    }
+
+    [Fact]
+    public async Task An_empty_project_is_nought_rather_than_nothing()
+    {
+        using var client = await SignedInAsync();
+
+        var project = await ReadAsync<ProjectBody>(await client.PostAsJsonAsync(
+            "/projects",
+            new { name = "api", retentionDays = 90 },
+            TestContext.Current.CancellationToken));
+
+        var outside = await ReadAsync<EntriesOutsideBody>(await client.GetAsync(
+            $"/projects/{project.Id}/retention/outside?retentionDays=1",
+            TestContext.Current.CancellationToken));
+
+        Assert.Equal(0, outside.Entries);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(RetentionWindow.MaximumDays + 1)]
+    public async Task A_window_that_could_not_be_applied_cannot_be_asked_about(int retentionDays)
+    {
+        using var client = await SignedInAsync();
+
+        var project = await ReadAsync<ProjectBody>(await client.PostAsJsonAsync(
+            "/projects",
+            new { name = "api", retentionDays = 90 },
+            TestContext.Current.CancellationToken));
+
+        using var response = await client.GetAsync(
+            $"/projects/{project.Id}/retention/outside?retentionDays={retentionDays}",
+            TestContext.Current.CancellationToken);
+
+        // Refused where every other window is (ADR 0020). There is no answering
+        // "and this is what a year would keep", because that is not a window an
+        // installation has.
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_project_that_is_gone_has_no_count()
+    {
+        using var client = await SignedInAsync();
+
+        using var response = await client.GetAsync(
+            $"/projects/{NoSuchProject}/retention/outside?retentionDays=7",
+            TestContext.Current.CancellationToken);
+
+        // Which is what another tab deleting it looks like. Nought would read as
+        // "this change costs nothing" for a project that cannot be changed.
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -307,8 +428,37 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : IAsyncLifet
         }
     }
 
+    /// <summary>
+    /// One entry, written straight into the table because the ingestion path
+    /// that would put it there does not exist yet. What is being asked about is
+    /// the number the operator is shown, and that only needs rows to count.
+    /// </summary>
+    private async Task StoreEntryAsync(long id, Guid projectId, DateTimeOffset receivedAt)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+
+        await using var command = new NpgsqlCommand(
+            """
+            insert into log_entry (
+                id, project_id, event_time, receipt_time, level,
+                message_template, rendered_message, message_truncated, exception_truncated)
+            values (@id, @project_id, @at, @at, 2, @text, @text, false, false)
+            """,
+            connection);
+
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("project_id", projectId);
+        command.Parameters.AddWithValue("at", receivedAt);
+        command.Parameters.AddWithValue("text", "Handled /orders");
+
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+    }
+
     private sealed record Enrolment(
         string SecondFactorSecret, IReadOnlyList<string> BackupCodes, string Ticket);
+
+    private sealed record EntriesOutsideBody(int RetentionDays, long Entries);
 
     private sealed record ProjectBody(
         Guid Id, string Name, int RetentionDays, DateTimeOffset CreatedAt);

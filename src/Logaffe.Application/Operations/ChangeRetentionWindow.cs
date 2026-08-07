@@ -14,13 +14,12 @@ namespace Logaffe.Application.Operations;
 /// is handed a window that already exists.
 /// </para>
 /// <para>
-/// <b>Lowering it removes entries, and this does not yet say how many.</b>
+/// <b>Lowering it removes entries, and this does not say how many.</b>
 /// <c>docs/projects.md</c> requires the operator be told what the new window
 /// puts outside it before it takes effect, because a settings field that
-/// silently destroys data is a bad settings field. That count is one query on
-/// the receipt-time index, asked for a window that has not been applied, and
-/// the table it reads is now there. It is not asked here: the warning is a
-/// screen in front of this act rather than a change to it, so that this stays a
+/// silently destroys data is a bad settings field. That is
+/// <see cref="CountEntriesOutsideWindow"/>, and it is a read in front of this
+/// act rather than a flag on it — the warning is a screen, and this stays a
 /// write with no reading behaviour in it.
 /// </para>
 /// <para>

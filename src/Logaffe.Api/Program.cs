@@ -79,6 +79,7 @@ builder.Services.AddScoped<ListProjects>();
 builder.Services.AddScoped<ReadProject>();
 builder.Services.AddScoped<RenameProject>();
 builder.Services.AddScoped<ChangeRetentionWindow>();
+builder.Services.AddScoped<CountEntriesOutsideWindow>();
 builder.Services.AddScoped<DeleteProject>();
 
 // The other end of both of those: the window is what this reads, and a deleted

@@ -44,4 +44,17 @@ public interface IEntries
     /// </remarks>
     Task<int> RemoveReceivedBeforeAsync(
         Guid projectId, DateTimeOffset receivedBefore, int portion, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// How many of one project's entries arrived before
+    /// <paramref name="receivedBefore"/>.
+    /// </summary>
+    /// <remarks>
+    /// The same shape as the removal above and over the same index, asked for a
+    /// window that has not been applied: it is what the operator is told before
+    /// a lower window takes effect, because a settings field that silently
+    /// destroys data is a bad settings field.
+    /// </remarks>
+    Task<long> CountReceivedBeforeAsync(
+        Guid projectId, DateTimeOffset receivedBefore, CancellationToken cancellationToken);
 }

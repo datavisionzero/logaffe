@@ -54,4 +54,19 @@ public sealed class Entries(LogaffeDbContext context) : IEntries
                 limit {portion})
             """,
             cancellationToken);
+
+    public async Task<long> CountReceivedBeforeAsync(
+        Guid projectId, DateTimeOffset receivedBefore, CancellationToken cancellationToken) =>
+        // The receipt index again, and nothing but it: leading with the project
+        // and ending at the cutoff makes this a walk over the keys that match
+        // rather than a read of the rows behind them. It is one number, and it
+        // is asked while an operator waits for the answer.
+        await context.Database
+            .SqlQuery<long>(
+                $"""
+                select count(*) as "Value"
+                from log_entry
+                where project_id = {projectId} and receipt_time < {receivedBefore}
+                """)
+            .SingleAsync(cancellationToken);
 }

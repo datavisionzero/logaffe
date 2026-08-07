@@ -20,6 +20,12 @@ internal sealed class RecordingEntries : IEntries
     /// <summary>Every removal asked for, in order.</summary>
     public List<(Guid ProjectId, DateTimeOffset ReceivedBefore)> Removals { get; } = [];
 
+    /// <summary>Every count asked for, in order.</summary>
+    public List<(Guid ProjectId, DateTimeOffset ReceivedBefore)> Counts { get; } = [];
+
+    /// <summary>What a count comes back as.</summary>
+    public long Counting { get; set; }
+
     /// <summary>Which projects the table still holds rows for.</summary>
     public void Holding(params Guid[] projectIds) => _holding.AddRange(projectIds);
 
@@ -51,5 +57,13 @@ internal sealed class RecordingEntries : IEntries
         Removals.Add((projectId, receivedBefore));
 
         return Task.FromResult(_removals.Count > 0 ? _removals.Dequeue() : 0);
+    }
+
+    public Task<long> CountReceivedBeforeAsync(
+        Guid projectId, DateTimeOffset receivedBefore, CancellationToken cancellationToken)
+    {
+        Counts.Add((projectId, receivedBefore));
+
+        return Task.FromResult(Counting);
     }
 }

@@ -20,6 +20,21 @@ public sealed record RenameProjectRequest(string? Name);
 /// <inheritdoc cref="CreateProjectRequest"/>
 public sealed record RetentionWindowRequest(int RetentionDays);
 
+/// <summary>
+/// What a window would put outside itself, read before it is applied.
+/// </summary>
+/// <param name="RetentionDays">
+/// The window that was asked about, echoed back so that an answer arriving after
+/// the operator has moved the field on is recognizable as the answer to the
+/// question it was.
+/// </param>
+/// <param name="Entries">
+/// How many of the project's entries the sweep would remove. Zero is the
+/// ordinary answer — it is also what raising a window gives — and it is not a
+/// warning.
+/// </param>
+public sealed record EntriesOutsideWindowResponse(int RetentionDays, long Entries);
+
 /// <summary>One project, by itself.</summary>
 public sealed record ProjectResponse(
     Guid Id, string Name, int RetentionDays, DateTimeOffset CreatedAt);
@@ -161,6 +176,32 @@ public static class ProjectEndpoints
             .Produces(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
 
+        operatorSurface.MapGet("/{id:guid}/retention/outside", async (
+                Guid id,
+                int retentionDays,
+                CountEntriesOutsideWindow count,
+                CancellationToken cancellationToken) =>
+            {
+                // Refused where every other window is. There is no answering
+                // "and this is what a year would keep", because that is not a
+                // window an installation has (ADR 0020).
+                if (!RetentionWindow.TryOfDays(retentionDays, out var proposed))
+                {
+                    return NotAWindow();
+                }
+
+                var outside = await count.ExecuteAsync(id, proposed, cancellationToken);
+
+                return outside is null
+                    ? Results.NotFound()
+                    : Results.Ok(new EntriesOutsideWindowResponse(retentionDays, outside.Value));
+            })
+            .WithName("CountEntriesOutsideWindow")
+            .WithSummary("How many entries a retention window would remove, before it is applied.")
+            .Produces<EntriesOutsideWindowResponse>()
+            .Produces(StatusCodes.Status404NotFound)
+            .ProducesValidationProblem();
+
         operatorSurface.MapPut("/{id:guid}/retention", async (
                 Guid id,
                 RetentionWindowRequest request,
@@ -173,9 +214,10 @@ public static class ProjectEndpoints
                 }
 
                 // Lowering it puts entries outside the window and the sweep
-                // removes them. What the operator is told first — how many —
-                // is a read of its own in front of this one, and it is not
-                // here yet.
+                // removes them. How many is the read above, and it is a route of
+                // its own rather than a flag on this one: the warning is a
+                // screen in front of this act, and this stays a write with no
+                // reading behaviour in it.
                 return await change.ExecuteAsync(id, retention, cancellationToken)
                     ? Results.NoContent()
                     : Results.NotFound();
