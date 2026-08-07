@@ -16,8 +16,8 @@ jobs:
     name: Unit tests
     runs-on: [self-hosted, logaffe]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - run: dotnet restore Logaffe.slnx
@@ -30,8 +30,8 @@ jobs:
     name: Integration tests
     runs-on: [self-hosted, logaffe]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
       - run: dotnet restore Logaffe.slnx
@@ -45,8 +45,8 @@ jobs:
       run:
         working-directory: src/web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: npm
@@ -78,8 +78,8 @@ jobs:
           --health-timeout 3s
           --health-retries 12
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -96,7 +96,10 @@ jobs:
             curl --fail --silent http://localhost:5142/openapi/v1.json -o /tmp/openapi.json && break
             sleep 2
           done
-          python3 -m json.tool --indent 2 /tmp/openapi.json > docs/api/openapi.json
+          test -s /tmp/openapi.json || { echo "the installation never served a document"; exit 1; }
+          # Formatted by the json module rather than by json.tool, whose --indent
+          # flag is not in every Python the runner might carry.
+          python3 -c 'import json,pathlib; d=json.loads(pathlib.Path("/tmp/openapi.json").read_text()); pathlib.Path("docs/api/openapi.json").write_text(json.dumps(d, indent=2) + "\n")'
 
       - name: The checked-in contract is the one being served
         run: git diff --exit-code -- docs/api/openapi.json
@@ -105,7 +108,7 @@ jobs:
     name: Image
     runs-on: [self-hosted, logaffe]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
       - name: Build (not pushed)
         uses: docker/build-push-action@v6
