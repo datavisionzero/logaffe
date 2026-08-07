@@ -45,6 +45,17 @@ builder.Services.AddScoped<CheckReadiness>();
 builder.Services.AddScoped<CheckTheKeyFits>();
 builder.Services.AddScoped<AuthenticateToken>();
 
+// The operator's token acts. They are registered here and reachable from HTTP
+// and the command line; what makes them unreachable over MCP is that the MCP
+// adapter offers four read tools and nothing else (ADR 0018).
+builder.Services.AddScoped<IssueIngestToken>();
+builder.Services.AddScoped<ListIngestTokens>();
+builder.Services.AddScoped<IssueAgentToken>();
+builder.Services.AddScoped<RenameAgentToken>();
+builder.Services.AddScoped<ListAgentTokens>();
+builder.Services.AddScoped<RevokeToken>();
+builder.Services.AddScoped<ReadTokenBack>();
+
 // One for the installation and sealed on first use: a token refused because its
 // identifier named no row is compared against this, so that the miss costs what
 // a mismatch costs (ADR 0031).

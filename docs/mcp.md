@@ -53,11 +53,14 @@ send someone looking in the wrong place. The prefix is read before the token is
 looked up at all, so the wrong kind is turned away without the database being
 asked anything ([ADR 0031](./adr/0031-a-token-names-its-own-row.md)).
 
-An agent token is ended by revoking it, or by
-[Host Recovery](./setup.md#host-recovery) removing the account it belongs to. A
-password change does **not** end it: an operator who has to reconnect every agent
-whenever they change their password is an operator who changes their password
-less often.
+An agent token is ended by revoking it, which **removes the row** exactly as
+revoking an ingest token does
+([Projects and tokens](./projects.md#rotation-and-knowing-when-it-is-done)) — a
+retired agent leaves no entry in the list and no sealed secret behind it. It also
+ends when [Host Recovery](./setup.md#host-recovery) removes the account it
+belongs to. A password change does **not** end it: an operator who has to
+reconnect every agent whenever they change their password is an operator who
+changes their password less often.
 
 ## The tools
 

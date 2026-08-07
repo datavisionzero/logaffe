@@ -63,6 +63,19 @@ it, rotation is finished when the old token's last-used stops moving.
 The sequence is therefore: issue the second token, move the applications over,
 watch the old one go quiet, revoke it. Revocation takes effect immediately.
 
+Issuing a third is **refused** rather than queued or rotating the oldest out: two
+tokens is what moving deployments over one at a time needs, and a third means the
+operator has lost track of which one they are retiring. They revoke one first,
+which costs nothing because revocation is immediate.
+
+**Revoking removes the row.** A revoked token is not kept as a revoked one: the
+`401` a sender gets is the same whether the token was revoked this morning or
+never existed, so a marked row would be a history answering no question the
+product asks — and it would leave the encrypted secret of a dead credential in
+the database for as long as the installation lives. A project may also be left
+holding none at all, which is how an operator closes a project's door without
+deleting the project.
+
 The timestamp is kept to within **five minutes**, not to the second: a use writes
 it only when the stored value is absent or older than that, because writing it on
 every delivery is a database write per batch on the hottest path in the product,

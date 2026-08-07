@@ -266,6 +266,41 @@ public sealed class AuthenticateTokenTests
             Writes++;
             return Task.CompletedTask;
         }
+
+        // The rest of the port is the operator's acts, which nothing on this
+        // path reaches. Refusing loudly is what keeps that true: an
+        // authentication that started listing or writing tokens would fail here
+        // rather than quietly pass.
+        public Task<IngestToken?> FindIngestTokenAsync(
+            Guid id, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<AgentToken?> FindAgentTokenAsync(
+            Guid id, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<IngestToken>> ListIngestTokensAsync(
+            Guid projectId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AgentToken>> ListAgentTokensAsync(
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task AddAsync(IngestToken token, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task AddAsync(AgentToken token, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task RemoveAsync(IngestToken token, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task RemoveAsync(AgentToken token, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task RecordRenameAsync(AgentToken token, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
     }
 
     /// <summary>
