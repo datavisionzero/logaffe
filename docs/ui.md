@@ -228,6 +228,12 @@ it — the same one the first-run guide hands over ([Setup](./setup.md)). An
 operator looking at an empty project is asking whether delivery works, and the
 answer is the configuration they are about to check anyway.
 
+The snippet arrives with the token rather than being assembled here: issuing one
+returns it and reading one back returns it again, because reading a token back
+and being able to use it are one errand. **A project holding no token at all is
+shown the act that issues one instead**, since there is nothing to deliver with
+yet — that is the same closed door the token count on the project list names.
+
 **A filter set that matches nothing** says that, names the filters responsible,
 and offers to clear them.
 

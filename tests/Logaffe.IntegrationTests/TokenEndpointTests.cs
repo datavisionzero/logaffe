@@ -201,6 +201,38 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
     }
 
     [Fact]
+    public async Task An_ingest_token_is_handed_over_as_a_delivery_that_can_be_pasted()
+    {
+        using var client = await SignedInAsync();
+        var project = await ProjectAsync("checkout");
+
+        var issued = await ReadAsync<IssuedIngestToken>(await client.PostAsync(
+            $"/projects/{project}/ingest-tokens", null, TestContext.Current.CancellationToken));
+
+        // What the product hands over is one finished delivery, not the bare
+        // token: this installation's address, this token, and an entry in the
+        // format the endpoint reads.
+        Assert.Contains($"{client.BaseAddress}ingest", issued.DeliverySnippet);
+        Assert.Contains($"Authorization: Bearer {issued.Token}", issued.DeliverySnippet);
+        Assert.Contains("Content-Type: application/x-ndjson", issued.DeliverySnippet);
+
+        // It names no logaffe package, because none of the three is published
+        // and a snippet whose first line cannot be installed is worse than none.
+        Assert.DoesNotContain("Logaffe.", issued.DeliverySnippet);
+
+        // Reading a token back and being able to use it are one errand, so the
+        // read-back carries the same snippet rather than the token alone.
+        var readBack = await ReadAsync<ReadIngestToken>(await client.GetAsync(
+            $"/ingest-tokens/{issued.Id}/token", TestContext.Current.CancellationToken));
+        Assert.Equal(issued.DeliverySnippet, readBack.DeliverySnippet);
+
+        // A list carries neither the token nor the snippet it sits inside.
+        var body = await client.GetStringAsync(
+            $"/projects/{project}/ingest-tokens", TestContext.Current.CancellationToken);
+        Assert.DoesNotContain(issued.Token, body);
+    }
+
+    [Fact]
     public async Task A_signed_out_session_admits_nothing_afterwards()
     {
         using var client = await SignedInAsync();
@@ -302,12 +334,13 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
     private sealed record Enrolment(
         string SecondFactorSecret, IReadOnlyList<string> BackupCodes, string Ticket);
 
-    private sealed record IssuedIngestToken(Guid Id, string Token, DateTimeOffset IssuedAt);
+    private sealed record IssuedIngestToken(
+        Guid Id, string Token, string DeliverySnippet, DateTimeOffset IssuedAt);
 
     private sealed record ListedIngestToken(
         Guid Id, string Identifier, DateTimeOffset IssuedAt, DateTimeOffset? LastUsedAt);
 
-    private sealed record ReadIngestToken(string Token);
+    private sealed record ReadIngestToken(string Token, string DeliverySnippet);
 
     private sealed record IssuedAgentToken(
         Guid Id, string Name, string Token, string ClientConfiguration, DateTimeOffset IssuedAt);

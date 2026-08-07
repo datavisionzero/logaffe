@@ -475,7 +475,7 @@
         "tags": [
           "logaffe"
         ],
-        "summary": "The token that is in the row, put together again.",
+        "summary": "The token that is in the row, and the delivery to paste it in.",
         "operationId": "ReadIngestTokenBack",
         "parameters": [
           {
@@ -909,6 +909,7 @@
         "required": [
           "id",
           "token",
+          "deliverySnippet",
           "issuedAt"
         ],
         "type": "object",
@@ -918,6 +919,9 @@
             "format": "uuid"
           },
           "token": {
+            "type": "string"
+          },
+          "deliverySnippet": {
             "type": "string"
           },
           "issuedAt": {
@@ -1070,11 +1074,15 @@
       },
       "ReadIngestTokenResponse": {
         "required": [
-          "token"
+          "token",
+          "deliverySnippet"
         ],
         "type": "object",
         "properties": {
           "token": {
+            "type": "string"
+          },
+          "deliverySnippet": {
             "type": "string"
           }
         }

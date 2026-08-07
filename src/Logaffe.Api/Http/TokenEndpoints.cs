@@ -13,7 +13,13 @@ namespace Logaffe.Api.Http;
 /// that this is not the only chance to see it (ADR 0022).
 /// </remarks>
 /// <param name="Id">What revoking or reading this token back names it by.</param>
-public sealed record IssuedIngestTokenResponse(Guid Id, string Token, DateTimeOffset IssuedAt);
+/// <param name="DeliverySnippet">
+/// One delivery to this installation with this token in it, ready to paste —
+/// the snippet the first-run guide hands over and the one an empty project
+/// shows (<c>docs/setup.md</c>, <c>docs/ui.md</c>).
+/// </param>
+public sealed record IssuedIngestTokenResponse(
+    Guid Id, string Token, string DeliverySnippet, DateTimeOffset IssuedAt);
 
 /// <summary>
 /// One of a project's tokens as the operator sees it in a list, carrying no
@@ -32,7 +38,15 @@ public sealed record ListedIngestTokenResponse(
     Guid Id, string Identifier, DateTimeOffset IssuedAt, DateTimeOffset? LastUsedAt);
 
 /// <summary>A token put together again out of its row and the key.</summary>
-public sealed record ReadIngestTokenResponse(string Token);
+/// <remarks>
+/// It carries the snippet as well, because reading a token back and being able
+/// to use it are one errand — the same reason the agent token carries its
+/// configuration on read-back and not only when it was issued.
+/// </remarks>
+/// <param name="DeliverySnippet">
+/// One delivery to this installation with this token in it, ready to paste.
+/// </param>
+public sealed record ReadIngestTokenResponse(string Token, string DeliverySnippet);
 
 /// <param name="Name">
 /// Pre-filled by whoever is issuing with what the client calls itself. It is a
@@ -83,7 +97,12 @@ public sealed record ReadAgentTokenResponse(string Token, string ClientConfigura
 /// records the method, the path and the status and never a body, and
 /// <see cref="TokenText.ToString"/> is redacted so that one reaching a log line
 /// by way of an interpolation carries the part that identifies it and not the
-/// part that admits anything.
+/// part that admits anything. Two of these bodies carry a token a second time,
+/// in the middle of a string a person is meant to paste —
+/// <see cref="DeliverySnippet"/> and
+/// <see cref="AgentClientConfiguration"/> — which the redaction cannot help
+/// with, and which is the whole reason the rule is about bodies rather than
+/// about tokens.
 /// </para>
 /// <para>
 /// The two kinds are two sets of routes rather than one with a kind in it, for
@@ -113,6 +132,7 @@ public static class TokenEndpoints
         endpoints.MapPost("/projects/{projectId:guid}/ingest-tokens", async (
                 Guid projectId,
                 IssueIngestToken issue,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 var attempt = await issue.ExecuteAsync(projectId, cancellationToken);
@@ -134,6 +154,7 @@ public static class TokenEndpoints
                         new IssuedIngestTokenResponse(
                             attempt.Token.Id,
                             attempt.Token.Token.Text,
+                            DeliverySnippet.For(context.Request, attempt.Token.Token),
                             attempt.Token.IssuedAt)),
                 };
             })
@@ -171,16 +192,18 @@ public static class TokenEndpoints
         endpoints.MapGet("/ingest-tokens/{id:guid}/token", async (
                 Guid id,
                 ReadTokenBack read,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 var token = await read.IngestTokenAsync(id, cancellationToken);
 
                 return token is null
                     ? Results.NotFound()
-                    : Results.Ok(new ReadIngestTokenResponse(token.Text));
+                    : Results.Ok(new ReadIngestTokenResponse(
+                        token.Text, DeliverySnippet.For(context.Request, token)));
             })
             .WithName("ReadIngestTokenBack")
-            .WithSummary("The token that is in the row, put together again.")
+            .WithSummary("The token that is in the row, and the delivery to paste it in.")
             .Produces<ReadIngestTokenResponse>()
             .Produces(StatusCodes.Status404NotFound);
 

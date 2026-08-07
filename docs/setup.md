@@ -105,14 +105,41 @@ it has the same answer: the host.
 ## After the claim
 
 What follows the claim is a **guide, not a stage**: it offers the first project
-and hands over a copy-paste snippet for a Serilog sink pointed at this
-installation, with the ingest token already in it. It can be skipped, it holds no state, and
-nothing is half-configured if it is abandoned — the installation is fully claimed
-the moment the claim completed.
+and hands over a copy-paste delivery pointed at this installation, with the
+ingest token already in it. It can be skipped, it holds no state, and nothing is
+half-configured if it is abandoned — the installation is fully claimed the moment
+the claim completed.
 
 It exists because `VISION.md` makes ingestion friction the adoption barrier, and
 the shortest path from a running installation to a log arriving is a snippet the
 operator does not have to assemble from documentation.
+
+**The guide is the interface's, and the backend knows nothing about it.** It is
+the act that creates a project and the act that issues an ingest token, walked in
+order by the single-page application. There is no endpoint that reports how far
+along it is: a guide that holds no state has no progress to report, and one that
+reported it would be the stage this is not.
+
+**What it hands over is the plain path** — an address, a header and one CLEF
+line, which needs nothing installed and works from any language
+([Ingestion](./ingestion.md)):
+
+```
+curl -X POST https://logs.example.com/ingest \
+  -H "Authorization: Bearer logaffe_ingest_…" \
+  -H "Content-Type: application/x-ndjson" \
+  --data-binary "{\"@t\":\"$(date -u +%FT%TZ)\",\"@mt\":\"Hello from {Sender}\",\"Sender\":\"curl\"}"
+```
+
+The token and the address are already in it, and the timestamp is generated when
+the line is sent rather than when the token was issued — the UI orders by `@t`,
+and a snippet carrying a fixed one would deliver an entry dated whenever the
+operator happened to open the page. The cost is that this is a POSIX shell line.
+
+**The Serilog form is the same handover with the sink in place of `curl`, and it
+arrives with the package it needs.** The .NET packages are not published yet
+([Codebase](./codebase.md)), and a snippet whose first line is a package nobody
+can install is worse than one that is honestly the plain path.
 
 ## Host Recovery
 

@@ -85,6 +85,14 @@ records when it was last used, and a project holds one of them — or two while 
 is being rotated.
 _Avoid_: API key, password, credential, project id, access token
 
+**Delivery Snippet**:
+One finished delivery to this installation with an ingest token already in it,
+handed over whenever a token is issued or read back. It is what the first-run
+guide offers and what a project with no entries shows, and it is the plain path —
+an address, a header and one entry — rather than the configuration of any
+particular client.
+_Avoid_: Example, code sample, quickstart, onboarding, sink configuration
+
 **Agent Token**:
 The read-only secret an agent presents to MCP, issued and named by the operator,
 readable again at any time, recording when it was last used, and revocable on its

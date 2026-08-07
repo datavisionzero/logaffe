@@ -182,7 +182,8 @@ data when its credentials are maintained teaches operators not to maintain them.
 ## The .NET packages
 
 Two convenience packages sit on top of the endpoint, and neither is required —
-everything above works with `curl`.
+everything above works with `curl`, which is why the snippet the product hands
+over with an ingest token names none of them ([Setup](./setup.md)).
 
 - A **Serilog sink**, which is `CompactJsonFormatter` pointed at the endpoint.
   Because the format is CLEF, the sink is configuration rather than a mapping
