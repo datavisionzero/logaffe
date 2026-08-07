@@ -40,13 +40,12 @@ public sealed class HostVolumeKey
         // Only one CreateNew can win, and the loser reads what the winner wrote.
         if (TryCreate(out var created))
         {
-            // The alarm for a volume that has gone missing. An installation that
-            // has tokens and writes a fresh key here can no longer read any of
-            // them, and this line is where that is visible (ADR 0002).
-            logger.LogWarning(
-                "Wrote a new token encryption key to {Path}. If this installation "
-                + "already held tokens, they were encrypted under a key that is "
-                + "now gone and cannot be read back.",
+            // Ordinary on a first start, and not an alarm on its own: whether a
+            // new key is the wrong key is a question about what the database
+            // holds, and the startup check is what asks it.
+            logger.LogInformation(
+                "Wrote a new token encryption key to {Path}. Back it up together "
+                + "with the database — neither store is useful without the other.",
                 path);
             return created;
         }

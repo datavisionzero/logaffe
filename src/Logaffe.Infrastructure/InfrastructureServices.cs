@@ -25,6 +25,7 @@ public static class InfrastructureServices
             ?? throw new InvalidOperationException("ConnectionStrings:Postgres is not configured.")));
 
         services.AddScoped<IDatabaseProbe, DatabaseProbe>();
+        services.AddScoped<ISealedSecrets, SealedSecrets>();
         services.AddScoped<SchemaMigrator>();
 
         // One key for the installation, read from the volume the first time a

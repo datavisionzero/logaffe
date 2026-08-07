@@ -41,7 +41,12 @@ builder.Services.AddLogaffeInfrastructure(builder.Configuration);
 // The composition root is where the use cases are registered; the layers below
 // know nothing about the container they are resolved from.
 builder.Services.AddScoped<CheckReadiness>();
+builder.Services.AddScoped<CheckTheKeyFits>();
+
+// Order is start order: the schema first, because the check below reads tables a
+// migration may be about to create.
 builder.Services.AddHostedService<SchemaMigrationService>();
+builder.Services.AddHostedService<KeyFitsService>();
 
 builder.Services.AddLogaffeOpenApi();
 

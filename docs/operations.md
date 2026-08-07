@@ -22,9 +22,17 @@ operator here, in the same spirit as the claim needing no setup secret: an
 installation that came up is one that has a key. It is base64 in a file readable
 by its owner alone, and a start that finds one uses it rather than replacing
 it — including two containers starting at once, where only the first creates and
-the second reads what the first wrote. A start that writes a *new* key says so in
-logaffe's own log, and on an installation that already held tokens that line is
-the alarm: the volume is gone, and with it every token in the database.
+the second reads what the first wrote.
+
+**A start whose key does not open what the database holds is refused.** The
+installation takes a handful of its stored secrets and tries them; if none of
+them opens, the two stores are not halves of one installation and the container
+exits with that in its log rather than serving. This is the check that catches a
+lost volume, a database restored without its key, and a volume swapped for
+somebody else's — and it catches them at the start rather than at the moment the
+operator goes looking for a token. A single unreadable secret is not enough to
+refuse on: that is a corrupt row, and only a whole unreadable sample is a wrong
+key.
 
 Nothing lives inside the container image. A container can be destroyed and
 recreated without losing anything, which is what makes an upgrade a `pull` and an
