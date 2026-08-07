@@ -10,6 +10,18 @@ on:
 permissions:
   contents: read
 
+# One run at a time, across every branch. The contract job starts a real
+# installation and a real database on the runner's host, each on a port it
+# names, and the runners share that host — so two runs overlapping would have
+# them fight over those ports. Making every port dynamic would fix the two that
+# exist today and leave the next one to be discovered; serialising is the one
+# rule that covers all of them. Nothing is cancelled, so every run still
+# happens, and with a single operator pushing there is nothing to gain from two
+# racing.
+concurrency:
+  group: ci
+  cancel-in-progress: false
+
 jobs:
   # Seconds, and no Docker. Domain rules and use cases against substituted ports.
   unit:
