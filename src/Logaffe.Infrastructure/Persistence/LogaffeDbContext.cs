@@ -1,3 +1,4 @@
+using Logaffe.Domain.Operators;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 using Microsoft.EntityFrameworkCore;
@@ -20,6 +21,17 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
     public DbSet<IngestToken> IngestTokens => Set<IngestToken>();
 
     public DbSet<AgentToken> AgentTokens => Set<AgentToken>();
+
+    /// <summary>
+    /// The one account, and a set with no row in it while the installation is
+    /// unclaimed. That there can be no second one is the table's own doing —
+    /// see <c>OperatorConfiguration</c>.
+    /// </summary>
+    public DbSet<Operator> Operators => Set<Operator>();
+
+    public DbSet<Session> Sessions => Set<Session>();
+
+    public DbSet<BackupCode> BackupCodes => Set<BackupCode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LogaffeDbContext).Assembly);

@@ -48,7 +48,7 @@ public enum KeyFit
 /// worth refusing to start over.
 /// </para>
 /// </remarks>
-public sealed class CheckTheKeyFits(ISealedSecrets secrets, ITokenCipher cipher)
+public sealed class CheckTheKeyFits(ISealedSecrets secrets, ISecretCipher cipher)
 {
     public const int SampleSize = 3;
 

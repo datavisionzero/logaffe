@@ -38,7 +38,7 @@ public sealed class CheckTheKeyFitsTests
             KeyFit.Fits,
             await Check(new StubSecrets([1], [2], [3]), new StubCipher { Unreadable = [1] }));
 
-    private static Task<KeyFit> Check(ISealedSecrets secrets, ITokenCipher cipher) =>
+    private static Task<KeyFit> Check(ISealedSecrets secrets, ISecretCipher cipher) =>
         new CheckTheKeyFits(secrets, cipher).ExecuteAsync(TestContext.Current.CancellationToken);
 
     private sealed class StubSecrets(params byte[][] sample) : ISealedSecrets
@@ -53,7 +53,7 @@ public sealed class CheckTheKeyFitsTests
         }
     }
 
-    private sealed class StubCipher : ITokenCipher
+    private sealed class StubCipher : ISecretCipher
     {
         /// <summary>The first byte of every sealed value this cipher refuses.</summary>
         public byte[] Unreadable { get; init; } = [];

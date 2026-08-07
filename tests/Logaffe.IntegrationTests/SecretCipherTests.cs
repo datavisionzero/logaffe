@@ -11,7 +11,7 @@ namespace Logaffe.IntegrationTests;
 /// the key file, its permissions and what happens when two of them race are
 /// exactly the parts no substitute can vouch for.
 /// </summary>
-public sealed class TokenCipherTests : IDisposable
+public sealed class SecretCipherTests : IDisposable
 {
     private readonly string volume = Directory.CreateTempSubdirectory("logaffe-key-").FullName;
 
@@ -136,5 +136,5 @@ public sealed class TokenCipherTests : IDisposable
     private static HostVolumeKey KeyOn(string volumePath) =>
         new(volumePath, NullLogger<HostVolumeKey>.Instance);
 
-    private static AesGcmTokenCipher CipherOn(string volumePath) => new(KeyOn(volumePath));
+    private static AesGcmSecretCipher CipherOn(string volumePath) => new(KeyOn(volumePath));
 }

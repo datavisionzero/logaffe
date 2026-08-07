@@ -27,6 +27,8 @@ public static class InfrastructureServices
         services.AddScoped<IDatabaseProbe, DatabaseProbe>();
         services.AddScoped<ISealedSecrets, SealedSecrets>();
         services.AddScoped<ITokens, Tokens>();
+        services.AddScoped<IOperators, Operators>();
+        services.AddScoped<ISessions, Sessions>();
         services.AddScoped<SchemaMigrator>();
 
         // One key for the installation, read from the volume the first time a
@@ -36,7 +38,13 @@ public static class InfrastructureServices
             configuration["Logaffe:VolumePath"]
             ?? throw new InvalidOperationException("Logaffe:VolumePath is not configured."),
             provider.GetRequiredService<ILogger<HostVolumeKey>>()));
-        services.AddSingleton<ITokenCipher, AesGcmTokenCipher>();
+        services.AddSingleton<ISecretCipher, AesGcmSecretCipher>();
+
+        // Neither of these holds anything: one is PBKDF2 with its parameters
+        // written into every hash it produces, the other is arithmetic over a
+        // secret the caller brings.
+        services.AddSingleton<IPasswordHasher, FrameworkPasswordHasher>();
+        services.AddSingleton<ISecondFactor, Rfc6238SecondFactor>();
 
         return services;
     }

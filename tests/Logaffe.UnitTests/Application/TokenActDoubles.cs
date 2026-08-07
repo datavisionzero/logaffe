@@ -78,7 +78,7 @@ internal sealed class InMemoryTokens : ITokens
 /// reverses what it is given, so that a row holding the secret in the clear is a
 /// failing assertion rather than an indistinguishable pass.
 /// </summary>
-internal sealed class ReversingCipher : ITokenCipher
+internal sealed class ReversingCipher : ISecretCipher
 {
     public byte[] Encrypt(string secret) => Encoding.UTF8.GetBytes(Reversed(secret));
 

@@ -86,6 +86,6 @@ public sealed class TokenReadBackTests(PostgresFixture postgres) : IDisposable
     private static SchemaMigrator MigratorFor(LogaffeDbContext context) =>
         new(context, NullLogger<SchemaMigrator>.Instance);
 
-    private static AesGcmTokenCipher CipherOn(string volumePath) =>
+    private static AesGcmSecretCipher CipherOn(string volumePath) =>
         new(new HostVolumeKey(volumePath, NullLogger<HostVolumeKey>.Instance));
 }

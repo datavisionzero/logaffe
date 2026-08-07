@@ -5,6 +5,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- For PasswordHasher<T>, which is the whole of what this takes from it.
+         ADR 0032 chose it over Argon2id precisely because it arrives with the
+         shared framework at no dependency cost, and a FrameworkReference is what
+         that costs nothing means: the runtime is already there, and no package
+         is fetched. -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <!-- Design-time only: this project is its own startup project for
          `dotnet ef`, through the factory in Persistence. -->

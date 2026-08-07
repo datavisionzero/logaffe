@@ -17,11 +17,11 @@ namespace Logaffe.Infrastructure.Secrets;
 /// </para>
 /// <para>
 /// A sealed value is <c>[version][nonce][tag][ciphertext]</c>. The version byte
-/// costs one byte per token and is what lets the algorithm or the key change
-/// later without having to guess what an existing row was written by.
+/// costs one byte per sealed secret and is what lets the algorithm or the key
+/// change later without having to guess what an existing row was written by.
 /// </para>
 /// </remarks>
-public sealed class AesGcmTokenCipher(HostVolumeKey key) : ITokenCipher
+public sealed class AesGcmSecretCipher(HostVolumeKey key) : ISecretCipher
 {
     private const byte Version = 1;
     private const int NonceLength = 12;

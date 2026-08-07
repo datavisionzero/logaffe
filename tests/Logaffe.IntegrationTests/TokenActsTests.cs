@@ -212,7 +212,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
     /// One issuing, with the context of its own that a request would have.
     /// </summary>
     private async Task<IssuedToken?> IssueAsync(
-        string connectionString, ITokenCipher cipher, Guid project, DateTimeOffset now)
+        string connectionString, ISecretCipher cipher, Guid project, DateTimeOffset now)
     {
         await using var context = ContextFor(connectionString);
         var issue = new IssueIngestToken(new Tokens(context), cipher, At(now));
@@ -221,7 +221,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
     }
 
     private async Task<Guid?> DeliverAsync(
-        string connectionString, ITokenCipher cipher, TokenText presented)
+        string connectionString, ISecretCipher cipher, TokenText presented)
     {
         await using var context = ContextFor(connectionString);
         var authenticate = new AuthenticateToken(
@@ -236,7 +236,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
     private static LogaffeDbContext ContextFor(string connectionString) =>
         new(new DbContextOptionsBuilder<LogaffeDbContext>().UseNpgsql(connectionString).Options);
 
-    private static AesGcmTokenCipher CipherOn(string volumePath) =>
+    private static AesGcmSecretCipher CipherOn(string volumePath) =>
         new(new HostVolumeKey(volumePath, NullLogger<HostVolumeKey>.Instance));
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider

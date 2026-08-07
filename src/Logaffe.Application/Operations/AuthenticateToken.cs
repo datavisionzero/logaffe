@@ -25,7 +25,7 @@ namespace Logaffe.Application.Operations;
 /// </remarks>
 public sealed class AuthenticateToken(
     ITokens tokens,
-    ITokenCipher cipher,
+    ISecretCipher cipher,
     DummySecret dummy,
     TimeProvider clock)
 {

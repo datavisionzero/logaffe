@@ -307,7 +307,7 @@ public sealed class AuthenticateTokenTests
     /// A cipher in name only — it counts what it was asked, which is what the
     /// equal-cost rule of ADR 0031 is stated in.
     /// </summary>
-    private sealed class StubCipher : ITokenCipher
+    private sealed class StubCipher : ISecretCipher
     {
         public int Decryptions { get; private set; }
 

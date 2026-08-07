@@ -76,7 +76,7 @@ public sealed class TokenAuthenticationTests(PostgresFixture postgres) : IDispos
     /// A fresh installation holding one project and one ingest token for it.
     /// </summary>
     private async Task<(string ConnectionString, Guid Project, TokenText Issued)> IssueAsync(
-        ITokenCipher cipher)
+        ISecretCipher cipher)
     {
         var connectionString = await postgres.CreateDatabaseAsync();
         await using var context = ContextFor(connectionString);
@@ -97,7 +97,7 @@ public sealed class TokenAuthenticationTests(PostgresFixture postgres) : IDispos
     /// One delivery, with the context of its own that a request would have.
     /// </summary>
     private async Task<Guid?> DeliverAsync(
-        string connectionString, string authorization, ITokenCipher cipher, TimeProvider clock)
+        string connectionString, string authorization, ISecretCipher cipher, TimeProvider clock)
     {
         await using var context = ContextFor(connectionString);
         var authenticate = new AuthenticateToken(
@@ -122,7 +122,7 @@ public sealed class TokenAuthenticationTests(PostgresFixture postgres) : IDispos
     private static LogaffeDbContext ContextFor(string connectionString) =>
         new(new DbContextOptionsBuilder<LogaffeDbContext>().UseNpgsql(connectionString).Options);
 
-    private static AesGcmTokenCipher CipherOn(string volumePath) =>
+    private static AesGcmSecretCipher CipherOn(string volumePath) =>
         new(new HostVolumeKey(volumePath, NullLogger<HostVolumeKey>.Instance));
 
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider

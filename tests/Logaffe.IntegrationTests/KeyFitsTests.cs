@@ -1,4 +1,5 @@
 using Logaffe.Application.Operations;
+using Logaffe.Domain.Operators;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
@@ -79,6 +80,26 @@ public sealed class KeyFitsTests(PostgresFixture postgres) : IDisposable
         Assert.Equal(KeyFit.DoesNotFit, await CheckWith(context, NewVolume()));
     }
 
+    [Fact]
+    public async Task An_operator_with_no_tokens_at_all_is_enough_to_check_against()
+    {
+        var volume = NewVolume();
+        var context = await MigratedAsync();
+        var cipher = CipherOn(volume);
+        context.Operators.Add(Operator.Claim(
+            "AQAAAAIAAYagAAAAE-not-a-real-hash",
+            cipher.Encrypt("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"),
+            Now));
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // An installation claimed a minute ago holds no project, no token and
+        // one sealed secret — the operator's second factor. It is the case the
+        // token tables miss entirely, and the one where a wrong key costs the
+        // most: without it the operator cannot verify a code at all (ADR 0032).
+        Assert.Equal(KeyFit.Fits, await CheckWith(context, volume));
+        Assert.Equal(KeyFit.DoesNotFit, await CheckWith(context, NewVolume()));
+    }
+
     private async Task SealATokenInto(LogaffeDbContext context, string volume)
     {
         var project = Project.Create("api", RetentionWindow.OfDays(7), Now);
@@ -114,6 +135,6 @@ public sealed class KeyFitsTests(PostgresFixture postgres) : IDisposable
         return volume;
     }
 
-    private static AesGcmTokenCipher CipherOn(string volume) =>
+    private static AesGcmSecretCipher CipherOn(string volume) =>
         new(new HostVolumeKey(volume, NullLogger<HostVolumeKey>.Instance));
 }

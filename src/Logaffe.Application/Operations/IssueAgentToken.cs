@@ -27,7 +27,7 @@ namespace Logaffe.Application.Operations;
 /// something only the adapter knows.
 /// </para>
 /// </remarks>
-public sealed class IssueAgentToken(ITokens tokens, ITokenCipher cipher, TimeProvider clock)
+public sealed class IssueAgentToken(ITokens tokens, ISecretCipher cipher, TimeProvider clock)
 {
     /// <exception cref="ArgumentException">
     /// <paramref name="name"/> is not a name — it is blank, or longer than

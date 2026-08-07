@@ -21,7 +21,7 @@ namespace Logaffe.Application.Operations;
 /// back, as an encryption, the difference this exists to remove.
 /// </para>
 /// </remarks>
-public sealed class DummySecret(ITokenCipher cipher)
+public sealed class DummySecret(ISecretCipher cipher)
 {
     private readonly Lazy<byte[]> sealedSecret = new(
         () => cipher.Encrypt(TokenAlphabet.Random(TokenText.SecretLength)),

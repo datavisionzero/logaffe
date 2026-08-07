@@ -85,6 +85,13 @@ A session lasts generously — on the order of **30 days** — and every use pus
 the deadline forward, so an installation in regular use is not a place where the
 operator keeps re-authenticating.
 
+What the browser holds is a value the installation draws, and it is stored as a
+**fast hash** — the same storage a backup code gets and for the same reasons
+([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)): it
+carries all of its own entropy, so there is nothing a slow hash would defend
+against, and it is not readable back. Unlike the operator's three credentials it
+is not theirs to keep, and losing it costs a sign-in and nothing else.
+
 **There is no separate "trust this browser".** The session *is* the remembering.
 A second mechanism whose entire purpose is skipping the second factor would
 weaken precisely the thing that makes public exposure defensible, in exchange for

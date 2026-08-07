@@ -22,7 +22,7 @@ namespace Logaffe.Application.Operations;
 /// names.
 /// </para>
 /// </remarks>
-public sealed class ReadTokenBack(ITokens tokens, ITokenCipher cipher)
+public sealed class ReadTokenBack(ITokens tokens, ISecretCipher cipher)
 {
     /// <summary>
     /// The whole token of an ingest row, or <c>null</c> when there is no such

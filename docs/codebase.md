@@ -61,8 +61,9 @@ backup and the recovery. Every one of them is reachable from more than one
 adapter or is a candidate to become so, and none of them knows what it is being
 called by — the first is called by both public endpoints and is the plainest
 case. Beside them sit the ports — a writer and a reader for entries, stores for
-the small relational rows, the token cipher, the id source, the TOTP — which is
-the whole of what this layer asks the world for. The clock is not among them:
+the small relational rows, the cipher for whatever is sealed under the key on the
+host volume, the id source, the password hasher, the TOTP — which is the whole of
+what this layer asks the world for. The clock is not among them:
 `TimeProvider` is in the base class libraries, and a port over it would be an
 abstraction over an abstraction.
 

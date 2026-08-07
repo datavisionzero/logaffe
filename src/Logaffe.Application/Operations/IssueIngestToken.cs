@@ -13,7 +13,7 @@ namespace Logaffe.Application.Operations;
 /// the host volume, keep the identifier in the clear so the row can be found
 /// again, and hand the token to the operator once. The secret is never held
 /// anywhere else in the clear, and the row keeps only what
-/// <see cref="ITokenCipher"/> made of it (ADR 0022).
+/// <see cref="ISecretCipher"/> made of it (ADR 0022).
 /// </para>
 /// <para>
 /// It is an operator act and is unreachable over MCP, which is a property of the
@@ -22,7 +22,7 @@ namespace Logaffe.Application.Operations;
 /// (ADR 0018).
 /// </para>
 /// </remarks>
-public sealed class IssueIngestToken(ITokens tokens, ITokenCipher cipher, TimeProvider clock)
+public sealed class IssueIngestToken(ITokens tokens, ISecretCipher cipher, TimeProvider clock)
 {
     /// <summary>
     /// The token the project may now receive on, or <c>null</c> when it already
