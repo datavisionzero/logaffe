@@ -55,3 +55,4 @@ material value to understanding the decision.
 - [0029 – Filter values come from the entries, not from a list](./0029-filter-values-come-from-the-entries-not-from-a-list.md)
 - [0030 – The solution is four layers, not one project](./0030-the-solution-is-four-layers-not-one-project.md)
 - [0031 – A token names its own row](./0031-a-token-names-its-own-row.md)
+- [0032 – Each operator secret is stored for what it is](./0032-each-operator-secret-is-stored-for-what-it-is.md)

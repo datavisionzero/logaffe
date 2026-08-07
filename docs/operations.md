@@ -13,16 +13,19 @@ Two stores, and both are needed.
 - **The database** holds projects, tokens, entries and the operator's account.
 - **The host volume** holds the configuration and the secrets — including the
   **encryption key** that makes the stored tokens readable
-  ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)).
+  ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)),
+  and with them the operator's TOTP secret, which is encrypted under the same key
+  ([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)).
 
 Nothing lives inside the container image. A container can be destroyed and
 recreated without losing anything, which is what makes an upgrade a `pull` and an
 `up`.
 
 **Neither store is useful without the other.** A database restored without its
-key is an installation whose every ingest and agent token is undecryptable, and
-the operator discovers it at the moment they go looking for one. This is the
-trap the backup command below exists to remove.
+key is an installation whose every ingest and agent token is undecryptable and
+whose operator has only their backup codes left to get in with, and both are
+discovered at the moment they go looking. This is the trap the backup command
+below exists to remove.
 
 ## Backup
 

@@ -28,19 +28,35 @@ A **backup code** may be given instead of the second factor. It is consumed when
 used, and the product says how many remain whenever one is spent, because a set
 that quietly runs out ends at Host Recovery.
 
+A code is **stored as a plain fast hash and cannot be read back**, which is the
+deliberate opposite of a token
+([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)): a
+token is a copy of something the operator can already reach, and a backup code is
+what stands in when they can reach nothing. Being consumed is a timestamp rather
+than a deletion, so how many remain is a count and a spent code stays visibly
+spent.
+
 ## The second factor is TOTP
 
 The second factor is a time-based one-time code from an authenticator app,
 enrolled during the claim from a QR code and the secret in text for anyone typing
 it by hand ([ADR 0016](./adr/0016-the-second-factor-is-totp.md)).
 
+The secret is **encrypted with the key on the host volume**, like a token, for
+the plain reason that a code cannot be computed without it — so unlike the other
+two credentials it is not hashed, and unlike the other two it is unusable if that
+key is lost
+([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)).
+
 **It can be re-enrolled while signed in**, which is what makes replacing a phone
 an ordinary afternoon instead of an incident. Re-enrolling asks for the password
 and the current second factor — or a backup code — and it issues a fresh set of
-backup codes, retiring the old set. What cannot happen is turning it off:
-`VISION.md` puts it in the guided setup so that it is not optional, and a
-god-mode account on the public internet does not get to become single-factor
-later.
+backup codes, retiring the old set. Both replacements are **overwrites**: the
+previous secret and the previous codes are gone rather than kept beside the new
+ones, and what is kept of the old enrolment is the date it happened. What cannot
+happen is turning it off: `VISION.md` puts it in the guided setup so that it is
+not optional, and a god-mode account on the public internet does not get to
+become single-factor later.
 
 The honest cost is stated in the ADR: TOTP is phishable in a way a passkey is
 not. It is chosen because it is the only common second factor that asks nothing
@@ -52,6 +68,14 @@ A minimum length and nothing else — no composition rules, no forced rotation, 
 no check against an outside service, which would put a network dependency and a
 disclosure into the sign-in path of a self-hosted product. Length is the property
 that matters, and the second factor is what carries the rest.
+
+It is stored as a **slow hash** — the framework's PBKDF2-HMAC-SHA512 — whose
+cost parameters are versioned, and a successful sign-in rewrites the hash at the
+current cost, so raising that cost later is a thing the product does on its own
+([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)). The
+ADR states what that buys and what it does not: a stolen database dump is the one
+place this credential can be attacked without limit, and what holds there is the
+second factor rather than the hash.
 
 Changing the password requires the current one, and it ends every other session.
 
