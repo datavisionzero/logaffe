@@ -34,6 +34,12 @@ receipt-time index answers with a single lookup per project
 gets asked at that moment — whether an application is still delivering — and it
 costs nothing like a count would.
 
+A row also carries **how many ingest tokens the project holds** — one
+ordinarily, two while it is being rotated, and none for a project whose door is
+closed. That last case is why the number is on the list rather than only in the
+project's settings: a project nothing can deliver to should be visible without
+opening each one in turn.
+
 A project switcher is present everywhere. Moving from one project to another is
 the frequent act, and it should never be a trip back to a start page.
 

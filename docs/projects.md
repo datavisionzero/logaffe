@@ -125,6 +125,11 @@ Deleting is **immediate and irreversible**, and it is confirmed by typing the
 project's name, which is the guard that fits an act that destroys data and cannot
 be undone.
 
+The confirmation is **the interface's, and the server sees nothing of it**. The
+endpoint takes an identity and no typed name: repeating the name back would
+protect nobody who issued the request deliberately, and it would make one route
+answer to a rule none of the others do.
+
 The project, its tokens and its visibility are gone at once; the entries are
 removed afterwards, in the background
 ([ADR 0019](./adr/0019-a-project-is-deleted-at-once-and-its-entries-follow.md)).

@@ -40,6 +40,13 @@ internal sealed class InMemoryTokens : ITokens
         Task.FromResult<IReadOnlyList<IngestToken>>(
             [.. _ingestTokens.Where(t => t.ProjectId == projectId).OrderBy(t => t.IssuedAt)]);
 
+    public Task<IReadOnlyDictionary<Guid, int>> CountIngestTokensAsync(
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, int>>(
+            _ingestTokens
+                .GroupBy(t => t.ProjectId)
+                .ToDictionary(project => project.Key, project => project.Count()));
+
     public Task<IReadOnlyList<AgentToken>> ListAgentTokensAsync(
         CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<AgentToken>>([.. _agentTokens.OrderBy(t => t.IssuedAt)]);

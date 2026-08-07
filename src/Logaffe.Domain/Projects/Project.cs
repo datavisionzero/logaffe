@@ -41,13 +41,26 @@ public sealed class Project
     public DateTimeOffset CreatedAt { get; private init; }
 
     public static Project Create(string name, RetentionWindow retention, DateTimeOffset createdAt) =>
-        new(Guid.CreateVersion7(), Normalize(name), retention, createdAt);
+        new(Guid.CreateVersion7(), NormalizeName(name), retention, createdAt);
 
-    public void Rename(string name) => Name = Normalize(name);
+    public void Rename(string name) => Name = NormalizeName(name);
 
     public void KeepFor(RetentionWindow retention) => Retention = retention;
 
-    private static string Normalize(string name)
+    /// <summary>
+    /// The name as it would be stored.
+    /// </summary>
+    /// <remarks>
+    /// Public because uniqueness is asked about before it is written: whoever
+    /// looks a name up has to ask about the string this would store rather than
+    /// the one that was typed, or a name with a space on the end passes the
+    /// check and is then refused by the unique index.
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="name"/> is not a name — it is blank, or longer than
+    /// <see cref="NameMaxLength"/>.
+    /// </exception>
+    public static string NormalizeName(string name)
     {
         var trimmed = name?.Trim();
         if (string.IsNullOrEmpty(trimmed))

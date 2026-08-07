@@ -283,6 +283,10 @@ public sealed class AuthenticateTokenTests
             Guid projectId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
+        public Task<IReadOnlyDictionary<Guid, int>> CountIngestTokensAsync(
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyList<AgentToken>> ListAgentTokensAsync(
             CancellationToken cancellationToken) =>
             throw new NotSupportedException();

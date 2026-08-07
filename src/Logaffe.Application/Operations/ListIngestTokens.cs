@@ -32,11 +32,25 @@ public sealed record ListedIngestToken(
 /// What one project can currently receive on: one token, or two while it is
 /// being rotated.
 /// </summary>
-public sealed class ListIngestTokens(ITokens tokens)
+public sealed class ListIngestTokens(IProjects projects, ITokens tokens)
 {
-    public async Task<IReadOnlyList<ListedIngestToken>> ExecuteAsync(
+    /// <summary>
+    /// What the project holds, or <c>null</c> when there is no such project.
+    /// </summary>
+    /// <remarks>
+    /// A project that is not there and a project holding no token are two
+    /// different readings — one is an address that is gone, the other is a door
+    /// the operator closed themselves — and an empty list for both would show
+    /// the settings of something deleted.
+    /// </remarks>
+    public async Task<IReadOnlyList<ListedIngestToken>?> ExecuteAsync(
         Guid projectId, CancellationToken cancellationToken)
     {
+        if (await projects.FindAsync(projectId, cancellationToken) is null)
+        {
+            return null;
+        }
+
         var held = await tokens.ListIngestTokensAsync(projectId, cancellationToken);
 
         return [.. held.Select(token => new ListedIngestToken(

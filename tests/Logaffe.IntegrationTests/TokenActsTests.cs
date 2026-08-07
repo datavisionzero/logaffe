@@ -113,10 +113,10 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
         Assert.NotNull(await IssueAsync(installation, cipher, other, Now.AddDays(31)));
 
         await using var reader = ContextFor(installation);
-        var listed = await new ListIngestTokens(new Tokens(reader))
+        var listed = await new ListIngestTokens(new Projects(reader), new Tokens(reader))
             .ExecuteAsync(project, TestContext.Current.CancellationToken);
 
-        Assert.Equal([first!.Id, second.Id], listed.Select(token => token.Id));
+        Assert.Equal([first!.Id, second.Id], listed!.Select(token => token.Id));
         Assert.Equal(
             3, await reader.IngestTokens.CountAsync(TestContext.Current.CancellationToken));
     }
@@ -172,19 +172,24 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
         var installation = await InstallationAsync();
         var project = await ProjectAsync(installation, "api");
 
-        await IssueAsync(installation, cipher, project, Now);
+        var issued = await IssueAsync(installation, cipher, project, Now);
 
         await using (var context = ContextFor(installation))
         {
-            context.Projects.Remove(
-                await context.Projects.SingleAsync(TestContext.Current.CancellationToken));
-            await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+            Assert.True(await new DeleteProject(new Projects(context))
+                .ExecuteAsync(project, TestContext.Current.CancellationToken));
         }
 
         // The project, its tokens and its visibility go at once (ADR 0019), and
-        // nothing in the issuing path has to remember that.
+        // nothing in the issuing path has to remember that: the cascade on the
+        // foreign key is what removes them.
         await using var reader = ContextFor(installation);
+        Assert.Empty(await reader.Projects.ToListAsync(TestContext.Current.CancellationToken));
         Assert.Empty(await reader.IngestTokens.ToListAsync(TestContext.Current.CancellationToken));
+
+        // Which is what a sender holding one is answered by: 401 from its next
+        // delivery, the same as a rotation done carelessly.
+        Assert.Null(await DeliverAsync(installation, cipher, issued!.Token));
     }
 
     /// <summary>A migrated database with nothing in it.</summary>
@@ -215,9 +220,10 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
         string connectionString, ISecretCipher cipher, Guid project, DateTimeOffset now)
     {
         await using var context = ContextFor(connectionString);
-        var issue = new IssueIngestToken(new Tokens(context), cipher, At(now));
+        var issue = new IssueIngestToken(
+            new Projects(context), new Tokens(context), cipher, At(now));
 
-        return await issue.ExecuteAsync(project, TestContext.Current.CancellationToken);
+        return (await issue.ExecuteAsync(project, TestContext.Current.CancellationToken)).Token;
     }
 
     private async Task<Guid?> DeliverAsync(

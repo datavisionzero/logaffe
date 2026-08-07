@@ -4,6 +4,32 @@ using Logaffe.Domain.Tokens;
 namespace Logaffe.Application.Operations;
 
 /// <summary>
+/// How issuing ended.
+/// </summary>
+public enum IssueOutcome
+{
+    /// <summary>The project has a token it did not have before.</summary>
+    Issued,
+
+    /// <summary>
+    /// There is no such project. Another browser tab deleted it, or the address
+    /// was typed.
+    /// </summary>
+    NoSuchProject,
+
+    /// <summary>
+    /// The project already holds the two that rotation is made of, and a third
+    /// is refused rather than queued.
+    /// </summary>
+    AlreadyHoldsTwo,
+}
+
+/// <summary>
+/// The end of an issue, and the token it hands over once when it succeeded.
+/// </summary>
+public sealed record IssueAttempt(IssueOutcome Outcome, IssuedToken? Token);
+
+/// <summary>
 /// Gives a project a token to receive on, and gives it the second one that
 /// rotation is made of.
 /// </summary>
@@ -22,11 +48,11 @@ namespace Logaffe.Application.Operations;
 /// (ADR 0018).
 /// </para>
 /// </remarks>
-public sealed class IssueIngestToken(ITokens tokens, ISecretCipher cipher, TimeProvider clock)
+public sealed class IssueIngestToken(
+    IProjects projects, ITokens tokens, ISecretCipher cipher, TimeProvider clock)
 {
     /// <summary>
-    /// The token the project may now receive on, or <c>null</c> when it already
-    /// holds <see cref="IngestToken.MaximumPerProject"/> of them.
+    /// The token the project may now receive on, or why it got none.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -43,18 +69,26 @@ public sealed class IssueIngestToken(ITokens tokens, ISecretCipher cipher, TimeP
     /// with a lock the rest of the product would then have to carry.
     /// </para>
     /// <para>
-    /// That the project exists is not asked here. The caller reached this
-    /// through a project, and the foreign key is what answers a project deleted
-    /// underneath it.
+    /// <b>That the project exists is asked first.</b> It has to be: a token
+    /// issued into a project that is not there is a foreign key violation
+    /// surfacing as a failure of the installation, when what happened is that
+    /// the operator named something that is gone. The check does not make the
+    /// foreign key redundant — a project deleted between here and the insert is
+    /// still the database's to refuse — it makes the ordinary case an answer.
     /// </para>
     /// </remarks>
-    public async Task<IssuedToken?> ExecuteAsync(
+    public async Task<IssueAttempt> ExecuteAsync(
         Guid projectId, CancellationToken cancellationToken)
     {
+        if (await projects.FindAsync(projectId, cancellationToken) is null)
+        {
+            return new IssueAttempt(IssueOutcome.NoSuchProject, null);
+        }
+
         var held = await tokens.ListIngestTokensAsync(projectId, cancellationToken);
         if (held.Count >= IngestToken.MaximumPerProject)
         {
-            return null;
+            return new IssueAttempt(IssueOutcome.AlreadyHoldsTwo, null);
         }
 
         var minted = TokenText.Mint(TokenKind.Ingest);
@@ -64,6 +98,7 @@ public sealed class IssueIngestToken(ITokens tokens, ISecretCipher cipher, TimeP
 
         await tokens.AddAsync(token, cancellationToken);
 
-        return new IssuedToken(token.Id, minted, issuedAt);
+        return new IssueAttempt(
+            IssueOutcome.Issued, new IssuedToken(token.Id, minted, issuedAt));
     }
 }

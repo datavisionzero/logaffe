@@ -115,24 +115,32 @@ public static class TokenEndpoints
                 IssueIngestToken issue,
                 CancellationToken cancellationToken) =>
             {
-                var issued = await issue.ExecuteAsync(projectId, cancellationToken);
+                var attempt = await issue.ExecuteAsync(projectId, cancellationToken);
 
                 // A third is refused rather than queued or rotating the oldest
                 // out: two is what moving deployments over one at a time needs,
                 // and a third means the operator has lost track of which one
                 // they are retiring. They revoke one first, which is immediate —
                 // so this is a conflict with what the project holds rather than
-                // anything wrong with the request.
-                return issued is null
-                    ? Results.Conflict()
-                    : Results.Created(
-                        ReadBackOf("ingest-tokens", issued.Id),
+                // anything wrong with the request. A project that is not there
+                // is 404: nothing about the request is wrong either, and the
+                // address is what is gone.
+                return attempt.Outcome switch
+                {
+                    IssueOutcome.NoSuchProject => Results.NotFound(),
+                    IssueOutcome.AlreadyHoldsTwo => Results.Conflict(),
+                    _ => Results.Created(
+                        ReadBackOf("ingest-tokens", attempt.Token!.Id),
                         new IssuedIngestTokenResponse(
-                            issued.Id, issued.Token.Text, issued.IssuedAt));
+                            attempt.Token.Id,
+                            attempt.Token.Token.Text,
+                            attempt.Token.IssuedAt)),
+                };
             })
             .WithName("IssueIngestToken")
             .WithSummary("Gives a project a token to receive on.")
             .Produces<IssuedIngestTokenResponse>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict);
 
         endpoints.MapGet("/projects/{projectId:guid}/ingest-tokens", async (
@@ -142,6 +150,14 @@ public static class TokenEndpoints
             {
                 var held = await list.ExecuteAsync(projectId, cancellationToken);
 
+                // A project that is not there is 404 rather than an empty list:
+                // a closed door and a deleted project are two different
+                // readings, and one of them is the settings of something gone.
+                if (held is null)
+                {
+                    return Results.NotFound();
+                }
+
                 // A list decrypts nothing. Opening the settings of a project is
                 // not the same act as reading its credential.
                 return Results.Ok(held.Select(token => new ListedIngestTokenResponse(
@@ -149,7 +165,8 @@ public static class TokenEndpoints
             })
             .WithName("ListIngestTokens")
             .WithSummary("What one project can currently receive on.")
-            .Produces<IEnumerable<ListedIngestTokenResponse>>();
+            .Produces<IEnumerable<ListedIngestTokenResponse>>()
+            .Produces(StatusCodes.Status404NotFound);
 
         endpoints.MapGet("/ingest-tokens/{id:guid}/token", async (
                 Guid id,

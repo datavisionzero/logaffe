@@ -55,6 +55,16 @@ builder.Services.AddScoped<SignIn>();
 builder.Services.AddScoped<AuthenticateSession>();
 builder.Services.AddScoped<SignOut>();
 
+// The unit everything else hangs off. Nothing creates one implicitly — a token
+// that names nothing admits nothing — so these four acts are the only way a
+// project comes about, changes or ends.
+builder.Services.AddScoped<CreateProject>();
+builder.Services.AddScoped<ListProjects>();
+builder.Services.AddScoped<ReadProject>();
+builder.Services.AddScoped<RenameProject>();
+builder.Services.AddScoped<ChangeRetentionWindow>();
+builder.Services.AddScoped<DeleteProject>();
+
 // The operator's token acts. They are registered here and reachable from HTTP
 // and the command line; what makes them unreachable over MCP is that the MCP
 // adapter offers four read tools and nothing else (ADR 0018).
@@ -102,6 +112,7 @@ app.MapOpenApi();
 app.MapHealth();
 app.MapClaim();
 app.MapSessions();
+app.MapProjects();
 app.MapTokens();
 
 // The single-page application is built by its own toolchain and copied into

@@ -53,6 +53,19 @@ public interface ITokens
         Guid projectId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// How many ingest tokens each project holds, projects holding none left
+    /// out.
+    /// </summary>
+    /// <remarks>
+    /// One statement for the whole project list rather than one per row. A
+    /// project holding no token at all is a project whose door is closed, which
+    /// is what the operator is reading the list for; the number is 0, 1 or 2 and
+    /// nothing else can put it there.
+    /// </remarks>
+    Task<IReadOnlyDictionary<Guid, int>> CountIngestTokensAsync(
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Every agent token in the installation, oldest first. There is no project
     /// to scope this by: an agent token reads all of them (ADR 0021).
     /// </summary>

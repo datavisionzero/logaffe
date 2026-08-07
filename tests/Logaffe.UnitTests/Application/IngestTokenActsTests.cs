@@ -1,5 +1,6 @@
 using System.Text;
 using Logaffe.Application.Operations;
+using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 
 namespace Logaffe.UnitTests.Application;
@@ -12,11 +13,20 @@ namespace Logaffe.UnitTests.Application;
 public sealed class IngestTokenActsTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 7, 9, 0, 0, TimeSpan.Zero);
-    private static readonly Guid Project = Guid.CreateVersion7();
 
+    private readonly InMemoryProjects _projects = new();
     private readonly InMemoryTokens _tokens = new();
     private readonly ReversingCipher _cipher = new();
     private readonly StoppedClock _clock = new(Now);
+
+    /// <summary>
+    /// The project these acts are reached through. It exists, because issuing
+    /// into one that does not is its own answer.
+    /// </summary>
+    private readonly Guid _project;
+
+    public IngestTokenActsTests() =>
+        _project = _projects.Holding("api", RetentionWindow.OfDays(7), Now).Id;
 
     [Fact]
     public async Task An_issued_token_is_an_ingest_token_for_the_project_that_asked()
@@ -30,7 +40,7 @@ public sealed class IngestTokenActsTests
 
         var stored = Assert.Single(_tokens.Stored);
         Assert.Equal(issued.Id, stored.Id);
-        Assert.Equal(Project, stored.ProjectId);
+        Assert.Equal(_project, stored.ProjectId);
         Assert.Equal(issued.Token.Identifier, stored.Identifier);
         Assert.Null(stored.LastUsedAt);
     }
@@ -83,7 +93,7 @@ public sealed class IngestTokenActsTests
         Assert.NotEqual(first.Token.Secret, second.Token.Secret);
 
         // Oldest first, so the one being rotated away is the one at the top.
-        var listed = await Listing().ExecuteAsync(Project, TestContext.Current.CancellationToken);
+        var listed = await ListedAsync(_project);
         Assert.Equal([first.Id, second.Id], listed.Select(token => token.Id));
     }
 
@@ -96,25 +106,50 @@ public sealed class IngestTokenActsTests
 
         // The rotation model saying what it is for: the operator revokes the
         // one they are retiring rather than collecting a third.
-        Assert.Null(await IssueAsync());
+        var third = await Issuing().ExecuteAsync(_project, TestContext.Current.CancellationToken);
+
+        Assert.Equal(IssueOutcome.AlreadyHoldsTwo, third.Outcome);
+        Assert.Null(third.Token);
         Assert.Equal(IngestToken.MaximumPerProject, _tokens.Stored.Count);
         Assert.Equal(writesBefore, _tokens.Writes);
     }
 
     [Fact]
+    public async Task A_token_is_not_issued_into_a_project_that_is_not_there()
+    {
+        // The foreign key would refuse it as a failure of the installation;
+        // what happened is that the operator named something that is gone.
+        var attempt = await Issuing().ExecuteAsync(
+            Guid.CreateVersion7(), TestContext.Current.CancellationToken);
+
+        Assert.Equal(IssueOutcome.NoSuchProject, attempt.Outcome);
+        Assert.Null(attempt.Token);
+        Assert.Empty(_tokens.Stored);
+        Assert.Equal(0, _tokens.Writes);
+    }
+
+    [Fact]
+    public async Task The_tokens_of_a_project_that_is_not_there_are_not_an_empty_list()
+    {
+        // A closed door and a deleted project are two different readings, and
+        // an empty list for both is the settings of something gone.
+        Assert.Null(await Listing().ExecuteAsync(
+            Guid.CreateVersion7(), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Another_projects_tokens_are_neither_counted_nor_listed()
     {
-        var other = Guid.CreateVersion7();
+        var other = _projects.Holding("web", RetentionWindow.OfDays(7), Now).Id;
         await IssueAsync();
         await IssueAsync();
 
         var elsewhere = await Issuing().ExecuteAsync(other, TestContext.Current.CancellationToken);
 
-        Assert.NotNull(elsewhere);
+        Assert.Equal(IssueOutcome.Issued, elsewhere.Outcome);
         Assert.Equal(
-            [elsewhere.Id],
-            (await Listing().ExecuteAsync(other, TestContext.Current.CancellationToken))
-                .Select(token => token.Id));
+            [elsewhere.Token!.Id],
+            (await ListedAsync(other)).Select(token => token.Id));
     }
 
     [Fact]
@@ -159,7 +194,7 @@ public sealed class IngestTokenActsTests
         Assert.True(await Revoking().IngestTokenAsync(
             issued!.Id, TestContext.Current.CancellationToken));
 
-        Assert.Empty(await Listing().ExecuteAsync(Project, TestContext.Current.CancellationToken));
+        Assert.Empty(await ListedAsync(_project));
     }
 
     [Fact]
@@ -168,8 +203,7 @@ public sealed class IngestTokenActsTests
         var issued = await IssueAsync();
         _tokens.Stored[0].WasUsedAt(Now.AddHours(3));
 
-        var listed = Assert.Single(
-            await Listing().ExecuteAsync(Project, TestContext.Current.CancellationToken));
+        var listed = Assert.Single(await ListedAsync(_project));
 
         Assert.Equal(issued!.Id, listed.Id);
         Assert.Equal(issued.Token.Identifier, listed.Identifier);
@@ -191,12 +225,20 @@ public sealed class IngestTokenActsTests
         Assert.Single(_tokens.Stored);
     }
 
-    private Task<IssuedToken?> IssueAsync() =>
-        Issuing().ExecuteAsync(Project, TestContext.Current.CancellationToken);
+    /// <summary>
+    /// One issuing into the project that is there, which is every case but the
+    /// two that are about the project rather than the token.
+    /// </summary>
+    private async Task<IssuedToken?> IssueAsync() =>
+        (await Issuing().ExecuteAsync(_project, TestContext.Current.CancellationToken)).Token;
 
-    private IssueIngestToken Issuing() => new(_tokens, _cipher, _clock);
+    private async Task<IReadOnlyList<ListedIngestToken>> ListedAsync(Guid project) =>
+        await Listing().ExecuteAsync(project, TestContext.Current.CancellationToken)
+        ?? throw new InvalidOperationException("The project is there.");
 
-    private ListIngestTokens Listing() => new(_tokens);
+    private IssueIngestToken Issuing() => new(_projects, _tokens, _cipher, _clock);
+
+    private ListIngestTokens Listing() => new(_projects, _tokens);
 
     private ReadTokenBack ReadingBack() => new(_tokens, _cipher);
 

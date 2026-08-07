@@ -40,6 +40,15 @@ public sealed class Tokens(LogaffeDbContext context) : ITokens
             .OrderBy(t => t.IssuedAt)
             .ToListAsync(cancellationToken);
 
+    // One grouped statement on ix_ingest_token_project for the whole project
+    // list, rather than one count per row.
+    public async Task<IReadOnlyDictionary<Guid, int>> CountIngestTokensAsync(
+        CancellationToken cancellationToken) =>
+        await context.IngestTokens
+            .GroupBy(t => t.ProjectId)
+            .Select(project => new { ProjectId = project.Key, Count = project.Count() })
+            .ToDictionaryAsync(row => row.ProjectId, row => row.Count, cancellationToken);
+
     public async Task<IReadOnlyList<AgentToken>> ListAgentTokensAsync(
         CancellationToken cancellationToken) =>
         await context.AgentTokens.OrderBy(t => t.IssuedAt).ToListAsync(cancellationToken);
