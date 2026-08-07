@@ -47,8 +47,9 @@ cheapest possible check that nothing has leaked into it.
 **`Logaffe.Domain` holds the rules.** The entry and its level, the two clocks, the
 message template and the rendered form, the trace and span as the byte lengths
 they actually are, the caps and the truncation, the project and its retention
-window, the operator with the session, the backup code and the claim window, and
-the filters with the cursor. The test of whether something belongs here is stated
+window, the two tokens with the identifier and the alphabet they are written in,
+the operator with the session, the backup code and the claim window, and the
+filters with the cursor. The test of whether something belongs here is stated
 in ADR 0030: **anything the documents already state as a rule.** A retention
 window that can be constructed above ninety days, or a search text that can be
 constructed with two characters, is a rule that escaped.

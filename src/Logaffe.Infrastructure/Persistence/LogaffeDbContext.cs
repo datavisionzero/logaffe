@@ -1,4 +1,5 @@
 using Logaffe.Domain.Projects;
+using Logaffe.Domain.Tokens;
 using Microsoft.EntityFrameworkCore;
 
 namespace Logaffe.Infrastructure.Persistence;
@@ -15,6 +16,10 @@ namespace Logaffe.Infrastructure.Persistence;
 public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options) : DbContext(options)
 {
     public DbSet<Project> Projects => Set<Project>();
+
+    public DbSet<IngestToken> IngestTokens => Set<IngestToken>();
+
+    public DbSet<AgentToken> AgentTokens => Set<AgentToken>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(LogaffeDbContext).Assembly);

@@ -1,4 +1,5 @@
 using Logaffe.Domain.Projects;
+using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -15,6 +16,13 @@ namespace Logaffe.IntegrationTests;
 public sealed class SchemaTests(PostgresFixture postgres)
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 6, 12, 0, 0, TimeSpan.Zero);
+
+    /// <summary>
+    /// Stands in for what the cipher will produce. The schema's job is to hold
+    /// the bytes and hand them back; what makes them unreadable is the key on
+    /// the host volume, which is not this test's business.
+    /// </summary>
+    private static readonly byte[] Ciphertext = [1, 2, 3, 4];
 
     [Fact]
     public async Task Migrations_apply_to_an_empty_database()
@@ -85,6 +93,132 @@ public sealed class SchemaTests(PostgresFixture postgres)
         // one of them at three in the morning.
         await Assert.ThrowsAsync<DbUpdateException>(
             () => context.SaveChangesAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task An_ingest_token_round_trips_and_records_its_last_use()
+    {
+        var connectionString = await postgres.CreateDatabaseAsync();
+        await using var context = ContextFor(connectionString);
+        await MigratorFor(context).ApplyAsync(TestContext.Current.CancellationToken);
+
+        var project = Project.Create("api", RetentionWindow.OfDays(7), Now);
+        var minted = TokenText.Mint(TokenKind.Ingest);
+        var token = IngestToken.Issue(project.Id, minted.Identifier, Ciphertext, Now);
+        context.Projects.Add(project);
+        context.IngestTokens.Add(token);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await using (var reader = ContextFor(connectionString))
+        {
+            var stored = await reader.IngestTokens.SingleAsync(TestContext.Current.CancellationToken);
+
+            Assert.Equal(project.Id, stored.ProjectId);
+            // A varchar in the column and an identifier again on the way out.
+            Assert.Equal(minted.Identifier, stored.Identifier);
+            Assert.Equal(Ciphertext, stored.EncryptedSecret);
+            Assert.Null(stored.LastUsedAt);
+        }
+
+        token.WasUsedAt(Now.AddMinutes(1));
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await using var afterUse = ContextFor(connectionString);
+        var used = await afterUse.IngestTokens.SingleAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(Now.AddMinutes(1), used.LastUsedAt);
+    }
+
+    [Fact]
+    public async Task An_ingest_token_is_found_by_its_identifier()
+    {
+        var connectionString = await postgres.CreateDatabaseAsync();
+        await using var context = ContextFor(connectionString);
+        await MigratorFor(context).ApplyAsync(TestContext.Current.CancellationToken);
+
+        var project = Project.Create("api", RetentionWindow.OfDays(7), Now);
+        var minted = TokenText.Mint(TokenKind.Ingest);
+        context.Projects.Add(project);
+        context.IngestTokens.Add(IngestToken.Issue(project.Id, minted.Identifier, Ciphertext, Now));
+        // A second project mid-rotation, so the lookup has more than one row to
+        // be wrong about.
+        var other = Project.Create("web", RetentionWindow.OfDays(7), Now);
+        context.Projects.Add(other);
+        context.IngestTokens.Add(
+            IngestToken.Issue(other.Id, TokenIdentifier.Mint(), Ciphertext, Now));
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await using var reader = ContextFor(connectionString);
+        // The whole of authentication's database work: one indexed lookup on the
+        // identifier the presented token carries (ADR 0031).
+        var found = await reader.IngestTokens.SingleAsync(
+            t => t.Identifier == minted.Identifier, TestContext.Current.CancellationToken);
+
+        Assert.Equal(project.Id, found.ProjectId);
+    }
+
+    [Fact]
+    public async Task Two_tokens_cannot_share_an_identifier()
+    {
+        var connectionString = await postgres.CreateDatabaseAsync();
+        await using var context = ContextFor(connectionString);
+        await MigratorFor(context).ApplyAsync(TestContext.Current.CancellationToken);
+
+        var project = Project.Create("api", RetentionWindow.OfDays(7), Now);
+        var identifier = TokenIdentifier.Mint();
+        context.Projects.Add(project);
+        context.IngestTokens.Add(IngestToken.Issue(project.Id, identifier, Ciphertext, Now));
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        context.IngestTokens.Add(IngestToken.Issue(project.Id, identifier, Ciphertext, Now));
+
+        // Two rows answering to one identifier would make which of them was
+        // meant a question the ingest path has no way to answer.
+        await Assert.ThrowsAsync<DbUpdateException>(
+            () => context.SaveChangesAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task Deleting_a_project_takes_its_ingest_tokens()
+    {
+        var connectionString = await postgres.CreateDatabaseAsync();
+        await using var context = ContextFor(connectionString);
+        await MigratorFor(context).ApplyAsync(TestContext.Current.CancellationToken);
+
+        var project = Project.Create("api", RetentionWindow.OfDays(7), Now);
+        context.Projects.Add(project);
+        context.IngestTokens.Add(
+            IngestToken.Issue(project.Id, TokenIdentifier.Mint(), Ciphertext, Now));
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        context.Projects.Remove(project);
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        // The project, its tokens and its visibility are gone at once
+        // (ADR 0019), and the cascade is the database's rather than a step the
+        // deleting code has to remember.
+        await using var reader = ContextFor(connectionString);
+        Assert.Empty(await reader.IngestTokens.ToListAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task An_agent_token_round_trips_and_belongs_to_no_project()
+    {
+        var connectionString = await postgres.CreateDatabaseAsync();
+        await using var context = ContextFor(connectionString);
+        await MigratorFor(context).ApplyAsync(TestContext.Current.CancellationToken);
+
+        var minted = TokenText.Mint(TokenKind.Agent);
+        context.AgentTokens.Add(AgentToken.Issue("terminal agent", minted.Identifier, Ciphertext, Now));
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await using var reader = ContextFor(connectionString);
+        var stored = await reader.AgentTokens.SingleAsync(TestContext.Current.CancellationToken);
+
+        // An agent token reads every project, so there is nothing for it to hang
+        // off and no project has to exist for one to be issued.
+        Assert.Equal("terminal agent", stored.Name);
+        Assert.Equal(minted.Identifier, stored.Identifier);
+        Assert.Null(stored.LastUsedAt);
     }
 
     private static LogaffeDbContext ContextFor(string connectionString) =>

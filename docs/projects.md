@@ -37,10 +37,13 @@ any kind. The operator can **read it back at any time** — it is stored encrypt
 rather than hashed, so mislaying it means looking it up rather than rotating and
 redeploying
 ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)).
-It carries a recognizable prefix, which costs nothing and means an accidental
+It carries a recognizable prefix — `logaffe_ingest`, against the agent token's
+`logaffe_agent` — which costs nothing and means an accidental
 appearance in a repository or a log is something a scanner can find. That second case is not
 hypothetical: applications log the configuration they started with, and a token
-that ends up in a log entry ends up here.
+that ends up in a log entry ends up here. The prefix is written down here rather
+than only in the code, because a prefix nobody outside the product knows is a
+prefix no scanner is looking for.
 
 Between the prefix and the secret sits a **non-secret identifier naming the row
 that holds the token**, so that a delivery is authenticated by one indexed lookup
