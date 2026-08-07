@@ -118,6 +118,21 @@ has fallen outside their project's window, in bounded portions rather than one
 statement, so it never holds a long transaction across a table other projects are
 still being written to.
 
+It runs **hourly**, though a window is measured in days. A daily pass would take
+a whole day of a project in one burst on the largest table in the database, and
+index churn under continuous insert-and-delete is the part of this design most
+likely to need attention
+([ADR 0023](./adr/0023-retention-deletes-rows-rather-than-dropping-partitions.md));
+an hourly pass takes a twenty-fourth of that, and a pass with nothing to do —
+which is most of them — costs one index probe per project.
+
+**The same job takes what a deleted project left behind.** A project goes at
+once and its entries follow in the background
+([ADR 0019](./adr/0019-a-project-is-deleted-at-once-and-its-entries-follow.md)),
+and this is that background: there is no window left to read, so they are removed
+whole. Nothing can reach them in the meantime — every query runs inside a
+project, and that project is gone.
+
 Deleting rows rather than dropping time partitions is the deliberate choice, and
 the reason is that **retention is per project**. A partition can only be dropped
 once everything inside it has expired, so a project keeping entries for seven days

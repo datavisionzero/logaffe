@@ -81,6 +81,12 @@ builder.Services.AddScoped<RenameProject>();
 builder.Services.AddScoped<ChangeRetentionWindow>();
 builder.Services.AddScoped<DeleteProject>();
 
+// The other end of both of those: the window is what this reads, and a deleted
+// project's entries are what it takes afterwards (ADR 0019). It is reachable
+// from nowhere but the timer below — retention is not an act the operator
+// triggers.
+builder.Services.AddScoped<SweepExpiredEntries>();
+
 // The operator's token acts. They are registered here and reachable from HTTP
 // and the command line; what makes them unreachable over MCP is that the MCP
 // adapter offers four read tools and nothing else (ADR 0018).
@@ -106,9 +112,12 @@ builder.Services.AddHostedService<KeyFitsService>();
 // window it will never serve.
 builder.Services.AddHostedService<ClaimWindowService>();
 
-// After the migrations, whose service has finished before this one starts: the
-// first pass reads a table a migration may have been about to create.
+// After the migrations, whose service has finished before these start: the
+// first pass reads a table a migration may have been about to create. Each has
+// a timer of its own — one is a statement a day, the other is bounded portions
+// over the largest table in the database.
 builder.Services.AddHostedService<ExpiredSessionService>();
+builder.Services.AddHostedService<RetentionService>();
 
 builder.Services.AddLogaffeRequestSource(builder.Configuration);
 builder.Services.AddLogaffeSessionAuthentication();

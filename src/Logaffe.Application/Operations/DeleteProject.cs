@@ -20,8 +20,9 @@ namespace Logaffe.Application.Operations;
 /// keeps writing locally without noticing — the same experience as a rotation
 /// done carelessly. The entries carry no such key, deliberately: a cascade would
 /// put millions of rows back inside this request. Nothing can reach them —
-/// every query runs inside a project and this one is gone — and the sweep that
-/// removes them hangs here once it exists.
+/// every query runs inside a project and this one is gone — and
+/// <see cref="SweepExpiredEntries"/> takes them on its next pass, which is the
+/// background ADR 0019 sends them to.
 /// </para>
 /// <para>
 /// <b>The confirmation is not here.</b> Deleting is confirmed by typing the

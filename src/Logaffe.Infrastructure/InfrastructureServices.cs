@@ -1,5 +1,6 @@
 using Logaffe.Application.Ports;
 using Logaffe.Infrastructure.Persistence;
+using Logaffe.Infrastructure.Persistence.Log;
 using Logaffe.Infrastructure.Secrets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -32,6 +33,11 @@ public static class InfrastructureServices
         services.AddScoped<IOperators, Operators>();
         services.AddScoped<ISessions, Sessions>();
         services.AddScoped<SchemaMigrator>();
+
+        // The one table EF Core declares and does not serve (ADR 0003). It is
+        // registered beside the stores because the layer above asks for it the
+        // same way; what is different is on the other side of the interface.
+        services.AddScoped<IEntries, Entries>();
 
         // One key for the installation, read from the volume the first time a
         // token is sealed or opened — the same deferral as the connection string
