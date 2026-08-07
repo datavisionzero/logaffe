@@ -34,9 +34,37 @@ agent's config. Assembling that by hand from an address, a header name and a
 string is the fiddliest part of connecting an agent, and it is the part most
 likely to be got wrong in a way that reports nothing useful.
 
+What they are handed is the block itself, with this installation's address and
+this token already in it:
+
+```json
+{
+  "mcpServers": {
+    "logaffe": {
+      "type": "http",
+      "url": "https://logs.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer logaffe_agent_…"
+      }
+    }
+  }
+}
+```
+
+The endpoint is **`/mcp`** on the installation's own address. It is written down
+here rather than only in the code because it goes into the configuration of
+every agent that ever connects, which makes it a promise to all of them rather
+than a route that can be moved. The address is filled in from the request the
+operator asked over, so an installation reached through a reverse proxy hands
+out the name they reached it by
+([Operations](./operations.md#behind-a-reverse-proxy)).
+
 This is the same move the first-run guide already makes for the Serilog sink
 ([Setup](./setup.md)): the shortest path from a running installation to a working
 client is a block the operator does not have to assemble.
+
+The same block comes back whenever the token is read back, because reading a
+token back and being able to use it are the same errand.
 
 **Several can exist at once**, because an operator with a terminal agent and a
 desktop agent should be able to retire one without disturbing the other. The

@@ -40,8 +40,13 @@ public static class RequestSource
 
         return services.Configure<ForwardedHeadersOptions>(options =>
         {
-            options.ForwardedHeaders =
-                ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            // The host and the scheme along with the caller, because the address
+            // an agent's configuration is assembled with is the one the operator
+            // reached the installation at rather than the one the container
+            // answers on.
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+                | ForwardedHeaders.XForwardedProto
+                | ForwardedHeaders.XForwardedHost;
 
             foreach (var entry in trusted)
             {

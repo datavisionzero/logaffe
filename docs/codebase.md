@@ -145,6 +145,13 @@ the indexes doing what [Storage](./storage.md) claims, the claim flow, and the
 retention sweep. The split is by what a test needs rather than by what it covers,
 because that is the distinction CI has to act on.
 
+It also **starts the installation itself**, through `WebApplicationFactory`, for
+the one class of fact that cannot be read off a registration: what an endpoint
+admits. That every operator surface sits behind the session is a one-line
+mistake away from not being true, so it is asked of a running composition root
+rather than of the line that was supposed to say so. That is why this project
+references `Logaffe.Api` and the unit tests do not.
+
 The frontend carries its own tests inside `src/web/`, run by the same CI job that
 builds it.
 

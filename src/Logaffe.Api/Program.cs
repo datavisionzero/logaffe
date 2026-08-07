@@ -94,6 +94,7 @@ app.UseAuthorization();
 app.MapOpenApi();
 app.MapHealth();
 app.MapSessions();
+app.MapTokens();
 
 // The single-page application is built by its own toolchain and copied into
 // wwwroot at image build time; in development the Vite dev server serves it and
@@ -104,3 +105,12 @@ app.MapFallbackToFile("index.html");
 
 await app.RunAsync();
 return 0;
+
+/// <summary>
+/// Named so that a test can start this installation in its own process. Top
+/// level statements produce a class that is otherwise unreachable, and asking a
+/// running installation what its endpoints admit is the only way to say it —
+/// reading the registrations back would be the test writing down what it just
+/// wrote.
+/// </summary>
+public partial class Program;

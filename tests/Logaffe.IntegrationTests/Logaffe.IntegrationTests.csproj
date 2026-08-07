@@ -6,9 +6,14 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Logaffe.Infrastructure/Logaffe.Infrastructure.csproj" />
+    <!-- The composition root itself, so that what sits behind the operator's
+         session is asked of a running installation rather than read off a
+         registration. -->
+    <ProjectReference Include="../../src/Logaffe.Api/Logaffe.Api.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Testcontainers.PostgreSql" />

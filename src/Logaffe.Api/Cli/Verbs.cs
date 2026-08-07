@@ -5,9 +5,18 @@ namespace Logaffe.Api.Cli;
 /// and exits; anything else starts the server.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Both verbs are host-local by design and never reachable over the network
 /// (ADR 0013). They are two words, so they are read as two words — a parser
 /// would be machinery for a surface that is not meant to grow.
+/// </para>
+/// <para>
+/// <b>The token acts are deliberately not here.</b> These two are host-local
+/// because they are the way back into an installation nobody can sign in to;
+/// issuing, revoking or reading back a credential is not that kind of act. The
+/// operator has a browser, the first-run guide hands them the snippet in it, and
+/// a second surface for the same acts would be a second thing to keep true.
+/// </para>
 /// </remarks>
 public static class Verbs
 {

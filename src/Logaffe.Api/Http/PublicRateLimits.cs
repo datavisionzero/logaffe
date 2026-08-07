@@ -18,9 +18,21 @@ public static class PublicRateLimits
     public const string SignIn = "sign-in";
 
     /// <summary>
+    /// The throttle on everything behind the operator's session. It is generous,
+    /// because the only repeating request the interface makes is the tail of the
+    /// view being watched (<c>docs/ui.md</c>) — it is here so that a stolen
+    /// cookie cannot walk the installation at machine speed, not to ration an
+    /// operator who is working.
+    /// </summary>
+    public const string Operator = "operator";
+
+    /// <summary>
     /// A burst of attempts a person mistyping their password actually makes.
     /// </summary>
     private const int Burst = 5;
+
+    /// <summary>How many requests a signed-in browser gets per minute.</summary>
+    private const int OperatorPerMinute = 300;
 
     /// <summary>
     /// What the bucket refills at once the burst is gone, which is what turns
@@ -56,6 +68,22 @@ public static class PublicRateLimits
                     QueueLimit = Waiting,
                     QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                     AutoReplenishment = true,
+                }));
+
+            // Partitioned by source here as well rather than by session, so that
+            // a request arriving with no session at all — which is most of what
+            // an intruder sends — is counted like any other.
+            limiter.AddPolicy(Operator, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.SeenFrom() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = OperatorPerMinute,
+                    Window = TimeSpan.FromMinutes(1),
+
+                    // Nothing waits here. Holding an operator's request open to
+                    // smooth a burst would make the interface feel broken, and
+                    // there is no guessing to slow down behind the door.
+                    QueueLimit = 0,
                 }));
 
             limiter.OnRejected = (context, cancellationToken) =>
