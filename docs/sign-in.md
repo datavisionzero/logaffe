@@ -85,7 +85,17 @@ A session lasts generously — on the order of **30 days** — and every use pus
 the deadline forward, so an installation in regular use is not a place where the
 operator keeps re-authenticating.
 
-What the browser holds is a value the installation draws, and it is stored as a
+What the browser holds is **a cookie and nothing else** — `HttpOnly`, so no
+script can read the value that is the whole of the operator's standing
+permission; `Secure`, because an installation on the open internet is behind TLS
+and a browser already treats `localhost` as a secure origin; and `SameSite=Strict`,
+because everything the operator does is at the installation's own address and
+nothing in the product is linked to from elsewhere. **The cookie carries the
+secret and nothing about who it belongs to**: the row is read on every request,
+which is what makes ending a session from the list below take effect
+immediately.
+
+The value the browser holds is one the installation draws, and it is stored as a
 **fast hash** — the same storage a backup code gets and for the same reasons
 ([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)): it
 carries all of its own entropy, so there is nothing a slow hash would defend
@@ -113,6 +123,13 @@ untouched, or when Host Recovery removes the account it belonged to.
 Failed sign-ins are throttled **by where they come from**, with the delay growing
 as attempts accumulate. The account itself is never locked
 ([ADR 0017](./adr/0017-a-wrong-password-never-locks-the-account.md)).
+
+Concretely: **five attempts in a burst**, which is what a person mistyping a
+passphrase actually makes, and then **one every thirty seconds**, with a couple
+held waiting rather than refused before the rest are answered `429`. Those are
+product values, the same in every installation, and not something an operator is
+asked to have an opinion about. Which address a burst is counted against is
+[the reverse proxy question](./operations.md#behind-a-reverse-proxy).
 
 With exactly one account, a lockout is a weapon pointed at its owner: anyone able
 to reach the installation could hold the operator out of it indefinitely by

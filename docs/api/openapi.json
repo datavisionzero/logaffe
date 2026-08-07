@@ -22,6 +22,109 @@
           }
         }
       }
+    },
+    "/sign-in": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Starts a session for the operator.",
+        "operationId": "SignIn",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/sign-out": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Ends the session this request was made with.",
+        "operationId": "SignOut",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "SignInRequest": {
+        "required": [
+          "password",
+          "secondFactorCode",
+          "backupCode"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secondFactorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "backupCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "SignInResponse": {
+        "required": [
+          "backupCodesRemaining"
+        ],
+        "type": "object",
+        "properties": {
+          "backupCodesRemaining": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      }
     }
   },
   "tags": [

@@ -45,6 +45,13 @@ builder.Services.AddScoped<CheckReadiness>();
 builder.Services.AddScoped<CheckTheKeyFits>();
 builder.Services.AddScoped<AuthenticateToken>();
 
+// The operator's door. Authenticating a session is the counterpart of
+// authenticating a token — one credential a person carries, one a machine does —
+// and everything the operator can do stands behind it.
+builder.Services.AddScoped<SignIn>();
+builder.Services.AddScoped<AuthenticateSession>();
+builder.Services.AddScoped<SignOut>();
+
 // The operator's token acts. They are registered here and reachable from HTTP
 // and the command line; what makes them unreachable over MCP is that the MCP
 // adapter offers four read tools and nothing else (ADR 0018).
@@ -66,14 +73,27 @@ builder.Services.AddSingleton<DummySecret>();
 builder.Services.AddHostedService<SchemaMigrationService>();
 builder.Services.AddHostedService<KeyFitsService>();
 
+builder.Services.AddLogaffeRequestSource(builder.Configuration);
+builder.Services.AddLogaffeSessionAuthentication();
+builder.Services.AddLogaffeRateLimits();
 builder.Services.AddLogaffeOpenApi();
 
 var app = builder.Build();
 
+// Before anything reads an address: the throttle and the session list both act
+// on where a request came from, and behind a named proxy that is the forwarded
+// value rather than the connection's.
+app.UseForwardedHeaders();
+
 app.UseSerilogRequestLogging();
+
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapOpenApi();
 app.MapHealth();
+app.MapSessions();
 
 // The single-page application is built by its own toolchain and copied into
 // wwwroot at image build time; in development the Vite dev server serves it and

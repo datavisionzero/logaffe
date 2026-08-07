@@ -136,6 +136,33 @@ It reports ready when the database is reachable and migrations are complete —
 during a long migration on a large installation the answer is `503`, which is the
 honest one, since nothing can be served yet.
 
+## Behind a reverse proxy
+
+Two things in the product act on **where a request came from**: the throttle in
+front of the sign-in ([ADR 0017](./adr/0017-a-wrong-password-never-locks-the-account.md))
+and the address beside each session in the operator's list
+([Signing in](./sign-in.md)), which is the only way they can ever notice a
+session that is not theirs.
+
+An installation reached directly gets that from the connection and needs no
+configuration. One reached through a reverse proxy sees the proxy on every
+connection instead, and has to be told which addresses to believe an
+`X-Forwarded-For` from:
+
+```
+Logaffe__TrustedProxies=10.0.0.0/8,203.0.113.4
+```
+
+**Unset means nothing is trusted and the header is ignored**, which is the right
+default rather than a cautious one: `X-Forwarded-For` is written by whoever sent
+the request, so an installation that honours it without naming a proxy hands
+both of the things above to the caller — a throttle partitioned by a value the
+attacker picks, and a session list showing whatever an intruder wanted it to
+show. Loopback is the one exception and stays trusted, which covers a proxy
+sharing the container's network namespace; a proxy in its own container on the
+Compose network arrives from that network's address range and has to be named
+like any other.
+
 ## Sizing the disk
 
 The store is bounded by the retention window and the delivery rate, so its size

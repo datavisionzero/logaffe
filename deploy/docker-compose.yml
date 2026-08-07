@@ -16,6 +16,13 @@ services:
     environment:
       ConnectionStrings__Postgres: >-
         Host=db;Port=5432;Database=logaffe;Username=logaffe;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      # An installation reached through a reverse proxy names it here, as
+      # addresses or CIDR ranges, so that the address a request is throttled by
+      # and listed under is the caller's rather than the proxy's. Unset means
+      # nothing is trusted and `X-Forwarded-For` is ignored, which is right for
+      # an installation reached directly: the header is written by whoever sent
+      # the request.
+      Logaffe__TrustedProxies: "${LOGAFFE_TRUSTED_PROXIES:-}"
     volumes:
       # Both stores are needed, and a database alone is not a backup: the key
       # that makes stored tokens readable lives here.
