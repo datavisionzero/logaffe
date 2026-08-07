@@ -12,10 +12,19 @@ Two stores, and both are needed.
 
 - **The database** holds projects, tokens, entries and the operator's account.
 - **The host volume** holds the configuration and the secrets — including the
-  **encryption key** that makes the stored tokens readable
+  **encryption key** at `keys/token.key` that makes the stored tokens readable
   ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)),
   and with them the operator's TOTP secret, which is encrypted under the same key
   ([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)).
+
+**The key is written on first start and never again.** There is no step for the
+operator here, in the same spirit as the claim needing no setup secret: an
+installation that came up is one that has a key. It is base64 in a file readable
+by its owner alone, and a start that finds one uses it rather than replacing
+it — including two containers starting at once, where only the first creates and
+the second reads what the first wrote. A start that writes a *new* key says so in
+logaffe's own log, and on an installation that already held tokens that line is
+the alarm: the volume is gone, and with it every token in the database.
 
 Nothing lives inside the container image. A container can be destroyed and
 recreated without losing anything, which is what makes an upgrade a `pull` and an

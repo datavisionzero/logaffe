@@ -1,8 +1,10 @@
 using Logaffe.Application.Ports;
 using Logaffe.Infrastructure.Persistence;
+using Logaffe.Infrastructure.Secrets;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Logaffe.Infrastructure;
 
@@ -24,6 +26,15 @@ public static class InfrastructureServices
 
         services.AddScoped<IDatabaseProbe, DatabaseProbe>();
         services.AddScoped<SchemaMigrator>();
+
+        // One key for the installation, read from the volume the first time a
+        // token is sealed or opened — the same deferral as the connection string
+        // above, and for the same reason.
+        services.AddSingleton(provider => new HostVolumeKey(
+            configuration["Logaffe:VolumePath"]
+            ?? throw new InvalidOperationException("Logaffe:VolumePath is not configured."),
+            provider.GetRequiredService<ILogger<HostVolumeKey>>()));
+        services.AddSingleton<ITokenCipher, AesGcmTokenCipher>();
 
         return services;
     }
