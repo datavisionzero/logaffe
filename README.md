@@ -10,10 +10,20 @@ deliberately is not.
 
 ## Status
 
-Pre-release. The solution scaffold stands and starts — it applies its schema,
-answers its health endpoint and serves the web shell — but none of the product
-is built yet: nothing ingests, nothing queries, and there is no claim, no UI and
-no MCP. See [VISION.md](VISION.md) for where it is going and
+Pre-release, and the product is built. An installation ingests CLEF over HTTP,
+stores and queries it, and is claimed by the one operator it belongs to. Behind
+their sign-in are the projects and their ingest tokens, the log view with its
+filters and its live tail, and the settings for the installation and for each
+project. The same reads are offered to an agent as four MCP tools. `logaffe
+backup` writes both halves of an installation into one artifact and `logaffe
+restore` puts them back; `logaffe recover` is the way back in when the sign-in
+is lost. All of it has been exercised end to end against a running installation.
+
+**What is not there yet is a release.** No version has been tagged, so neither
+the image nor the three client packages have been published, and today logaffe
+is run by building this repository. Pushing a tag is what changes that.
+
+See [VISION.md](VISION.md) for where it is going and
 [docs/codebase.md](docs/codebase.md) for how the repository is laid out.
 
 Working on it needs the .NET 10 SDK, Node 24 or newer, and Docker:
