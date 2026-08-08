@@ -11,6 +11,16 @@
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
+  <!-- The tag is the version, and it is the only source of one: a release
+       passes `-p:Version=` from the tag it was started by, for the image and all
+       three packages alike. That single number is load-bearing beyond the
+       registry, because a backup manifest records it (ADR 0024), so a build
+       that was not started by a tag says so rather than claiming a number
+       nobody released. -->
+  <PropertyGroup>
+    <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
+  </PropertyGroup>
+
   <!-- Shared package metadata for the three client packages. Whether a project
        is packable is decided by the project itself. -->
   <PropertyGroup>

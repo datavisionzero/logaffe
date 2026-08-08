@@ -25,6 +25,11 @@ RUN npm run build -- --outDir dist --emptyOutDir
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
 WORKDIR /src
 
+# What this build calls itself. The release workflow passes the tag; a build
+# started by hand keeps the default the props file gives, which says plainly
+# that it is not a release.
+ARG VERSION=0.0.0-dev
+
 # Restore against the manifests alone, so that a change to a source file does
 # not invalidate the package layer.
 COPY global.json Directory.Build.props Directory.Packages.props ./
@@ -38,7 +43,7 @@ COPY src/Logaffe.Domain/ src/Logaffe.Domain/
 COPY src/Logaffe.Application/ src/Logaffe.Application/
 COPY src/Logaffe.Infrastructure/ src/Logaffe.Infrastructure/
 COPY src/Logaffe.Api/ src/Logaffe.Api/
-RUN dotnet publish src/Logaffe.Api/Logaffe.Api.csproj -c Release -o /app
+RUN dotnet publish src/Logaffe.Api/Logaffe.Api.csproj -c Release -o /app -p:Version=$VERSION
 
 # ------------------------------------------------------------ the runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
