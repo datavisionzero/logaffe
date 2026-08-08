@@ -1,0 +1,181 @@
+# A tag is the release, and the tag is the version.
+#
+#   git tag v1.4.0 && git push origin v1.4.0
+#
+# One tag publishes the image and all three packages under the same number. For
+# a project this size a single version is far less to explain than two release
+# trains, and a client package carrying the server's number says something
+# useful about what it was built against. The accepted cost is that a package
+# gets a version bump with nothing changed in it.
+#
+# That number is load-bearing beyond the registry: `logaffe backup` writes it
+# into the manifest and a restore compares what it finds there, so one version
+# has to mean one thing everywhere. It reaches the build as `-p:Version=`, taken
+# from the tag and from nowhere else — `Directory.Build.props` otherwise says
+# `0.0.0-dev`, which is what an unreleased build honestly is.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  # So that a release can be re-run against a tag that already exists, which is
+  # what a failed push to one registry leaves behind.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The tag to release, as it is written (v1.4.0).
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+# Never two releases at once, and never a release racing the CI run of the
+# commit it is built from: they share a host and the ports on it.
+concurrency:
+  group: ci
+  cancel-in-progress: false
+
+jobs:
+  version:
+    name: Version
+    runs-on: [self-hosted, logaffe]
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+      ref: ${{ steps.read.outputs.ref }}
+      latest: ${{ steps.read.outputs.latest }}
+    steps:
+      - id: read
+        name: Read the version out of the tag
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          case "$TAG" in
+            v*) version="${TAG#v}" ;;
+            *) echo "A release tag begins with v: $TAG"; exit 1 ;;
+          esac
+
+          # What NuGet and the registry will both take, and what the build can
+          # stamp: major.minor.patch, with an optional prerelease behind it.
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "Not a version this can release: $version"
+            exit 1
+          fi
+
+          {
+            echo "version=$version"
+            echo "ref=$TAG"
+            # `latest` is what `deploy/docker-compose.yml` pulls, so a
+            # prerelease must not move it — an operator who never asked for one
+            # would be upgraded into it by an ordinary `docker compose pull`.
+            case "$version" in
+              *-*) echo "latest=false" ;;
+              *) echo "latest=true" ;;
+            esac
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Releasing logaffe $version from $TAG."
+
+  image:
+    name: Image
+    needs: version
+    runs-on: [self-hosted, logaffe]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.ref }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Sign in to the registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: tags
+        name: Which names this image answers to
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          LATEST: ${{ needs.version.outputs.latest }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "tags<<TAGS"
+            echo "ghcr.io/datavisionzero/logaffe:$VERSION"
+
+            if [ "$LATEST" = "true" ]; then
+              echo "ghcr.io/datavisionzero/logaffe:latest"
+            fi
+
+            echo "TAGS"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: true
+          build-args: |
+            VERSION=${{ needs.version.outputs.version }}
+          tags: ${{ steps.tags.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  packages:
+    name: Packages
+    needs: version
+    runs-on: [self-hosted, logaffe]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.ref }}
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # The three of them and nothing else: every other project in the solution
+      # says it is not packable.
+      - name: Pack
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          for package in Logaffe.Client Logaffe.Serilog Logaffe.Extensions.Logging; do
+            dotnet pack "src/clients/$package/$package.csproj" \
+              -c Release \
+              -p:Version="$VERSION" \
+              -o packages
+          done
+
+      # nuget.org rather than this repository's own package feed, because the
+      # problem being solved is that these are unreachable to anyone who is not
+      # building the repository — and a feed that has to be configured and
+      # authenticated before `dotnet add package` works is not reachable in the
+      # sense that matters.
+      - name: Push
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NUGET_API_KEY}" ]; then
+            echo "NUGET_API_KEY is not set on this repository, so there is nowhere"
+            echo "to push. The image was published; the packages were not."
+            exit 1
+          fi
+
+          # `--skip-duplicate`, so that re-running a release whose image
+          # succeeded and whose packages half did is not an error.
+          dotnet nuget push "packages/*.nupkg" \
+            --source https://api.nuget.org/v3/index.json \
+            --api-key "$NUGET_API_KEY" \
+            --skip-duplicate

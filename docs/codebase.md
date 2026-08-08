@@ -14,7 +14,7 @@ carries two languages, and the one artifact an operator runs carries both.
 
 ```
 logaffe/
-├─ .github/workflows/         ci; release joins it at the first release
+├─ .github/workflows/         ci on every push, release on every tag
 ├─ docs/                      the product, the decisions, and this
 │  ├─ adr/
 │  ├─ agents/
