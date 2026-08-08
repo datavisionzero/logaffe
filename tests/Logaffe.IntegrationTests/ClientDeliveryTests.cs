@@ -1,6 +1,7 @@
 using System.Net;
 using Logaffe.Application.Operations;
 using Logaffe.Client;
+using Logaffe.Serilog;
 using Logaffe.Domain.Entries;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
@@ -9,6 +10,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
+using Serilog;
 
 namespace Logaffe.IntegrationTests;
 
@@ -129,20 +131,63 @@ public sealed class ClientDeliveryTests(PostgresFixture postgres) : IAsyncLifeti
         Assert.Contains(refusals, what => what.Contains("token was refused"));
     }
 
+    /// <summary>
+    /// The same question of the package above it: what
+    /// <c>CompactJsonFormatter</c> writes is what the endpoint stores.
+    /// </summary>
+    /// <remarks>
+    /// Nothing but a running installation can answer it. logaffe refuses an
+    /// entry carrying <c>@m</c>, so the rendered formatter would produce an
+    /// integration in which every line is counted invalid and nothing is stored
+    /// — and a substituted handler, which accepts whatever it is sent, would
+    /// have agreed with either one.
+    /// </remarks>
+    [Fact]
+    public async Task An_event_logged_through_the_serilog_sink_becomes_a_row()
+    {
+        var (project, token) = await AdmittedAsync();
+
+        using (var logger = new LoggerConfiguration()
+                   .WriteTo.Sink(new LogaffeSink(
+                       DeliveryOptions(token.Text), "api-7c4f", _installation.CreateClient()))
+                   .CreateLogger())
+        {
+            logger
+                .ForContext("SourceContext", "Orders.Api")
+                .Warning("User {UserId} failed login from {Ip}", 42, "203.0.113.7");
+        }
+
+        var only = Assert.Single(await StoredAsync(project));
+
+        // Rendered by the server from the template and the values the sink
+        // carried across, which is the whole reason it is not the rendered
+        // formatter (ADR 0005).
+        Assert.Equal("User {UserId} failed login from {Ip}", only.Template);
+        Assert.Equal("User 42 failed login from 203.0.113.7", only.Rendered);
+
+        // Serilog's spelling of the level, taken as it is.
+        Assert.Equal((short)Level.Warning, only.Level);
+
+        Assert.Equal("api-7c4f", only.Instance);
+        Assert.Equal("Orders.Api", only.LoggerName);
+    }
+
     private EntryDelivery Delivery(string token, Action<string, Exception?>? onFailure = null) =>
-        new(
-            new EntryDeliveryOptions
-            {
-                // The host is the test server's, and the path is the package's
-                // own -- which is the point: a client that reached for the
-                // wrong one would find nothing here either.
-                Installation = new Uri("http://localhost"),
-                IngestToken = token,
-                BatchInterval = TimeSpan.FromMilliseconds(50),
-                FlushTimeout = TimeSpan.FromSeconds(30),
-                OnFailure = onFailure,
-            },
-            _installation.CreateClient());
+        new(DeliveryOptions(token, onFailure), _installation.CreateClient());
+
+    private static EntryDeliveryOptions DeliveryOptions(
+        string token, Action<string, Exception?>? onFailure = null) =>
+        new()
+        {
+            // The host is the test server's, and the path is the package's
+            // own -- which is the point: a client that reached for the
+            // wrong one would find nothing here either.
+            Installation = new Uri("http://localhost"),
+            IngestToken = token,
+            BatchInterval = TimeSpan.FromMilliseconds(50),
+            FlushTimeout = TimeSpan.FromSeconds(30),
+            OnFailure = onFailure,
+        };
 
     private async Task<(Guid Project, TokenText Token)> AdmittedAsync()
     {

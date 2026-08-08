@@ -14,6 +14,10 @@
          the two is asked of both ends at once rather than of a substituted
          handler that would agree with whatever the client sent. -->
     <ProjectReference Include="../../src/clients/Logaffe.Client/Logaffe.Client.csproj" />
+    <!-- And the two packages above it, for the same reason: a formatter that
+         wrote `@m` would be counted invalid per entry, which no substituted
+         handler would ever notice. -->
+    <ProjectReference Include="../../src/clients/Logaffe.Serilog/Logaffe.Serilog.csproj" />
   </ItemGroup>
 
   <ItemGroup>

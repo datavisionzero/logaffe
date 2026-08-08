@@ -36,6 +36,19 @@
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
 
+  <ItemGroup Label="Clients">
+    <!-- Serilog 4 is the floor: Serilog.Formatting.Compact 3.0.0 asks for it,
+         and applications on the runtime these packages target are on it.
+         Reversible — supporting Serilog 3.x means multi-targeting against
+         Serilog.Formatting.Compact 2.x, and nothing forecloses that. -->
+    <PackageVersion Include="Serilog" Version="4.3.0" />
+    <!-- The whole of the sink, really: because the ingestion format is CLEF
+         (ADR 0004), pointing this formatter at the endpoint is the integration.
+         Never RenderedCompactJsonFormatter, which writes `@m` and would have
+         every line counted invalid. -->
+    <PackageVersion Include="Serilog.Formatting.Compact" Version="3.0.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Tests">
     <!-- Starts the composition root in the test process, which is the only way
          to say that an endpoint is behind the door rather than that a line of

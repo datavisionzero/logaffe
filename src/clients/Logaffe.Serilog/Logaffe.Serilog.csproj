@@ -15,4 +15,9 @@
     <ProjectReference Include="../Logaffe.Client/Logaffe.Client.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Formatting.Compact" />
+  </ItemGroup>
+
 </Project>
