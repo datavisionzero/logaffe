@@ -416,6 +416,150 @@ public sealed class EntryReaderTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task A_poll_answers_what_arrived_after_the_cursor_and_not_the_entry_at_it()
+    {
+        var reader = await ReadingAsync(
+            Entry(1, Ten, received: Ten),
+            Entry(2, Ten, received: Ten.AddSeconds(1)),
+            Entry(3, Ten, received: Ten.AddSeconds(2)));
+
+        var arrived = await ArrivalsAsync(reader, new TailCursor(Ten.AddSeconds(1), 2));
+
+        Assert.Equal([3], arrived.Select(entry => entry.Id));
+    }
+
+    [Fact]
+    public async Task A_late_delivery_arrives_though_it_happened_before_what_the_tail_has_shown()
+    {
+        // A sender that was disconnected: it happened ten minutes ago and it is
+        // being delivered now. This is the whole of ADR 0009 — a cursor on event
+        // time would never return this entry, and the outage being watched would
+        // be the one thing the live view omits.
+        var reader = await ReadingAsync(
+            Entry(1, Ten, received: Ten),
+            Entry(2, Ten.AddMinutes(-10), received: Ten.AddSeconds(1)));
+
+        var arrived = await ArrivalsAsync(reader, new TailCursor(Ten, 1));
+
+        Assert.Equal([2], arrived.Select(entry => entry.Id));
+    }
+
+    [Fact]
+    public async Task A_poll_is_answered_in_the_order_the_view_keeps()
+    {
+        var reader = await ReadingAsync(
+            Entry(1, Ten.AddMinutes(-5), received: Ten),
+            Entry(2, Ten.AddMinutes(-10), received: Ten.AddSeconds(1)),
+            Entry(3, Ten, received: Ten.AddSeconds(2)));
+
+        var arrived = await ArrivalsAsync(reader);
+
+        // Newest first by event time, which is neither the order they arrived in
+        // nor the reverse of it: the caller drops these into the page it is
+        // holding without re-sorting it, and the late one takes its place among
+        // the entries it belongs with.
+        Assert.Equal([3, 1, 2], arrived.Select(entry => entry.Id));
+    }
+
+    [Fact]
+    public async Task A_poll_steps_through_the_entries_of_one_delivery_by_identity()
+    {
+        // One batch, one receipt time, which is the ordinary case: the cursor
+        // carries the identity because a position on the timestamp alone would
+        // repeat this batch on the next poll or skip the rest of it.
+        var reader = await ReadingAsync(
+            Entry(1, Ten, received: Ten),
+            Entry(2, Ten, received: Ten),
+            Entry(3, Ten, received: Ten));
+
+        var arrived = await ArrivalsAsync(reader, new TailCursor(Ten, 2));
+
+        Assert.Equal([3], arrived.Select(entry => entry.Id));
+    }
+
+    [Fact]
+    public async Task A_poll_that_fills_takes_the_front_of_the_arrival_order()
+    {
+        // Delivered in the reverse of the order they happened in, so that taking
+        // the newest by event time would be a different set of rows from taking
+        // what arrived first.
+        var reader = await ReadingAsync(
+            [.. Enumerable.Range(1, Page.Size + 20).Select(id =>
+                Entry(id, Ten.AddSeconds(-id), received: Ten.AddSeconds(id)))]);
+
+        var first = await ArrivalsAsync(reader);
+
+        Assert.Equal(Page.Size, first.Count);
+        Assert.Equal(Enumerable.Range(1, Page.Size), first.Select(entry => (int)entry.Id));
+
+        // What a poll that filled leaves behind is the rest of the arrival
+        // order, resumed with no gap and nothing repeated — the middle is not
+        // lost, it is waiting.
+        var second = await ArrivalsAsync(
+            reader, new TailCursor(Ten.AddSeconds(Page.Size), Page.Size));
+
+        Assert.Equal(
+            Enumerable.Range(Page.Size + 1, 20), second.Select(entry => (int)entry.Id));
+    }
+
+    [Fact]
+    public async Task A_tail_narrows_with_the_filters_like_every_other_read()
+    {
+        var reader = await ReadingAsync(
+            Entry(1, Ten, level: Level.Error, received: Ten.AddSeconds(1)),
+            Entry(2, Ten, level: Level.Debug, received: Ten.AddSeconds(2)),
+            Entry(3, Ten.AddDays(-1), level: Level.Error, received: Ten.AddSeconds(3)));
+
+        var arrived = await ArrivalsAsync(
+            reader,
+            filters: new EntryFilters { From = Ten.AddHours(-1), MinimumLevel = Level.Warning });
+
+        // A filter set that is being watched, not a mode with rules of its own —
+        // including the event-time range, so a view showing the last hour does
+        // not begin showing yesterday because it was delivered late.
+        Assert.Equal([1], arrived.Select(entry => entry.Id));
+    }
+
+    [Fact]
+    public async Task A_poll_never_leaves_the_project_it_was_asked_for()
+    {
+        var reader = await ReadingAsync(
+            Entry(1, Ten, received: Ten.AddSeconds(1)),
+            Entry(2, Ten, projectId: _other, received: Ten.AddSeconds(2)),
+            Entry(3, Ten, received: Ten.AddSeconds(3)));
+
+        var arrived = await ArrivalsAsync(reader);
+
+        Assert.Equal([3, 1], arrived.Select(entry => entry.Id));
+    }
+
+    [Fact]
+    public async Task Arming_a_tail_is_where_the_arrival_order_currently_ends()
+    {
+        var reader = await ReadingAsync(
+            Entry(1, Ten, received: Ten.AddSeconds(2)),
+            Entry(2, Ten, received: Ten.AddSeconds(1)),
+            Entry(3, Ten, projectId: _other, received: Ten.AddSeconds(9)));
+
+        var newest = await reader.NewestArrivalAsync(
+            _project, TestContext.Current.CancellationToken);
+
+        // The latest to have arrived and not the latest to have happened, inside
+        // this project and no other. Reading it out of the store rather than off
+        // a clock is what leaves no window for an entry to be lost in.
+        Assert.Equal(new TailCursor(Ten.AddSeconds(2), 1), newest);
+    }
+
+    [Fact]
+    public async Task A_tail_on_a_project_holding_nothing_has_no_arrival_to_start_after()
+    {
+        var reader = await ReadingAsync();
+
+        Assert.Null(await reader.NewestArrivalAsync(
+            _project, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Every_read_is_cut_off_after_five_seconds()
     {
         var connectionString = await MigratedAsync();
@@ -441,6 +585,9 @@ public sealed class EntryReaderTests(PostgresFixture postgres)
         // occupied by one request is the thing ADR 0026 exists to prevent.
         await Assert.ThrowsAsync<ReadExpiredException>(() => PageAsync(reader));
         await Assert.ThrowsAsync<ReadExpiredException>(() => CountAsync(reader));
+        await Assert.ThrowsAsync<ReadExpiredException>(() => ArrivalsAsync(reader));
+        await Assert.ThrowsAsync<ReadExpiredException>(() =>
+            reader.NewestArrivalAsync(_project, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ReadExpiredException>(() =>
             reader.FindAsync(_project, 1, TestContext.Current.CancellationToken));
     }
@@ -479,12 +626,17 @@ public sealed class EntryReaderTests(PostgresFixture postgres)
         string? instance = null,
         byte[]? traceId = null,
         string? message = null,
-        string? exception = null) => new()
+        string? exception = null,
+        DateTimeOffset? received = null) => new()
     {
         Id = id,
         ProjectId = projectId ?? _project,
         EventTime = at,
-        ReceiptTime = at,
+
+        // The same instant unless a test says otherwise. The two clocks
+        // disagreeing is what the tail is about, and every other read here does
+        // not care which one a row carries.
+        ReceiptTime = received ?? at,
         Level = level,
         LoggerName = loggerName,
         Instance = instance,
@@ -500,6 +652,14 @@ public sealed class EntryReaderTests(PostgresFixture postgres)
         IEntryReader reader, EntryFilters? filters = null, EntryCursor? after = null) =>
         reader.PageAsync(
             _project, filters ?? EntryFilters.None, after, TestContext.Current.CancellationToken);
+
+    private Task<IReadOnlyList<LogEntry>> ArrivalsAsync(
+        IEntryReader reader, TailCursor? since = null, EntryFilters? filters = null) =>
+        reader.ArrivalsAsync(
+            _project,
+            filters ?? EntryFilters.None,
+            since ?? TailCursor.Beginning,
+            TestContext.Current.CancellationToken);
 
     private async Task<IReadOnlyList<long>> IdsAsync(IEntryReader reader, string search)
     {

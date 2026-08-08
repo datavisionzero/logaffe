@@ -17,8 +17,8 @@ namespace Logaffe.Application.Ports;
 public sealed record CountedGroup(string? Value, long Entries);
 
 /// <summary>
-/// Reading the entries a project holds: the filtered page, the count, and one
-/// entry in full.
+/// Reading the entries a project holds: the filtered page, the count, one entry
+/// in full, and what has arrived since a live tail last asked.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -26,9 +26,11 @@ public sealed record CountedGroup(string? Value, long Entries);
 /// port of its own. That one is the write and the sweep — a batch in, rows out,
 /// nothing handed back — and it says so. This one hands entries back, is fitted
 /// to the indexes <c>docs/storage.md</c> claims, and is the surface both
-/// consumers meet: the operator's screen and the MCP tools call these three and
+/// consumers meet: the operator's screen and the MCP tools call these and
 /// nothing else, which is what keeps them from being two surfaces that drift
-/// (<c>docs/querying.md</c>).
+/// (<c>docs/querying.md</c>). The tail is the operator's alone — <c>docs/mcp.md</c>
+/// offers an agent none — and it is here rather than beside itself because it is
+/// the same filters over the same table, asked on the other clock.
 /// </para>
 /// <para>
 /// <b>Every method takes the project.</b> A query always runs inside one, and
@@ -79,6 +81,49 @@ public interface IEntryReader
         Grouping grouping,
         TimeBucket bucket,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The entries matching <paramref name="filters"/> that arrived after
+    /// <paramref name="since"/>, oldest arrival first taken and answered in the
+    /// view's order — newest first by event time, identity breaking ties.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The cursor runs on receipt time and the answer is ordered by event
+    /// time</b> (ADR 0009). Both at once: what is taken is the front of the
+    /// arrival order, so a poll that hits its cap leaves a position the next one
+    /// resumes from without a gap, and what comes back is already in the order
+    /// the view holds, so the caller places the rows without re-sorting the page
+    /// it is watching.
+    /// </para>
+    /// <para>
+    /// It answers at most <see cref="Page.Size"/> entries, like a page and for
+    /// the same reason. Whether the poll filled is read off the length of what
+    /// comes back.
+    /// </para>
+    /// </remarks>
+    Task<IReadOnlyList<LogEntry>> ArrivalsAsync(
+        Guid projectId,
+        EntryFilters filters,
+        TailCursor since,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Where the project's arrival order currently ends, or <c>null</c> when it
+    /// holds no entries at all.
+    /// </summary>
+    /// <remarks>
+    /// This is what arms a tail: the first poll has no cursor and needs one, and
+    /// reading the position out of the store rather than off a clock is what
+    /// leaves no window — an entry received a moment ago is either behind this
+    /// position or ahead of it, and there is no instant in between for one to be
+    /// lost in.
+    /// <b>It takes no filters.</b> A position in the arrival order is the same
+    /// position whatever a view is narrowed to, and starting a tail at the
+    /// newest <i>matching</i> entry would make it walk everything delivered
+    /// since, for a set the caller has already been given a page of.
+    /// </remarks>
+    Task<TailCursor?> NewestArrivalAsync(Guid projectId, CancellationToken cancellationToken);
 
     /// <summary>
     /// One entry by its identity, or <c>null</c> when the project holds no such

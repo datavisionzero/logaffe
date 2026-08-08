@@ -94,6 +94,11 @@ builder.Services.AddScoped<SearchEntries>();
 builder.Services.AddScoped<CountEntries>();
 builder.Services.AddScoped<ReadEntry>();
 
+// The same filters, watched: the one request the interface repeats on its own,
+// asking what has arrived on the receipt clock while the view it feeds keeps the
+// order of events (ADR 0009).
+builder.Services.AddScoped<TailEntries>();
+
 // The other end of both of those: the window is what this reads, and a deleted
 // project's entries are what it takes afterwards (ADR 0019). It is reachable
 // from nowhere but the timer below — retention is not an act the operator

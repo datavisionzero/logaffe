@@ -118,6 +118,29 @@ the cursor runs on receipt time they arrive, and because the view sorts by event
 time they take their place among the entries they belong with — visibly below the
 newest line rather than at the top.
 
+A tail is **a filter set that is being watched**, and not a mode with rules of its
+own: the same narrowings, the same minimum on a search text, the same five
+seconds. The event-time range still applies — a view showing the last quarter of
+an hour does not begin showing this morning's entries because they were delivered
+late — but it is not what decides what is new.
+
+**Every poll answers a cursor, including the ones that answer nothing.** A quiet
+poll hands back the position it was given, so following the logs is a loop over
+the last answer rather than a state the reader has to keep. **The first poll arms
+the tail**: it has no cursor, it answers no entries, and what it carries back is
+where the project's arrival order currently ends — which is the position to watch
+from, read out of the store rather than off a clock, so that there is no instant
+in between for an entry to be lost in. Answering it the newest entries instead
+would hand back what the page it is sitting on already shows.
+
+**One poll carries at most a page**, and for the reason a page is bounded rather
+than for one of its own. A poll after a quiet minute returns a handful and a poll
+after a burst could otherwise return everything a project holds. What is taken is
+the front of the arrival order, so the middle is never lost — it is waiting where
+the cursor stopped — and a poll that filled **says so**, which is how an interval
+that cannot keep up becomes something the reader is told rather than something it
+discovers later.
+
 ## Counting
 
 A count answers a question about a set of entries without returning them, over

@@ -65,6 +65,7 @@ public sealed class EntryEndpointTests(PostgresFixture postgres) : IAsyncLifetim
 
     [Theory]
     [InlineData($"/projects/{NoSuchProject}/entries")]
+    [InlineData($"/projects/{NoSuchProject}/entries/tail")]
     [InlineData($"/projects/{NoSuchProject}/entries/count")]
     [InlineData($"/projects/{NoSuchProject}/entries/1")]
     public async Task Every_read_is_behind_the_operator_s_session(string path)
@@ -78,6 +79,7 @@ public sealed class EntryEndpointTests(PostgresFixture postgres) : IAsyncLifetim
 
     [Theory]
     [InlineData($"/projects/{NoSuchProject}/entries")]
+    [InlineData($"/projects/{NoSuchProject}/entries/tail")]
     [InlineData($"/projects/{NoSuchProject}/entries/count")]
     [InlineData($"/projects/{NoSuchProject}/entries/1")]
     public async Task There_is_no_reading_a_project_that_does_not_exist(string path)
@@ -142,6 +144,104 @@ public sealed class EntryEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         Assert.Null(second.Next);
         Assert.Equal("Line 100", second.Entries[0].Message);
         Assert.Empty(first.Entries.Select(e => e.Id).Intersect(second.Entries.Select(e => e.Id)));
+    }
+
+    [Fact]
+    public async Task The_first_poll_arms_the_tail_and_the_next_one_answers_what_arrived()
+    {
+        using var client = await SignedInAsync();
+        var project = await CreateAsync(client, "orders");
+
+        await StoreAsync(project.Id, Ten, message: "Checkout started");
+
+        var armed = await TailAsync(client, project);
+
+        // The view has just loaded its page, and what it needs is the position
+        // to watch from rather than the entries it is already showing.
+        Assert.Empty(armed.Entries);
+        Assert.False(armed.More);
+        Assert.NotNull(armed.Next);
+
+        // A sender that was disconnected, delivering what happened before the
+        // line the tail has already shown (ADR 0009).
+        await StoreAsync(
+            project.Id, Ten.AddMinutes(-10), message: "Checkout failed",
+            receivedAt: Ten.AddSeconds(1));
+
+        var polled = await TailAsync(client, project, armed.Next);
+
+        Assert.Equal("Checkout failed", Assert.Single(polled.Entries).Message);
+        Assert.False(polled.More);
+        Assert.NotEqual(armed.Next, polled.Next);
+
+        // And a quiet poll answers nothing and the same position again, so that
+        // following the logs is a loop over the last answer.
+        var quiet = await TailAsync(client, project, polled.Next);
+
+        Assert.Empty(quiet.Entries);
+        Assert.Equal(polled.Next, quiet.Next);
+    }
+
+    [Fact]
+    public async Task A_poll_is_in_the_views_order_and_says_when_it_could_not_carry_it_all()
+    {
+        using var client = await SignedInAsync();
+        var project = await CreateAsync(client, "orders");
+
+        var armed = await TailAsync(client, project);
+
+        // Delivered in the reverse of the order they happened in, and more of
+        // them than one poll may carry.
+        for (var i = 1; i <= 120; i++)
+        {
+            await StoreAsync(
+                project.Id, Ten.AddSeconds(-i), message: $"Line {i}",
+                receivedAt: Ten.AddSeconds(i));
+        }
+
+        var first = await TailAsync(client, project, armed.Next);
+
+        // What is taken is the front of the arrival order; what it is answered
+        // in is the order the view keeps.
+        Assert.Equal(100, first.Entries.Count);
+        Assert.Equal("Line 1", first.Entries[0].Message);
+        Assert.Equal("Line 100", first.Entries[^1].Message);
+
+        // An interval that cannot keep up says so rather than losing the middle:
+        // the rest is waiting where the cursor stopped.
+        Assert.True(first.More);
+
+        var second = await TailAsync(client, project, first.Next);
+
+        Assert.Equal(20, second.Entries.Count);
+        Assert.False(second.More);
+        Assert.Empty(
+            first.Entries.Select(e => e.Id).Intersect(second.Entries.Select(e => e.Id)));
+    }
+
+    [Fact]
+    public async Task A_tail_narrows_with_the_filters_in_its_address()
+    {
+        using var client = await SignedInAsync();
+        var project = await CreateAsync(client, "orders");
+
+        var armed = await TailAsync(client, project);
+
+        await StoreAsync(
+            project.Id, Ten, Level.Error, message: "Checkout failed",
+            receivedAt: Ten.AddSeconds(1));
+        await StoreAsync(
+            project.Id, Ten, Level.Debug, message: "Checkout started",
+            receivedAt: Ten.AddSeconds(2));
+
+        var polled = await ReadAsync<TailBody>(await client.GetAsync(
+            $"/projects/{project.Id}/entries/tail"
+            + $"?since={Uri.EscapeDataString(armed.Next)}&minimumLevel=warning",
+            TestContext.Current.CancellationToken));
+
+        // The same seven narrowings as every other read: a tail is a filter set
+        // that is being watched, not a mode with rules of its own.
+        Assert.Equal("Checkout failed", Assert.Single(polled.Entries).Message);
     }
 
     [Fact]
@@ -284,6 +384,7 @@ public sealed class EntryEndpointTests(PostgresFixture postgres) : IAsyncLifetim
     [InlineData("entries?minimumLevel=loud")]
     [InlineData("entries?trace=nothex")]
     [InlineData("entries?cursor=not-a-cursor")]
+    [InlineData("entries/tail?since=not-a-cursor")]
     [InlineData("entries/count?groupBy=trace")]
     [InlineData("entries/count?groupBy=time&bucket=fortnight")]
     public async Task A_filter_that_cannot_be_read_is_refused_rather_than_run(string query)
@@ -296,6 +397,17 @@ public sealed class EntryEndpointTests(PostgresFixture postgres) : IAsyncLifetim
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    /// <summary>
+    /// One poll of the tail, with the cursor the previous one handed back — or
+    /// none at all, which is the poll that arms it.
+    /// </summary>
+    private async Task<TailBody> TailAsync(
+        HttpClient client, ProjectBody project, string? since = null) =>
+        await ReadAsync<TailBody>(await client.GetAsync(
+            $"/projects/{project.Id}/entries/tail"
+            + (since is null ? string.Empty : $"?since={Uri.EscapeDataString(since)}"),
+            TestContext.Current.CancellationToken));
 
     private async Task<ProjectBody> CreateAsync(HttpClient client, string name) =>
         await ReadAsync<ProjectBody>(await client.PostAsJsonAsync(
@@ -317,7 +429,8 @@ public sealed class EntryEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         string? trace = null,
         string? message = null,
         string? exception = null,
-        string? properties = null)
+        string? properties = null,
+        DateTimeOffset? receivedAt = null)
     {
         var id = _nextId++;
 
@@ -331,7 +444,7 @@ public sealed class EntryEndpointTests(PostgresFixture postgres) : IAsyncLifetim
                 trace_id, message_template, rendered_message, exception, properties,
                 message_truncated, exception_truncated)
             values (
-                @id, @project_id, @at, @at, @level, @logger_name, @instance,
+                @id, @project_id, @at, @received, @level, @logger_name, @instance,
                 @trace_id, @text, @text, @exception, @properties::jsonb, false, false)
             """,
             connection);
@@ -339,6 +452,10 @@ public sealed class EntryEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("project_id", projectId);
         command.Parameters.AddWithValue("at", at);
+
+        // The two clocks are the same instant unless a test is about them
+        // disagreeing, which only the tail is (ADR 0009).
+        command.Parameters.AddWithValue("received", receivedAt ?? at);
         command.Parameters.AddWithValue("level", (short)level);
         command.Parameters.AddWithValue("logger_name", (object?)loggerName ?? DBNull.Value);
         command.Parameters.AddWithValue("instance", (object?)instance ?? DBNull.Value);
@@ -419,6 +536,13 @@ public sealed class EntryEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         Guid Id, string Name, int RetentionDays, DateTimeOffset CreatedAt);
 
     private sealed record PageBody(IReadOnlyList<ListedEntryBody> Entries, string? Next);
+
+    /// <summary>
+    /// The tail's answer. <c>Next</c> is not nullable here, deliberately: every
+    /// poll carries the position of the next one, including the one that
+    /// answered nothing and the one that armed the tail.
+    /// </summary>
+    private sealed record TailBody(IReadOnlyList<ListedEntryBody> Entries, string Next, bool More);
 
     private sealed record ListedEntryBody(
         long Id,

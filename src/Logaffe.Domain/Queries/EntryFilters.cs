@@ -40,8 +40,10 @@ public sealed record EntryFilters
     /// <remarks>
     /// <b>Event time and not receipt time</b> — the operator asking what happened
     /// between 10:00 and 10:05 means when it happened, not when it arrived
-    /// (ADR 0007). The live tail is the one read that runs on the other clock,
-    /// and it does not narrow with this.
+    /// (ADR 0007). The live tail is the one read whose cursor runs on the other
+    /// clock, and this still narrows what it answers: a view showing the last
+    /// quarter of an hour does not start showing an entry from this morning
+    /// because it was delivered late.
     /// </remarks>
     public DateTimeOffset? From { get; init; }
 

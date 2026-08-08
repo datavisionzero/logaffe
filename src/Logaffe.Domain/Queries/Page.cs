@@ -19,6 +19,17 @@ namespace Logaffe.Domain.Queries;
 /// one, and a count is its own deliberate act.
 /// </para>
 /// <para>
+/// <b>One poll of the live tail is bounded by this same number.</b> A poll after
+/// a quiet minute returns a handful and a poll after a burst could otherwise
+/// return everything the project holds, and the bound is there for the reason it
+/// is here: to keep one answer from becoming a download. A number of its own
+/// would be a second thing to reason about with no different question behind
+/// it — the tail is a filter set that is being watched, not a mode with rules of
+/// its own. A poll that fills says so instead, so that an interval which cannot
+/// keep up is something the caller is told rather than something that loses the
+/// middle.
+/// </para>
+/// <para>
 /// The MCP adapter's caps of 200 and 50 are not this number. Those bound one
 /// answer to an agent and are that adapter's, and they sit above this: a tool
 /// filling its cap pages until it is full.

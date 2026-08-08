@@ -78,6 +78,30 @@ public sealed record ListedEntryResponse(
 public sealed record EntryPageResponse(IEnumerable<ListedEntryResponse> Entries, string? Next);
 
 /// <summary>
+/// One poll of the live tail: what has arrived since the last one.
+/// </summary>
+/// <param name="Entries">
+/// The entries that arrived, in the order the view keeps — newest first by event
+/// time — so that they are placed into the page the caller holds without
+/// re-sorting it. An entry delivered late belongs among the entries it happened
+/// with, below the newest line rather than at the top (ADR 0009).
+/// </param>
+/// <param name="Next">
+/// The cursor to hand to the next poll. It is always here, including on the poll
+/// that answered nothing and on the first poll of all, which answers no entries
+/// and this: following the logs is a loop over the last answer, and a caller
+/// keeps no position of its own. Opaque, like every cursor here.
+/// </param>
+/// <param name="More">
+/// Whether the poll filled its cap and more is waiting. Nothing has been lost —
+/// the next poll resumes exactly where this one stopped — but the interval is
+/// not keeping up with the delivery, and the caller asks again rather than
+/// waiting it out.
+/// </param>
+public sealed record TailResponse(
+    IEnumerable<ListedEntryResponse> Entries, string Next, bool More);
+
+/// <summary>
 /// One entry in full: the follow-up after a compact search.
 /// </summary>
 /// <param name="Properties">
@@ -128,10 +152,19 @@ public sealed record ReadExpiredResponse(IEnumerable<string> Narrow);
 /// </summary>
 /// <remarks>
 /// <para>
-/// These three sit on the use cases of <c>docs/querying.md</c> and add no query
+/// These sit on the use cases of <c>docs/querying.md</c> and add no query
 /// behaviour of their own — which is what makes the promise that the operator
 /// and the agent share one surface structural rather than a matter of
-/// discipline. When the MCP adapter arrives it calls the same three.
+/// discipline. When the MCP adapter arrives it calls the same three; the fourth,
+/// the tail, is the operator's alone, because an agent reads on request and does
+/// not watch (<c>docs/mcp.md</c>).
+/// </para>
+/// <para>
+/// <b>The tail is the one request that repeats.</b> It is polling on the order of
+/// five seconds and nothing more: no subscription, no push, no socket held open,
+/// and no connection that outlives the screen that opened it. What pauses it,
+/// what marks a newly arrived row and what stops it on a hidden tab are the log
+/// view's (<c>docs/ui.md</c>) and not this endpoint's.
 /// </para>
 /// <para>
 /// <b>This is where log content becomes a response</b>, and therefore where
@@ -191,6 +224,48 @@ public static class EntryEndpoints
             .WithName("SearchEntries")
             .WithSummary("One page of a project's entries, newest first by event time.")
             .Produces<EntryPageResponse>()
+            .Produces<ReadExpiredResponse>(StatusCodes.Status408RequestTimeout)
+            .Produces(StatusCodes.Status404NotFound)
+            .ProducesValidationProblem();
+
+        operatorSurface.MapGet("/tail", async (
+                Guid id,
+                [AsParameters] EntryFiltersRequest request,
+                [FromQuery] string? since,
+                TailEntries tail,
+                CancellationToken cancellationToken) =>
+            {
+                if (!TryRead(request, out var filters, out var invalid))
+                {
+                    return invalid;
+                }
+
+                // Refused rather than ignored, and for a heavier reason than on
+                // a page: a tail that quietly restarted from nowhere would
+                // either show the operator the project's oldest entries as new
+                // arrivals or show them nothing while an outage runs.
+                if (!TailCursor.TryParse(since, out var seen))
+                {
+                    return NotATailCursor();
+                }
+
+                var read = await tail.ExecuteAsync(id, filters, seen, cancellationToken);
+
+                if (read is null)
+                {
+                    return Results.NotFound();
+                }
+
+                return read.Expired
+                    ? Expired(read.Narrow)
+                    : Results.Ok(new TailResponse(
+                        read.Answer!.Entries.Select(Listed),
+                        read.Answer.Next.ToString(),
+                        read.Answer.More));
+            })
+            .WithName("TailEntries")
+            .WithSummary("What has arrived since the last poll, in the view's order.")
+            .Produces<TailResponse>()
             .Produces<ReadExpiredResponse>(StatusCodes.Status408RequestTimeout)
             .Produces(StatusCodes.Status404NotFound)
             .ProducesValidationProblem();
@@ -451,6 +526,9 @@ public static class EntryEndpoints
 
     private static IResult NotACursor() =>
         Problem("cursor", "A cursor is one handed back by a previous page.");
+
+    private static IResult NotATailCursor() =>
+        Problem("since", "A cursor is one handed back by a previous poll.");
 
     private static IResult NotAGrouping() => Problem(
         "groupBy",

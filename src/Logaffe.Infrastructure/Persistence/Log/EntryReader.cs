@@ -10,7 +10,8 @@ using Npgsql;
 namespace Logaffe.Infrastructure.Persistence.Log;
 
 /// <summary>
-/// The read side of the log path: the filtered page, the count, and one entry.
+/// The read side of the log path: the filtered page, the count, one entry, and
+/// the live tail's poll.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,9 +19,9 @@ namespace Logaffe.Infrastructure.Persistence.Log;
 /// would need once something had rows to turn back into entries. The statements
 /// are written out because they are fitted to the indexes
 /// <c>docs/storage.md</c> claims — the paging index for the order and the
-/// cursor, the trigram index for the search, the partial one for the threshold
-/// people actually ask for — and re-reading them whenever an index changes is
-/// the standing cost that ADR names.
+/// cursor, the receipt index for the tail, the trigram index for the search, the
+/// partial one for the threshold people actually ask for — and re-reading them
+/// whenever an index changes is the standing cost that ADR names.
 /// </para>
 /// <para>
 /// <b>Every read here is held to five seconds</b> (ADR 0026). It is enforced by
@@ -87,6 +88,69 @@ public sealed class EntryReader(LogaffeDbContext context) : IEntryReader
         var rows = await QueryAsync<Row>(sql, parameters, cancellationToken);
 
         return [.. rows.Select(row => row.Entry())];
+    }
+
+    public async Task<IReadOnlyList<LogEntry>> ArrivalsAsync(
+        Guid projectId,
+        EntryFilters filters,
+        TailCursor since,
+        CancellationToken cancellationToken)
+    {
+        var (where, parameters) = EntryPredicate.For(projectId, filters);
+
+        // The pair compared as a pair again, and this time it is a position in
+        // the receipt index — (project_id, receipt_time, id), which
+        // docs/storage.md already carries for this and for the retention sweep.
+        parameters.Add("sinceTime", since.ReceiptTime.UtcDateTime);
+        parameters.Add("sinceId", since.Id);
+        parameters.Add("size", Page.Size);
+
+        // Two orders in one statement, and both are load-bearing. The inner one
+        // is the arrival order, so what a poll that fills leaves behind is the
+        // front of it and the cursor it hands back has nothing hiding under it.
+        // The outer one is the view's, so the caller drops these rows into the
+        // page it is holding without re-sorting it — and a late delivery lands
+        // among the entries it belongs with rather than at the top (ADR 0009).
+        var sql =
+            $"""
+            select * from (
+                select {Columns}
+                from log_entry
+                where {where} and (receipt_time, id) > (@sinceTime, @sinceId)
+                order by receipt_time, id
+                limit @size
+            ) arrived
+            order by "EventTime" desc, "Id" desc
+            """;
+
+        var rows = await QueryAsync<Row>(sql, parameters, cancellationToken);
+
+        return [.. rows.Select(row => row.Entry())];
+    }
+
+    public async Task<TailCursor?> NewestArrivalAsync(
+        Guid projectId, CancellationToken cancellationToken)
+    {
+        // The end of the receipt index, which is one lookup and no filters: the
+        // position a tail starts watching from is the same position whatever the
+        // view is narrowed to.
+        var sql =
+            """
+            select receipt_time as "ReceiptTime", id as "Id"
+            from log_entry
+            where project_id = @projectId
+            order by receipt_time desc, id desc
+            limit 1
+            """;
+
+        var parameters = new DynamicParameters();
+        parameters.Add("projectId", projectId);
+
+        var rows = await QueryAsync<Arrival>(sql, parameters, cancellationToken);
+
+        return rows.Count == 0
+            ? null
+            : new TailCursor(new DateTimeOffset(rows[0].ReceiptTime, TimeSpan.Zero), rows[0].Id);
     }
 
     public async Task<IReadOnlyList<CountedGroup>> CountAsync(
@@ -274,6 +338,16 @@ public sealed class EntryReader(LogaffeDbContext context) : IEntryReader
 
     /// <summary>Postgres's <c>query_canceled</c>.</summary>
     private const string QueryCanceled = "57014";
+
+    /// <summary>
+    /// A position in the arrival order, as it comes back.
+    /// </summary>
+    /// <remarks>
+    /// The two columns of the receipt index and none of the entry: what arms a
+    /// tail is where the order currently ends, and reading the row behind it
+    /// would be fetching a message and an exception nobody is going to show.
+    /// </remarks>
+    private sealed record Arrival(DateTime ReceiptTime, long Id);
 
     /// <summary>
     /// One row of the entry table, as it comes back.

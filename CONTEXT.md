@@ -207,6 +207,14 @@ and it is what makes paging independent of how deep it has gone, where an offset
 would skip and repeat entries as the store grows underneath the reader.
 _Avoid_: Offset, page number, token, continuation, bookmark
 
+**Tail Cursor**:
+The position a live tail has already seen — the receipt time and the identity of
+the latest entry to have arrived for it — which the next poll is handed back. It
+is opaque in the same way and a separate thing from the cursor, because the two
+name positions in two different orders: a page resumes where the log left off, a
+poll resumes where delivery left off.
+_Avoid_: Watermark, offset, last seen, checkpoint, timestamp
+
 **Log View**:
 The single screen on which the operator reads one project: the filters, the
 entries they leave, and the detail of one of them. It is where nearly all use of
