@@ -25,10 +25,10 @@ namespace Logaffe.Api.Http;
 /// along with the caller.
 /// </para>
 /// <para>
-/// <b>It names no logaffe package.</b> The three client packages
-/// (<c>docs/codebase.md</c>) are neither written nor published, and a snippet
-/// whose first line is a package nobody can install is worse than no snippet at
-/// all. So the first version is the plain path <c>docs/ingestion.md</c> already
+/// <b>It names no logaffe package.</b> None of the three client packages
+/// (<c>docs/codebase.md</c>) is published, whatever is written of them, and a
+/// snippet whose first line is a package nobody can install is worse than no
+/// snippet at all. So the first version is the plain path <c>docs/ingestion.md</c> already
 /// says everything works over — a request, a header and a line — which needs
 /// nothing installed, works from any language, and answers exactly what an
 /// operator staring at an empty project is asking. The Serilog form arrives with

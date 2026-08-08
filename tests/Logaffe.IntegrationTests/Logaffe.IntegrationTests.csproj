@@ -10,6 +10,10 @@
          session is asked of a running installation rather than read off a
          registration. -->
     <ProjectReference Include="../../src/Logaffe.Api/Logaffe.Api.csproj" />
+    <!-- The package a sender actually holds, so that the wire format between
+         the two is asked of both ends at once rather than of a substituted
+         handler that would agree with whatever the client sent. -->
+    <ProjectReference Include="../../src/clients/Logaffe.Client/Logaffe.Client.csproj" />
   </ItemGroup>
 
   <ItemGroup>

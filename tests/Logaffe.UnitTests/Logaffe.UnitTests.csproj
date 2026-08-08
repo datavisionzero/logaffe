@@ -7,6 +7,10 @@
   <ItemGroup>
     <ProjectReference Include="../../src/Logaffe.Domain/Logaffe.Domain.csproj" />
     <ProjectReference Include="../../src/Logaffe.Application/Logaffe.Application.csproj" />
+    <!-- The client belongs here rather than with the integration tests for the
+         reason docs/codebase.md gives: the split is by what a test needs to
+         run, and what this needs is a substituted message handler. -->
+    <ProjectReference Include="../../src/clients/Logaffe.Client/Logaffe.Client.csproj" />
   </ItemGroup>
 
   <ItemGroup>
