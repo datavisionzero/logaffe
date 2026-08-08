@@ -65,6 +65,46 @@ describe("the first screen", () => {
   });
 });
 
+describe("finishing the claim", () => {
+  /**
+   * What follows the claim is the guide, not the shell (`docs/setup.md`), and
+   * the only thing that ever reaches it is a claim finished in this browser.
+   */
+  it("reaches the first-run guide rather than the project list", async () => {
+    anInstallationAnswering({
+      "GET /claim": unclaimed(),
+      "POST /claim/enrolment": {
+        body: {
+          secondFactorSecret: "JBSWY3DPEHPK3PXP",
+          enrolmentUri: "otpauth://totp/logaffe:operator?secret=JBSWY3DPEHPK3PXP",
+          backupCodes: ["4RTY-8HQ2"],
+          ticket: "sealed",
+        },
+      },
+      "POST /claim": { status: 204 },
+    });
+
+    open();
+
+    const operator = userEvent.setup();
+    const password = "a passphrase nobody guesses";
+
+    await operator.type(await screen.findByLabelText("Password"), password);
+    await operator.type(screen.getByLabelText("Password again"), password);
+    await operator.click(screen.getByRole("button", { name: "Continue" }));
+
+    await operator.click(await screen.findByRole("checkbox"));
+    await operator.click(screen.getByRole("button", { name: "Continue" }));
+
+    await operator.type(screen.getByLabelText(/six digits/i), "123456");
+    await operator.type(screen.getByLabelText(/backup code/i), "4RTY-8HQ2");
+    await operator.click(screen.getByRole("button", { name: /claim this installation/i }));
+
+    expect(await screen.findByRole("heading", { name: /this installation is yours/i }))
+      .toBeInTheDocument();
+  });
+});
+
 describe("signing in", () => {
   it("reaches the project list, and says what a spent backup code left", async () => {
     anInstallationAnswering({

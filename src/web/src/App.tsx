@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, whenSignedOut } from "./api/client";
 import { ClaimScreen, WindowClosed } from "./claim/ClaimScreen";
+import { FirstRun } from "./claim/FirstRun";
 import { SignInScreen } from "./session/SignInScreen";
 import { Shell } from "./shell/Shell";
 
@@ -12,11 +13,18 @@ import { Shell } from "./shell/Shell";
  * operator is signed in is not asked here — the first request the application
  * makes answers it, and a screen that probed for it beforehand would be the
  * interface asking for something unasked.
+ *
+ * `guiding` is not a third: it is the claim that just completed, still on
+ * screen. Nothing reaches it except finishing a claim in this browser, which is
+ * what keeps the first-run guide a guide rather than a stage (`docs/setup.md`) —
+ * it holds no state, so it cannot know it was skipped, and an installation
+ * reloaded from here is simply a claimed one.
  */
 type Reached =
   | { at: "asking" }
   | { at: "unreachable" }
   | { at: "unclaimed"; windowIsOpen: boolean; closesAt: string | null }
+  | { at: "guiding" }
   | { at: "claimed" };
 
 export function App() {
@@ -72,11 +80,14 @@ export function App() {
       return reached.windowIsOpen ? (
         <ClaimScreen
           closesAt={reached.closesAt}
-          onClaimed={() => setReached({ at: "claimed" })}
+          onClaimed={() => setReached({ at: "guiding" })}
         />
       ) : (
         <WindowClosed />
       );
+
+    case "guiding":
+      return <FirstRun onDone={() => setReached({ at: "claimed" })} />;
 
     case "claimed":
       return <Installation />;
