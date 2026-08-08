@@ -19,10 +19,24 @@ public sealed class SealedSecrets(LogaffeDbContext context) : ISealedSecrets
     public async Task<IReadOnlyList<byte[]>> SampleAsync(
         int count, CancellationToken cancellationToken)
     {
-        var sample = await context.Operators
-            .Select(o => o.EncryptedSecondFactorSecret)
-            .Take(count)
-            .ToListAsync(cancellationToken);
+        var sample = new List<byte[]>(count);
+
+        // Taken as the single row it is rather than as a page of one: an
+        // installation has exactly one operator (ADR 0015), so there is no order
+        // to get right — and a row-limiting operator with nothing to order by is
+        // what had every start writing an EF warning next to the claim-window
+        // line an operator is watching for.
+        if (count > 0)
+        {
+            var secondFactor = await context.Operators
+                .Select(o => o.EncryptedSecondFactorSecret)
+                .SingleOrDefaultAsync(cancellationToken);
+
+            if (secondFactor is not null)
+            {
+                sample.Add(secondFactor);
+            }
+        }
 
         if (sample.Count < count)
         {
