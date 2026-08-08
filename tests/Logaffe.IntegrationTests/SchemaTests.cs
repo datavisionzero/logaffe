@@ -56,6 +56,40 @@ public sealed class SchemaTests(PostgresFixture postgres)
         Assert.Empty(await second.Database.GetPendingMigrationsAsync(TestContext.Current.CancellationToken));
     }
 
+    /// <summary>
+    /// The upgrade promise `docs/operations.md` makes that asking for pending
+    /// migrations cannot keep: on a database a later version has migrated there
+    /// is nothing pending, and an old image used to go on and serve.
+    /// </summary>
+    [Fact]
+    public async Task A_schema_from_a_newer_logaffe_is_refused()
+    {
+        var connectionString = await postgres.CreateDatabaseAsync();
+
+        await using (var context = ContextFor(connectionString))
+        {
+            await MigratorFor(context).ApplyAsync(TestContext.Current.CancellationToken);
+
+            // What a later version would have left behind: a row in the history
+            // table naming a migration this binary was built without.
+            await context.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO "__EFMigrationsHistory" ("MigrationId", "ProductVersion")
+                VALUES ('29991231235959_SomethingThisVersionNeverHeardOf', '10.0.0')
+                """,
+                TestContext.Current.CancellationToken);
+        }
+
+        await using (var context = ContextFor(connectionString))
+        {
+            var refusal = await Assert.ThrowsAsync<SchemaIsNewerException>(
+                () => MigratorFor(context).ApplyAsync(TestContext.Current.CancellationToken));
+
+            Assert.Equal(
+                ["29991231235959_SomethingThisVersionNeverHeardOf"], refusal.Migrations);
+        }
+    }
+
     [Fact]
     public async Task A_project_round_trips_with_its_retention_window()
     {
