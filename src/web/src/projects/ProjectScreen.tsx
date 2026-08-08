@@ -1,6 +1,6 @@
-import { Link, useParams } from "react-router";
+import { useParams } from "react-router";
 import { LogView } from "../logs/LogView";
-import { useProjects } from "./projects";
+import { NoSuchProject, useProjectAtHand } from "./projects";
 
 /**
  * One project, which is where nearly all the time is spent.
@@ -10,29 +10,18 @@ import { useProjects } from "./projects";
  */
 export function ProjectScreen() {
   const { id } = useParams();
-  const { state } = useProjects();
+  const at = useProjectAtHand(id);
 
-  if (state.status !== "held") {
+  if (at.at === "asking") {
     return null;
   }
 
-  const project = state.projects.find((held) => held.id === id);
-
-  if (project === undefined) {
-    return (
-      <section className="narrow">
-        <h1>No such project</h1>
-        <p>
-          This installation holds no project by that identity. It may have been deleted
-          from another browser.
-        </p>
-        <Link to="/">Back to the projects</Link>
-      </section>
-    );
+  if (at.at === "unknown") {
+    return <NoSuchProject />;
   }
 
   // Keyed by the project, so that switching to another one starts the view
   // rather than carrying the selection, the page and the tail's position of the
   // one that was open into it.
-  return <LogView key={project.id} project={project} />;
+  return <LogView key={at.project.id} project={at.project} />;
 }

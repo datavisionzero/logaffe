@@ -1,17 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { api, problemWith } from "../api/client";
-
-/** The ceiling no installation can raise (ADR 0020), and the floor under it. */
-const RETENTION_MINIMUM = 1;
-const RETENTION_MAXIMUM = 90;
-
-/**
- * A month, offered because a form needs something in the box and this is the
- * span an operator debugging last week's incident still has. It is the
- * operator's number, and it is changed in the project's settings afterwards.
- */
-const RETENTION_OFFERED = 30;
+import { RETENTION_MAXIMUM, RETENTION_MINIMUM, RETENTION_OFFERED } from "./retention";
 
 /**
  * Creating a project, which is the only way one comes about.

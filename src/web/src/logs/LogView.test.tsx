@@ -321,6 +321,30 @@ describe("the keyboard", () => {
   });
 });
 
+describe("the way into the project's settings", () => {
+  it("is on the screen the operator is already on", async () => {
+    anInstallationAnswering({
+      "GET /projects/p1/entries": { body: { entries: [], next: null } },
+      "GET /projects/p1/entries/tail": QUIET_TAIL,
+    });
+
+    open();
+
+    expect(await screen.findByRole("link", { name: /project settings/i })).toHaveAttribute(
+      "href",
+      "/project/p1/settings",
+    );
+  });
+
+  it("is on a project nothing has ever arrived at as well", async () => {
+    anInstallationAnswering({ "GET /projects/p1/ingest-tokens": { body: [] } });
+
+    open(UNTOUCHED);
+
+    expect(await screen.findByRole("link", { name: /project settings/i })).toBeInTheDocument();
+  });
+});
+
 describe("the two ways of being empty", () => {
   it("hands over the delivery when nothing has ever arrived", async () => {
     anInstallationAnswering({

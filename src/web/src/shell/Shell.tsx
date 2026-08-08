@@ -5,6 +5,8 @@ import { ProjectList } from "../projects/ProjectList";
 import { ProjectScreen } from "../projects/ProjectScreen";
 import { ProjectSwitcher } from "../projects/ProjectSwitcher";
 import { ProjectsProvider } from "../projects/projects";
+import { InstallationSettings } from "../settings/InstallationSettings";
+import { ProjectSettings } from "../settings/ProjectSettings";
 import { browserTimeZone } from "../shared/time";
 
 /**
@@ -46,6 +48,11 @@ export function Shell({
             millisecond, and there is no toggle to another one. */}
         <span className="zone">Times in {browserTimeZone()}</span>
 
+        {/* The installation's settings, which are the sessions, the agent
+            tokens and the operator's own credentials. A project's own settings
+            are reached from the project, not from here. */}
+        <Link to="/settings">Settings</Link>
+
         <button type="button" className="plain" onClick={() => void signOut()}>
           Sign out
         </button>
@@ -78,6 +85,8 @@ export function Shell({
         <Routes>
           <Route path="/" element={<ProjectList />} />
           <Route path="/project/:id" element={<ProjectScreen />} />
+          <Route path="/project/:id/settings" element={<ProjectSettings />} />
+          <Route path="/settings" element={<InstallationSettings />} />
           <Route path="*" element={<ProjectList />} />
         </Routes>
       </main>

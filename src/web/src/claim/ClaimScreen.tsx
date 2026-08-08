@@ -1,17 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { QRCodeSVG } from "qrcode.react";
 import { api, problemWith } from "../api/client";
+import { ShowEnrolment, type Enrolment } from "../session/Enrolment";
+import { PASSWORD_MINIMUM } from "../session/password";
 import { formatTimestamp } from "../shared/time";
-
-/** The shortest password the installation will take (`docs/sign-in.md`). */
-const PASSWORD_MINIMUM = 12;
-
-interface Enrolment {
-  secondFactorSecret: string;
-  enrolmentUri: string;
-  backupCodes: string[];
-  ticket: string;
-}
 
 type Step =
   | { at: "password" }
@@ -84,9 +75,16 @@ export function ClaimScreen({
         <ChoosePassword onChosen={(password, enrolment) => setStep({ at: "enrolment", password, enrolment })} />
       ) : step.at === "enrolment" ? (
         <ShowEnrolment
+          heading="2. A second factor, and ten backup codes"
           enrolment={step.enrolment}
           onKept={() => setStep({ at: "confirming", password: step.password, enrolment: step.enrolment })}
-        />
+        >
+          <p>
+            Scan this with an authenticator app. It cannot be turned off later, and it can
+            be re-enrolled while signed in — which is what makes replacing a phone an
+            ordinary afternoon.
+          </p>
+        </ShowEnrolment>
       ) : (
         <FinishTheClaim
           password={step.password}
@@ -185,74 +183,6 @@ function ChoosePassword({
         Continue
       </button>
     </form>
-  );
-}
-
-/**
- * The second factor and the sheet, shown once.
- *
- * Nothing here is stored yet — the installation drew both and kept neither —
- * so this is the only moment the backup codes exist anywhere but in the
- * operator's hands.
- */
-function ShowEnrolment({
-  enrolment,
-  onKept,
-}: {
-  enrolment: Enrolment;
-  onKept: () => void;
-}) {
-  const [kept, setKept] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  async function copy() {
-    await navigator.clipboard.writeText(enrolment.backupCodes.join("\n"));
-    setCopied(true);
-  }
-
-  return (
-    <section>
-      <h2>2. A second factor, and ten backup codes</h2>
-      <p>
-        Scan this with an authenticator app. It cannot be turned off later, and it can be
-        re-enrolled while signed in — which is what makes replacing a phone an ordinary
-        afternoon.
-      </p>
-
-      <QRCodeSVG value={enrolment.enrolmentUri} size={192} marginSize={2} />
-
-      <p>
-        Or type the secret in by hand: <code>{enrolment.secondFactorSecret}</code>
-      </p>
-
-      <h3>Backup codes</h3>
-      <p className="notice">
-        These are shown once and are stored in a form nobody can read back. Each is used
-        once, and they are what stands in for the second factor when the phone is gone.
-        Keep them somewhere that is not the phone.
-      </p>
-
-      <ul className="codes">
-        {enrolment.backupCodes.map((code) => (
-          <li key={code}>
-            <code>{code}</code>
-          </li>
-        ))}
-      </ul>
-
-      <button type="button" onClick={() => void copy()}>
-        {copied ? "Copied" : "Copy the codes"}
-      </button>
-
-      <label className="confirm">
-        <input type="checkbox" checked={kept} onChange={(e) => setKept(e.target.checked)} />I
-        have the authenticator enrolled and the codes kept
-      </label>
-
-      <button type="button" disabled={!kept} onClick={onKept}>
-        Continue
-      </button>
-    </section>
   );
 }
 

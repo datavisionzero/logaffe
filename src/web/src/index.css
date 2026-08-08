@@ -569,6 +569,17 @@ button.level.narrows {
   text-align: right;
 }
 
+/* The way into what is changed rarely about the project being read. It sits at
+   the end of the status line, away from the acts that narrow the view. */
+.to-settings {
+  margin-left: auto;
+}
+
+.logview > .to-settings {
+  align-self: flex-start;
+  margin: 0;
+}
+
 .expired,
 .nothing-matched,
 .empty {
@@ -584,4 +595,75 @@ button.level.narrows {
 .empty pre {
   white-space: pre-wrap;
   word-break: break-all;
+}
+
+/* ----------------------------------------------------------- the settings ---
+   The third surface: what is changed rarely, per project and per installation.
+   It is a column of prose with an act at the end of each section, because
+   every one of these is a sentence about what the act does followed by the
+   act. */
+
+.settings > section {
+  margin: 2rem 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+.settings p {
+  max-width: 40rem;
+}
+
+/* The sessions and the two kinds of token, each a short list of rows carrying
+   a last use and the acts that end them. */
+table.listing {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+table.listing th,
+table.listing td {
+  padding: 0.4rem 0.6rem 0.4rem 0;
+  text-align: left;
+  vertical-align: baseline;
+  border-bottom: 1px solid var(--rule);
+}
+
+table.listing thead th {
+  color: var(--quiet);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+table.listing td {
+  white-space: nowrap;
+}
+
+table.listing input {
+  display: inline-block;
+  width: auto;
+  margin: 0;
+}
+
+/* Which row is this browser, which the server says because nothing else can. */
+.here {
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+}
+
+/* An act that destroys data and cannot be undone. It is last on the screen, it
+   is marked, and it is not reached by pressing the same button as everything
+   else. */
+section.grave {
+  border-color: var(--refusal);
+}
+
+button.grave {
+  color: var(--refusal);
+  border-color: var(--refusal);
 }

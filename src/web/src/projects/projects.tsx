@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { Link } from "react-router";
 import { api, asInstant, asNumber } from "../api/client";
 
 /**
@@ -100,6 +101,46 @@ export function useProjects(): Held {
   }
 
   return held;
+}
+
+/**
+ * The project an address names, read off the list the shell already fetched
+ * rather than asked for again.
+ *
+ * Both screens a project has — the log view and its settings — resolve their
+ * address this way, and both have to tell the two answers apart: a list that has
+ * not arrived yet is a moment, and an identity the installation does not hold is
+ * a screen.
+ */
+export function useProjectAtHand(
+  id: string | undefined,
+): { at: "asking" } | { at: "held"; project: HeldProject } | { at: "unknown" } {
+  const { state } = useProjects();
+
+  if (state.status !== "held") {
+    return { at: "asking" };
+  }
+
+  const project = state.projects.find((held) => held.id === id);
+
+  return project === undefined ? { at: "unknown" } : { at: "held", project };
+}
+
+/**
+ * An address naming a project this installation does not hold, which is
+ * ordinarily one deleted from another browser.
+ */
+export function NoSuchProject() {
+  return (
+    <section className="narrow">
+      <h1>No such project</h1>
+      <p>
+        This installation holds no project by that identity. It may have been deleted from
+        another browser.
+      </p>
+      <Link to="/">Back to the projects</Link>
+    </section>
+  );
 }
 
 function held(project: {
