@@ -6,10 +6,20 @@
   color-scheme: light dark;
   font-family: system-ui, sans-serif;
   line-height: 1.5;
+
+  --ink: light-dark(#1a1a1a, #e6e6e6);
+  --quiet: light-dark(#5c5c5c, #9a9a9a);
+  --rule: light-dark(#d8d8d8, #333333);
+  --paper: light-dark(#fdfdfd, #161616);
+  --raised: light-dark(#f4f4f4, #202020);
+  --refusal: light-dark(#a4262c, #f08a8f);
+  --notice: light-dark(#8a6100, #e8b34a);
 }
 
 body {
   margin: 0;
+  color: var(--ink);
+  background: var(--paper);
 }
 
 main {
@@ -18,8 +28,194 @@ main {
   padding: 2rem 1rem;
 }
 
+h1 {
+  font-size: 1.4rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+}
+
+h3 {
+  font-size: 1rem;
+}
+
 /* Reading a log is scanning, and what is scanned is monospaced. */
 code,
+pre,
 time {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+
+pre {
+  padding: 0.75rem;
+  overflow-x: auto;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+a {
+  color: inherit;
+}
+
+/* The shell, which is around every screen of a signed-in installation and
+   carries no user furniture at all. */
+header.shell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--rule);
+  background: var(--raised);
+}
+
+.wordmark {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* The zone every timestamp on the screen is in, stated once so that no screen
+   is ambiguous about it. It sits after the switcher and before the acts. */
+.zone {
+  margin-left: auto;
+  color: var(--quiet);
+  font-size: 0.85rem;
+}
+
+.switcher select {
+  padding: 0.2rem 0.3rem;
+  font: inherit;
+  color: inherit;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+/* The project list: a list of projects and not a dashboard. */
+table.projects {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+table.projects th,
+table.projects td {
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+}
+
+table.projects thead th {
+  color: var(--quiet);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+/* A project whose door is closed, which is why the count is on the list at
+   all. */
+.closed {
+  color: var(--refusal);
+}
+
+.quiet {
+  color: var(--quiet);
+}
+
+.refusal {
+  color: var(--refusal);
+}
+
+.notice {
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid var(--notice);
+  background: var(--raised);
+}
+
+form {
+  max-width: 28rem;
+}
+
+label {
+  display: block;
+  margin: 0.75rem 0 0.25rem;
+}
+
+label.confirm {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 0.25rem;
+  padding: 0.4rem 0.5rem;
+  font: inherit;
+  color: inherit;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+input[type="checkbox"] {
+  display: inline;
+  width: auto;
+  margin: 0;
+}
+
+input[aria-invalid="true"] {
+  border-color: var(--refusal);
+}
+
+button {
+  margin: 0.75rem 0.5rem 0 0;
+  padding: 0.4rem 0.9rem;
+  font: inherit;
+  color: inherit;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button[disabled] {
+  cursor: default;
+  opacity: 0.5;
+}
+
+/* An act that is a sentence rather than a thing to press. */
+button.plain {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  text-decoration: underline;
+}
+
+/* Shown once, and never anywhere again. */
+ul.codes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.25rem 1rem;
+  max-width: 28rem;
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  list-style: none;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

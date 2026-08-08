@@ -12,6 +12,10 @@ artifacts/
 # The SPA is built into the image, never committed
 src/Logaffe.Api/wwwroot/
 
+# The web client's API layer is generated from docs/api/openapi.json before
+# every build. The contract is the artifact; its output is not.
+src/web/src/api/schema.d.ts
+
 # Node
 node_modules/
 dist/

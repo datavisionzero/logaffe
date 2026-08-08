@@ -14,17 +14,33 @@ export default defineConfig({
   },
 
   // In development the two toolchains run side by side and nothing joins them:
-  // Vite serves the SPA and forwards what belongs to the backend.
+  // Vite serves the SPA and forwards what belongs to the backend. Every route
+  // of the contract is listed, because the session cookie is `SameSite=Strict`
+  // and only reaches the installation when the browser thinks it is talking to
+  // one origin — which is what this forwarding is for.
   server: {
     port: 5173,
-    proxy: {
-      "/health": "http://localhost:5142",
-      "/ingest": "http://localhost:5142",
-      "/openapi": "http://localhost:5142",
-    },
+    proxy: Object.fromEntries(
+      [
+        "/health",
+        "/openapi",
+        "/ingest",
+        "/ingest-tokens",
+        "/claim",
+        "/sign-in",
+        "/sign-out",
+        "/sessions",
+        "/password",
+        "/backup-codes",
+        "/second-factor",
+        "/projects",
+        "/agent-tokens",
+      ].map((route) => [route, "http://localhost:5142"]),
+    ),
   },
 
   test: {
     environment: "jsdom",
+    setupFiles: ["./src/shared/setupTests.ts"],
   },
 });
