@@ -6,6 +6,8 @@ src/Logaffe.Api/wwwroot/
 .git/
 .github/
 docs/
+# Except the contract, which the SPA's API layer is generated from.
+!docs/api/openapi.json
 tests/
 volume/
 *.md

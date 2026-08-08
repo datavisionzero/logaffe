@@ -12,6 +12,12 @@ WORKDIR /web
 COPY src/web/package.json src/web/package-lock.json ./
 RUN npm ci
 
+# The API layer is generated from the contract before the build runs, so the
+# document has to be in this stage — at the path `npm run generate` reaches for,
+# which is two levels above src/web/. It is copied before the sources because it
+# changes less often than they do.
+COPY docs/api/openapi.json /docs/api/openapi.json
+
 COPY src/web/ ./
 RUN npm run build -- --outDir dist --emptyOutDir
 
