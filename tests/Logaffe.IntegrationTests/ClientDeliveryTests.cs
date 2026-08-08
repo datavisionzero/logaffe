@@ -1,6 +1,7 @@
 using System.Net;
 using Logaffe.Application.Operations;
 using Logaffe.Client;
+using Logaffe.Extensions.Logging;
 using Logaffe.Serilog;
 using Logaffe.Domain.Entries;
 using Logaffe.Domain.Projects;
@@ -9,6 +10,7 @@ using Logaffe.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Npgsql;
 using Serilog;
 
@@ -169,6 +171,55 @@ public sealed class ClientDeliveryTests(PostgresFixture postgres) : IAsyncLifeti
         Assert.Equal((short)Level.Warning, only.Level);
 
         Assert.Equal("api-7c4f", only.Instance);
+        Assert.Equal("Orders.Api", only.LoggerName);
+    }
+
+    /// <summary>
+    /// And of the package beside it, which has to arrive at the same place: the
+    /// two are required to behave identically, and an entry that renders
+    /// differently is a difference no unit test would call one.
+    /// </summary>
+    [Fact]
+    public async Task An_entry_logged_through_the_provider_becomes_the_same_row()
+    {
+        var (project, token) = await AdmittedAsync();
+
+        // Disposed by hand, because a factory given a ready-made provider does
+        // not dispose it -- which is the same rule that decides how
+        // `AddLogaffe` registers one.
+        using (var provider = new LogaffeLoggerProvider(
+                   new LogaffeLoggerOptions
+                   {
+                       Installation = new Uri("http://localhost"),
+                       IngestToken = token.Text,
+                       Instance = "api-7c4f",
+                       BatchInterval = TimeSpan.FromMilliseconds(50),
+                       FlushTimeout = TimeSpan.FromSeconds(30),
+                   },
+                   _installation.CreateClient()))
+        {
+            using var factory = LoggerFactory.Create(builder => builder
+                .SetMinimumLevel(LogLevel.Trace)
+                .AddProvider(provider));
+
+            factory
+                .CreateLogger("Orders.Api")
+                .LogWarning("User {UserId} failed login from {Ip}", 42, "203.0.113.7");
+        }
+
+        var only = Assert.Single(await StoredAsync(project));
+
+        Assert.Equal("User {UserId} failed login from {Ip}", only.Template);
+        Assert.Equal("User 42 failed login from 203.0.113.7", only.Rendered);
+
+        // The other spelling of the same level, mapped by the installation
+        // without loss.
+        Assert.Equal((short)Level.Warning, only.Level);
+
+        Assert.Equal("api-7c4f", only.Instance);
+
+        // The category, promoted to the logger name with nothing asked of the
+        // application.
         Assert.Equal("Orders.Api", only.LoggerName);
     }
 

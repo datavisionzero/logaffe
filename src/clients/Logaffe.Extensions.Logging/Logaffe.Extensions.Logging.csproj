@@ -16,4 +16,11 @@
     <ProjectReference Include="../Logaffe.Client/Logaffe.Client.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Below the solution's central version on purpose: this package targets
+         the LTS, and its floor is what an application on that runtime already
+         has rather than what this repository builds against. -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" VersionOverride="8.0.3" />
+  </ItemGroup>
+
 </Project>

@@ -12,9 +12,11 @@
          run, and what this needs is a substituted message handler. -->
     <ProjectReference Include="../../src/clients/Logaffe.Client/Logaffe.Client.csproj" />
     <ProjectReference Include="../../src/clients/Logaffe.Serilog/Logaffe.Serilog.csproj" />
+    <ProjectReference Include="../../src/clients/Logaffe.Extensions.Logging/Logaffe.Extensions.Logging.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="xunit.v3" />

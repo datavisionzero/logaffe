@@ -41,6 +41,12 @@
          and applications on the runtime these packages target are on it.
          Reversible — supporting Serilog 3.x means multi-targeting against
          Serilog.Formatting.Compact 2.x, and nothing forecloses that. -->
+    <!-- The abstraction an application already logs through. The version here
+         is what transitive pinning holds the rest of the solution to, where
+         Npgsql asks for 10; the package itself overrides it down to the LTS it
+         targets, so that an application on .NET 8 is not asked to take .NET 10's
+         libraries to use it. -->
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.10" />
     <PackageVersion Include="Serilog" Version="4.3.0" />
     <!-- The whole of the sink, really: because the ingestion format is CLEF
          (ADR 0004), pointing this formatter at the endpoint is the integration.
@@ -54,6 +60,10 @@
          to say that an endpoint is behind the door rather than that a line of
          Program.cs says so. -->
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
+    <!-- The factory itself, so that the ILoggerProvider is asked the way an
+         application asks it: through a real logging factory with real scopes,
+         rather than by calling the provider's own methods. -->
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.10" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
     <!-- The client half of the same SDK, so that the MCP surface is asked the
          way an agent asks it — a handshake, a tool list and a call over the
