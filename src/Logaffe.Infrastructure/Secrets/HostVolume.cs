@@ -46,6 +46,29 @@ public sealed class HostVolume(string volumePath) : IHostVolume
                 Share = FileShare.ReadWrite | FileShare.Delete,
             });
 
+    public Stream Create(string relativePath)
+    {
+        var path = System.IO.Path.Combine(volumePath, relativePath);
+
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+
+        var options = new FileStreamOptions
+        {
+            Mode = FileMode.Create,
+            Access = FileAccess.Write,
+        };
+
+        // The key comes back readable by its owner and nobody else, set as the
+        // file is created rather than afterwards, so there is no moment at which
+        // it is not — the same rule HostVolumeKey follows when it writes one.
+        if (!OperatingSystem.IsWindows() && relativePath.StartsWith("keys/", StringComparison.Ordinal))
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
+        return new FileStream(path, options);
+    }
+
     /// <summary>
     /// Forward slashes whatever the host writes them as: the artifact is a tar,
     /// and a tar's paths are not the local filesystem's.

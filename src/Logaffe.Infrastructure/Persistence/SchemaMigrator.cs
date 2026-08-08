@@ -1,3 +1,4 @@
+using Logaffe.Application.Operations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 

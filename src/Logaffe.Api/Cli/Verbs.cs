@@ -6,9 +6,10 @@ namespace Logaffe.Api.Cli;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Both verbs are host-local by design and never reachable over the network
-/// (ADR 0013). They are two words, so they are read as two words — a parser
-/// would be machinery for a surface that is not meant to grow.
+/// Every verb is host-local by design and never reachable over the network
+/// (ADR 0013). They are single words with at most a flag behind them, so they
+/// are read as such — a parser would be machinery for a surface that is not
+/// meant to grow.
 /// </para>
 /// <para>
 /// <b>The token acts are deliberately not here.</b> These two are host-local
@@ -26,12 +27,13 @@ public static class Verbs
     public static bool TryRead(string[] args, out string verb)
     {
         verb = args.FirstOrDefault(argument => !argument.StartsWith('-')) ?? string.Empty;
-        return verb is "backup" or "recover";
+        return verb is "backup" or "restore" or "recover";
     }
 
     public static Task<int> RunAsync(string verb, string[] args) => verb switch
     {
         "backup" => BackupCommand.RunAsync(args),
+        "restore" => RestoreCommand.RunAsync(args),
         "recover" => RecoverCommand.RunAsync(args),
         _ => Task.FromResult(NotImplemented),
     };

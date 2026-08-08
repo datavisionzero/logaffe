@@ -1,3 +1,4 @@
+using Logaffe.Application.Operations;
 using Logaffe.Infrastructure.Persistence;
 
 namespace Logaffe.Api.Hosting;

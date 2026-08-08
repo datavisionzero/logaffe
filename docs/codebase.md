@@ -80,7 +80,7 @@ and the rolling file log ([ADR 0002](./adr/0002-logaffe-logs-to-files-not-into-i
 
 **`Logaffe.Api` is the adapters and the composition root.** One binary that is
 the server and the CLI both: the HTTP endpoints, the four MCP tools
-([MCP](./mcp.md)), the `backup` and `recover` verbs that
+([MCP](./mcp.md)), the `backup`, `restore` and `recover` verbs that
 [Operations](./operations.md) and [Setup](./setup.md) document, the
 authentication of three different credentials, the rate limits every public
 surface carries, and the static files of the built SPA. Its name understates it
