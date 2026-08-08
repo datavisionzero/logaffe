@@ -1,13 +1,12 @@
 import { Link, useParams } from "react-router";
+import { LogView } from "../logs/LogView";
 import { useProjects } from "./projects";
 
 /**
  * One project, which is where nearly all the time is spent.
  *
- * The log view itself — the filters, the entries they leave, the detail of one
- * of them, and the live tail — is the next slice of `docs/ui.md` and is not
- * built yet. What stands here is the project this screen is for, so that the
- * switcher and the list both reach something they name.
+ * What this screen is is the log view; what it holds here is the project it is
+ * for, read off the list the shell already fetched rather than asked for again.
  */
 export function ProjectScreen() {
   const { id } = useParams();
@@ -21,7 +20,7 @@ export function ProjectScreen() {
 
   if (project === undefined) {
     return (
-      <section>
+      <section className="narrow">
         <h1>No such project</h1>
         <p>
           This installation holds no project by that identity. It may have been deleted
@@ -32,12 +31,8 @@ export function ProjectScreen() {
     );
   }
 
-  return (
-    <section>
-      <h1>{project.name}</h1>
-      <p className="quiet">
-        The log view is not built yet — see <code>docs/ui.md</code> for what belongs here.
-      </p>
-    </section>
-  );
+  // Keyed by the project, so that switching to another one starts the view
+  // rather than carrying the selection, the page and the tail's position of the
+  // one that was open into it.
+  return <LogView key={project.id} project={project} />;
 }

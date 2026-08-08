@@ -219,3 +219,369 @@ ul.codes {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ---------------------------------------------------------- the log view ----
+   One screen: the filters across the top, the entries below them, the detail
+   of one beside them. */
+
+main.surface {
+  max-width: none;
+  padding: 0;
+}
+
+/* The screens that are a column of prose rather than a list of log lines. */
+.narrow {
+  display: block;
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.logview {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 3.2rem);
+  padding: 0.6rem 1rem;
+  box-sizing: border-box;
+}
+
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.filter-row .filter {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin: 0;
+}
+
+.filters label,
+.count-head label {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin: 0;
+}
+
+.filters input,
+.filters select,
+.count-head select {
+  display: inline-block;
+  width: auto;
+  margin: 0;
+  padding: 0.25rem 0.4rem;
+  font: inherit;
+  color: inherit;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+.filters input[type="search"] {
+  min-width: 16rem;
+}
+
+.filter-row button {
+  margin: 0;
+  padding: 0.25rem 0.7rem;
+}
+
+.filter-row button[aria-pressed="true"] {
+  border-color: var(--ink);
+}
+
+/* The narrowings taken from entries, removed one at a time. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: baseline;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.85rem;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+}
+
+.chip button {
+  margin: 0;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  background: none;
+  border: none;
+}
+
+/* Visibly separate, because the two match different fields and the operator
+   has to know which one finds `nullreference` (ADR 0028). */
+.exception-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  max-width: none;
+  padding: 0.4rem 0.6rem;
+  border: 1px dashed var(--rule);
+  border-radius: 4px;
+}
+
+.exception-filter label {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  margin: 0;
+}
+
+.exception-filter .quiet {
+  font-size: 0.85rem;
+}
+
+.logview-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.4rem 0;
+  font-size: 0.85rem;
+}
+
+.logview-status button {
+  margin: 0;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.logview-status .notice {
+  padding: 0.15rem 0.5rem;
+}
+
+.logview-body {
+  display: flex;
+  flex: 1;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.logview-entries {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+/* One entry is one row, one line, never wrapping: a list whose rows change
+   height cannot be scanned. */
+ul.entries {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+li.entry {
+  display: grid;
+  grid-template-columns: 13.5rem 6.5rem 12rem 1fr auto;
+  gap: 0.6rem;
+  align-items: baseline;
+  padding: 0.15rem 0.5rem;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  cursor: default;
+  border-bottom: 1px solid color-mix(in srgb, var(--rule) 50%, transparent);
+}
+
+li.entry.selected {
+  background: var(--raised);
+  outline: 1px solid var(--rule);
+}
+
+/* Marked briefly wherever they land, so that something appearing out of eyeline
+   is still something the operator sees appear. */
+li.entry.just-arrived {
+  animation: just-arrived 4s ease-out;
+}
+
+@keyframes just-arrived {
+  from {
+    background: color-mix(in srgb, var(--notice) 35%, transparent);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+.entry-time {
+  color: var(--quiet);
+}
+
+.entry-logger,
+.entry-message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entry-logger button {
+  max-width: 100%;
+  overflow: hidden;
+  font-family: inherit;
+  font-size: inherit;
+  text-overflow: ellipsis;
+}
+
+.entry-marks {
+  color: var(--notice);
+}
+
+/* The level as a word with a colour behind it, and never as a colour alone. */
+.level {
+  display: inline-block;
+  min-width: 5.5rem;
+  padding: 0 0.35rem;
+  font-size: 0.78rem;
+  text-align: center;
+  border-radius: 3px;
+  background: var(--raised);
+}
+
+.level-Verbose,
+.level-Debug {
+  color: var(--quiet);
+}
+
+.level-Information {
+  background: light-dark(#dbeafe, #1e3a5f);
+}
+
+.level-Warning {
+  background: light-dark(#fdf0c8, #4a3a10);
+}
+
+.level-Error {
+  background: light-dark(#fbdada, #4d1f1f);
+}
+
+.level-Fatal {
+  color: light-dark(#fff, #fff);
+  background: light-dark(#a4262c, #7a1c20);
+}
+
+/* Opens beside the list without navigating anywhere; the list keeps its
+   position and the filters stay set. */
+.detail {
+  flex: 0 0 30rem;
+  max-width: 45vw;
+  overflow: auto;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+.detail-head {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.detail-fields {
+  display: grid;
+  grid-template-columns: 7rem 1fr;
+  gap: 0.35rem 0.75rem;
+  margin: 0.75rem 0 0;
+}
+
+.detail-fields dt {
+  color: var(--quiet);
+  font-size: 0.85rem;
+}
+
+.detail-fields dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.detail-fields pre {
+  max-height: 22rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8rem;
+}
+
+.detail-message {
+  margin: 0;
+}
+
+button.narrows {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  text-decoration: underline dotted;
+}
+
+button.level.narrows {
+  padding: 0 0.35rem;
+  text-decoration: none;
+}
+
+/* The count is asked for, and every row narrows to itself. */
+.count {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--raised);
+}
+
+.count-head {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.count-table {
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+}
+
+.count-table td {
+  padding: 0.15rem 0.75rem 0.15rem 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.count-number {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  text-align: right;
+}
+
+.expired,
+.nothing-matched,
+.empty {
+  max-width: 40rem;
+  padding: 1rem;
+}
+
+.expired ul,
+.nothing-matched ul {
+  margin: 0.5rem 0;
+}
+
+.empty pre {
+  white-space: pre-wrap;
+  word-break: break-all;
+}

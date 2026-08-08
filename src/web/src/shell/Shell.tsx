@@ -65,7 +65,10 @@ export function Shell({
         </p>
       )}
 
-      <main>
+      {/* The log view is the full width of the window and the project list is
+          a column, so the surface is not constrained here — each screen says
+          how wide it is. */}
+      <main className="surface">
         {/* The SPA's addresses are singular where the contract's are plural,
             and that is load-bearing rather than a matter of taste: the server
             falls back to `index.html` only for what no endpoint matched, and

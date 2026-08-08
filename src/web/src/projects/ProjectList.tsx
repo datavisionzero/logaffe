@@ -19,16 +19,16 @@ export function ProjectList() {
   const [creating, setCreating] = useState(false);
 
   if (state.status === "asking") {
-    return <p className="quiet">Asking the installation what it holds…</p>;
+    return <p className="narrow quiet">Asking the installation what it holds…</p>;
   }
 
   if (state.status === "unreachable") {
-    return <p className="refusal">This installation did not answer.</p>;
+    return <p className="narrow refusal">This installation did not answer.</p>;
   }
 
   if (state.projects.length === 0) {
     return (
-      <section>
+      <section className="narrow">
         <h1>No projects yet</h1>
         <p>
           A project is the unit of separation: every log entry belongs to exactly one, and
@@ -40,7 +40,7 @@ export function ProjectList() {
   }
 
   return (
-    <section>
+    <section className="narrow">
       <h1>Projects</h1>
 
       <table className="projects">
