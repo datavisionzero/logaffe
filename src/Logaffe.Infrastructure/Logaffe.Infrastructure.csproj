@@ -15,6 +15,11 @@
 
   <ItemGroup>
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <!-- Named as well as arriving under the provider above, because the log
+         path writes with Npgsql's binary COPY directly (ADR 0003) rather than
+         only through EF Core. A dependency that is used by name is declared by
+         name. -->
+    <PackageReference Include="Npgsql" />
     <!-- Design-time only: this project is its own startup project for
          `dotnet ef`, through the factory in Persistence. -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design">

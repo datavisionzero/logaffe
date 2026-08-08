@@ -33,6 +33,12 @@ Keys beginning with `@` are the entry's own fields; every other key is a
 property. The second line above is what a `curl` sender writes, and it needs to
 know nothing about templates, properties or Serilog to write it.
 
+**An `@` key logaffe does not know is passed over.** CLEF carries fields logaffe
+has no column for — its event id, its renderings — and one of them is neither a
+field nor a property: it is not stored, and it does not make the entry invalid.
+The format is adopted rather than frozen, and treating its growth as a defect in
+the sender would be the wrong way round.
+
 ## What an entry carries
 
 ### The message is a template, and plain text is a template without holes
@@ -53,6 +59,16 @@ for character as it arrived. This is deliberate and it exists because log conten
 is untrusted: an application logging a raw request body will sooner or later log
 braces, and Serilog's escaping would rewrite that text. Under this rule a plain
 line always renders to itself byte for byte.
+
+Two pieces of Serilog's placeholder syntax are read far enough to find the name
+and no further. A destructuring hint — the `@` or `$` of `{@User}` — says how
+the sender captured the value rather than what it is called, and the property
+arrives under the bare name. **A format or alignment specifier is used to find
+the name and then dropped rather than applied**: `{Elapsed:0.000}` renders the
+number that was delivered, because logaffe stores values as they arrived and
+holds no type for a specifier to mean anything against. Leaving the whole
+placeholder standing instead is the one reading that helps nobody, since what it
+puts on the operator's screen is `{Elapsed:0.000}`.
 
 ### The level
 
@@ -114,7 +130,16 @@ numbers. Nothing in a sender's control flow depends on it — it exists so that 
 person debugging a new integration with `curl` can see what is wrong.
 
 An entry is invalid when `@t` is missing or unparsable, `@mt` is missing, `@l` is
-unrecognized, `@m` is present, or the line is not a JSON object.
+unrecognized, `@m` is present, the line is not a JSON object, or the entry is
+over one of the two property limits below.
+
+**The property limits make an entry invalid rather than being truncated**, which
+is the one place they part company with the message and the exception. Dropping
+the sixty-fifth property would be a silent modification of what was delivered
+and which one went would be arbitrary, and there is no tail to cut off a nesting
+that is too deep. Both are defects in one code path of the sending application,
+which is under the operator's own control and can be fixed — and the counted
+rejection is how they find out.
 
 ### Backpressure and refusal
 
@@ -128,6 +153,24 @@ A bad token answers `401` and says nothing further. It does not reveal whether
 the project exists, whether the token once existed, or whether it was revoked;
 the endpoint is on the public internet and an unauthenticated caller learns
 nothing from it.
+
+A body that announced `Content-Encoding: gzip` and is not gzip answers `400`.
+That is the one thing wrong with the request rather than with the entries inside
+it, there is no part of it to accept, and it is not one of the three refusals
+above because nothing about the batch was ever legible enough to refuse.
+
+**The rate limit is 600 deliveries per minute**, counted per source rather than
+per token. At the thousand entries a batch may carry that is ten thousand
+entries a second, which is what [Storage](./storage.md) measured this
+installation sustaining — so the limit sits where the store does rather than
+below it. It is by source because the throttle runs before anything is
+authenticated, and a partition read off the presented token would be a partition
+an unauthenticated caller chooses: a flood writing a fresh identifier into every
+request would draw a fresh budget each time and be throttled by nothing at all.
+What that costs is a fleet behind one address sharing a bucket, which at this
+rate is not a bucket they can empty. Nothing is held waiting — a sender does not
+read the answer and will not retry, so holding a delivery open to smooth a burst
+buys it nothing and costs the installation a connection.
 
 ## The limits
 
@@ -147,7 +190,14 @@ that a four-megabyte stack trace costs its tail rather than the whole entry. Thi
 is the one place on this path where what is stored differs from what arrived, and
 `VISION.md` names it as the sole exception to "stored as delivered";
 [ADR 0008](./adr/0008-an-over-long-message-is-truncated-not-refused.md) records
-why it wins over refusing the entry.
+why it wins over refusing the entry. The cut lands on a character and never
+inside one: text ending in half a surrogate pair is not text, and every consumer
+of the column would be carrying that.
+
+The four are not one rule. The two on the batch are the hard limits, and a
+delivery over either is refused whole with `413`. The two on the properties make
+the entry invalid and are counted, for the reason given above. Only the message
+and the exception are truncated.
 
 ## Authentication
 

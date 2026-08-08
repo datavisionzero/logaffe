@@ -1,3 +1,5 @@
+using Logaffe.Domain.Entries;
+
 namespace Logaffe.Application.Ports;
 
 /// <summary>
@@ -5,11 +7,10 @@ namespace Logaffe.Application.Ports;
 /// </summary>
 /// <remarks>
 /// <para>
-/// This is the port over the one table that dominates the product, and it
-/// offers what the sweep needs and nothing else. The writer that takes a batch
-/// and the reader that answers a filtered page are the ingestion and querying
-/// paths' and arrive with them; putting all three here now would be writing
-/// down the shape of two paths that have not been built.
+/// This is the port over the one table that dominates the product: the writer
+/// the ingestion path hands a batch to, and what the sweep needs to take rows
+/// out again. The reader that answers a filtered page is the querying path's and
+/// arrives with it.
 /// </para>
 /// <para>
 /// Nothing on it hands an entry back. Removing is counted rather than
@@ -20,6 +21,27 @@ namespace Logaffe.Application.Ports;
 /// </remarks>
 public interface IEntries
 {
+    /// <summary>
+    /// Writes a whole batch, every entry of it carrying the identity it was
+    /// given before it got here.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It is one call for the batch rather than one per entry because this is
+    /// the hottest path in the product and the thing on the other side is a
+    /// binary <c>COPY</c>
+    /// (<see href="https://github.com/datavisionzero/logaffe/blob/main/docs/adr/0003-ef-core-owns-the-schema-the-log-path-goes-around-it.md">ADR 0003</see>).
+    /// </para>
+    /// <para>
+    /// <b>It either stores the batch or throws.</b> There is no partial answer
+    /// here: which entries are worth storing was decided before this was called,
+    /// and a store that cannot be reached is the <c>503</c> of
+    /// <c>docs/ingestion.md</c> — the batch is gone, which is what
+    /// fire-and-forget means and why the application still has its file.
+    /// </para>
+    /// </remarks>
+    Task WriteAsync(IReadOnlyList<LogEntry> batch, CancellationToken cancellationToken);
+
     /// <summary>
     /// Every project identity the entry table still holds rows for.
     /// </summary>

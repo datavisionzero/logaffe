@@ -39,6 +39,11 @@ builder.Services.AddScoped<CheckReadiness>();
 builder.Services.AddScoped<CheckTheKeyFits>();
 builder.Services.AddScoped<AuthenticateToken>();
 
+// The hottest path in the product, and the one the adoption barrier of
+// `VISION.md` is measured on. It is the only use case both public endpoints'
+// authentication stands in front of, and the only one that writes entries.
+builder.Services.AddScoped<IngestBatch>();
+
 // The claim, which is the whole reachable surface of an installation nobody
 // owns. `Recover` is the other half of the same window and is registered by the
 // command line rather than here, because it is host-local and never reachable
@@ -145,6 +150,7 @@ app.MapSessions();
 app.MapOperator();
 app.MapProjects();
 app.MapTokens();
+app.MapIngest();
 
 // The single-page application is built by its own toolchain and copied into
 // wwwroot at image build time; in development the Vite dev server serves it and

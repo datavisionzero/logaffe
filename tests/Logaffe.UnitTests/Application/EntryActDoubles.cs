@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Entries;
 
 namespace Logaffe.UnitTests.Application;
 
@@ -23,6 +24,22 @@ internal sealed class RecordingEntries : IEntries
     /// <summary>Every count asked for, in order.</summary>
     public List<(Guid ProjectId, DateTimeOffset ReceivedBefore)> Counts { get; } = [];
 
+    /// <summary>
+    /// Every batch written, in order. Unlike the removals this keeps the entries
+    /// themselves, because what an ingestion is asked about is what it made of a
+    /// line — the row it built, not that it built one.
+    /// </summary>
+    public List<IReadOnlyList<LogEntry>> Written { get; } = [];
+
+    /// <summary>Every entry of every batch, which is the usual question.</summary>
+    public IReadOnlyList<LogEntry> Entries => [.. Written.SelectMany(batch => batch)];
+
+    /// <summary>
+    /// What a write throws instead of storing, which is the store that cannot be
+    /// reached.
+    /// </summary>
+    public Exception? Refusing { get; set; }
+
     /// <summary>What a count comes back as.</summary>
     public long Counting { get; set; }
 
@@ -43,6 +60,18 @@ internal sealed class RecordingEntries : IEntries
 
     public DateTimeOffset CutoffFor(Guid projectId) =>
         Removals.Single(removal => removal.ProjectId == projectId).ReceivedBefore;
+
+    public Task WriteAsync(IReadOnlyList<LogEntry> batch, CancellationToken cancellationToken)
+    {
+        if (Refusing is not null)
+        {
+            return Task.FromException(Refusing);
+        }
+
+        Written.Add(batch);
+
+        return Task.CompletedTask;
+    }
 
     public Task<IReadOnlyList<Guid>> ProjectsWithEntriesAsync(
         CancellationToken cancellationToken) =>
@@ -65,5 +94,31 @@ internal sealed class RecordingEntries : IEntries
         Counts.Add((projectId, receivedBefore));
 
         return Task.FromResult(Counting);
+    }
+}
+
+/// <summary>
+/// The counter, as the act above it sees it: it hands out blocks from where the
+/// test says the table already got to.
+/// </summary>
+/// <remarks>
+/// It counts the blocks as well as handing them out, because the act asks for
+/// one per batch and asking twice for one batch would be a gap nobody noticed —
+/// gaps being irrelevant is a statement about the store, not a licence to leave
+/// them here.
+/// </remarks>
+internal sealed class HandingOutIds(long from = 0) : IEntryIds
+{
+    /// <summary>Every block asked for, in order, as its size.</summary>
+    public List<int> Blocks { get; } = [];
+
+    private long HandedOut { get; set; } = from;
+
+    public Task<long> ReserveAsync(int count, CancellationToken cancellationToken)
+    {
+        Blocks.Add(count);
+        HandedOut += count;
+
+        return Task.FromResult(HandedOut - count + 1);
     }
 }

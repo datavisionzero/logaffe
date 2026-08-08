@@ -172,6 +172,52 @@
         }
       }
     },
+    "/ingest": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Takes a batch of log entries for the project its token names.",
+        "operationId": "Ingest",
+        "requestBody": {
+          "content": {
+            "application/x-ndjson": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeliveryReceiptResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "413": {
+            "description": "Payload Too Large"
+          },
+          "429": {
+            "description": "Too Many Requests"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
     "/sessions": {
       "get": {
         "tags": [
@@ -1081,6 +1127,38 @@
           }
         }
       },
+      "DeliveryReceiptResponse": {
+        "required": [
+          "accepted",
+          "rejected",
+          "reasons"
+        ],
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "rejected": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RejectedLineResponse"
+            }
+          }
+        }
+      },
       "EnrolmentResponse": {
         "required": [
           "secondFactorSecret",
@@ -1491,6 +1569,26 @@
             "type": "string"
           },
           "deliverySnippet": {
+            "type": "string"
+          }
+        }
+      },
+      "RejectedLineResponse": {
+        "required": [
+          "line",
+          "reason"
+        ],
+        "type": "object",
+        "properties": {
+          "line": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "reason": {
             "type": "string"
           }
         }

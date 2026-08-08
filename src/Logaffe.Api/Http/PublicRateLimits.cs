@@ -43,9 +43,26 @@ public static class PublicRateLimits
     public const string Operator = "operator";
 
     /// <summary>
+    /// The throttle in front of the deliveries. It is what <c>VISION.md</c> asks
+    /// abuse protection on the ingestion endpoint for: keeping an
+    /// unauthenticated flood or a misbehaving deployment from filling the store,
+    /// and not defending against the sending applications, which are the
+    /// operator's own.
+    /// </summary>
+    public const string Ingest = "ingest";
+
+    /// <summary>
     /// A burst of attempts a person mistyping their password actually makes.
     /// </summary>
     private const int Burst = 5;
+
+    /// <summary>
+    /// How many deliveries one source gets per minute. At the thousand entries a
+    /// batch may carry, it is ten thousand entries a second — which is what
+    /// <c>docs/storage.md</c> measured this installation sustaining, so the
+    /// limit sits where the store does rather than below it.
+    /// </summary>
+    private const int IngestPerMinute = 600;
 
     /// <summary>How many requests a signed-in browser gets per minute.</summary>
     private const int OperatorPerMinute = 300;
@@ -132,6 +149,28 @@ public static class PublicRateLimits
                     // Nothing waits here. Holding an operator's request open to
                     // smooth a burst would make the interface feel broken, and
                     // there is no guessing to slow down behind the door.
+                    QueueLimit = 0,
+                }));
+
+            // By source, like the rest, and deliberately not by the token the
+            // delivery presents. The limiter runs before anything is
+            // authenticated, so a partition read off the header would be a
+            // partition an unauthenticated caller chooses — and a flood that
+            // wrote a fresh identifier into every request would spend a fresh
+            // budget each time and be throttled by nothing at all. What that
+            // costs is a fleet behind one address sharing a bucket, which at the
+            // rate above is not a bucket they can empty.
+            limiter.AddPolicy(Ingest, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.SeenFrom() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = IngestPerMinute,
+                    Window = TimeSpan.FromMinutes(1),
+
+                    // Nothing waits. A sender does not look at the answer and
+                    // will not retry, so holding a delivery open to smooth a
+                    // burst would buy it nothing and cost the installation a
+                    // connection.
                     QueueLimit = 0,
                 }));
 
