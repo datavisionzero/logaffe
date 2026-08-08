@@ -194,6 +194,19 @@ filter no index serves — deliberately, because a stack trace is kilobytes wher
 message is a line.
 _Avoid_: Stack trace search, error filter, exception search, trace filter
 
+**Page**:
+One answer to a filter set: the entries it leaves, newest first by event time
+with the identity breaking ties, up to a size that is the same in every
+installation. It carries the cursor for the next one and never a total.
+_Avoid_: Result set, batch, results, hits, window
+
+**Cursor**:
+The position a page left off at — the event time and the identity of its last
+entry — which the following page is asked for. It is opaque to whoever holds it,
+and it is what makes paging independent of how deep it has gone, where an offset
+would skip and repeat entries as the store grows underneath the reader.
+_Avoid_: Offset, page number, token, continuation, bookmark
+
 **Log View**:
 The single screen on which the operator reads one project: the filters, the
 entries they leave, and the detail of one of them. It is where nearly all use of

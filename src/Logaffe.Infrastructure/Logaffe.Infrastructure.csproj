@@ -14,6 +14,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The read side of the log path. The sweep and the write needed none of
+         it — a delete answers with a row count and COPY takes a batch — and the
+         filtered page is the first work that has rows to turn back into
+         entries, which is when ADR 0003 said this would arrive. -->
+    <PackageReference Include="Dapper" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <!-- Named as well as arriving under the provider above, because the log
          path writes with Npgsql's binary COPY directly (ADR 0003) rather than

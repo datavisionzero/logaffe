@@ -6,6 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup Label="Persistence">
+    <!-- What the log path reads with (ADR 0003). EF Core declares the entry
+         table and serves none of it; the queries are hand-written because they
+         are fitted to the indexes docs/storage.md claims, and this is what turns
+         their rows back into entries. -->
+    <PackageVersion Include="Dapper" Version="2.1.66" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" />
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.3" />
     <!-- The Npgsql provider asks for EF Core 10.0.4 and the design-time package

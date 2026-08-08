@@ -39,6 +39,10 @@ public static class InfrastructureServices
         // same way; what is different is on the other side of the interface.
         services.AddScoped<IEntries, Entries>();
 
+        // The other half of it, and the one this layer takes Dapper for: the
+        // write and the sweep had nothing to map, and a filtered page does.
+        services.AddScoped<IEntryReader, EntryReader>();
+
         // The counter that gives entries their identities, and the one thing in
         // this layer that has to outlive a request: an installation is a single
         // writer, and a number handed out per scope would hand out the same

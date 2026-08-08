@@ -87,6 +87,13 @@ builder.Services.AddScoped<ChangeRetentionWindow>();
 builder.Services.AddScoped<CountEntriesOutsideWindow>();
 builder.Services.AddScoped<DeleteProject>();
 
+// The read the ingestion path exists for, and the one surface both consumers
+// meet: the MCP tools, when they come, call exactly these and add no query
+// behaviour of their own (`docs/querying.md`).
+builder.Services.AddScoped<SearchEntries>();
+builder.Services.AddScoped<CountEntries>();
+builder.Services.AddScoped<ReadEntry>();
+
 // The other end of both of those: the window is what this reads, and a deleted
 // project's entries are what it takes afterwards (ADR 0019). It is reachable
 // from nowhere but the timer below — retention is not an act the operator
@@ -149,6 +156,7 @@ app.MapClaim();
 app.MapSessions();
 app.MapOperator();
 app.MapProjects();
+app.MapEntries();
 app.MapTokens();
 app.MapIngest();
 

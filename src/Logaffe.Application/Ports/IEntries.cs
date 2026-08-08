@@ -9,8 +9,8 @@ namespace Logaffe.Application.Ports;
 /// <para>
 /// This is the port over the one table that dominates the product: the writer
 /// the ingestion path hands a batch to, and what the sweep needs to take rows
-/// out again. The reader that answers a filtered page is the querying path's and
-/// arrives with it.
+/// out again. Reading the entries is <see cref="IEntryReader"/>, which is a port
+/// of its own because it is a different surface with different consumers.
 /// </para>
 /// <para>
 /// Nothing on it hands an entry back. Removing is counted rather than

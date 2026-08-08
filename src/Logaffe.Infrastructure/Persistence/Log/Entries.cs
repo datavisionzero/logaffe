@@ -30,8 +30,8 @@ namespace Logaffe.Infrastructure.Persistence.Log;
 /// The others are sent through EF Core's raw channel rather than through Dapper,
 /// which is what ADR 0003 says the log path reads with. Nothing here reads: a
 /// delete answers with a row count and the one query answers with identities,
-/// so there is no mapping to do and no reason yet to take the dependency.
-/// Dapper arrives with the filtered page that needs it.
+/// so there is no mapping to do. The reads that do have rows to turn back into
+/// entries are <see cref="EntryReader"/>'s, and that is where Dapper is.
 /// </para>
 /// </remarks>
 public sealed class Entries(LogaffeDbContext context) : IEntries
