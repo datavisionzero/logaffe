@@ -11,6 +11,7 @@
          reason docs/codebase.md gives: the split is by what a test needs to
          run, and what this needs is a substituted message handler. -->
     <ProjectReference Include="../../src/clients/Logaffe.Client/Logaffe.Client.csproj" />
+    <ProjectReference Include="../../src/clients/Logaffe.Serilog/Logaffe.Serilog.csproj" />
   </ItemGroup>
 
   <ItemGroup>
