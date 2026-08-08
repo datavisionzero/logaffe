@@ -13,13 +13,14 @@ if (Verbs.TryRead(args, out var verb))
     return await Verbs.RunAsync(verb, args);
 }
 
-var builder = WebApplication.CreateBuilder(args);
+// Built from the same settings the verbs are, so that the server and the
+// command line in one binary read one configuration.
+var builder = WebApplication.CreateBuilder(HostConfiguration.ForTheServer(args));
 
 // Everything that is not in the database lives on the host volume, never inside
 // the container image, so a container can be destroyed and recreated without
 // losing anything.
-var volumePath = builder.Configuration["Logaffe:VolumePath"]
-    ?? throw new InvalidOperationException("Logaffe:VolumePath is not configured.");
+var volumePath = HostConfiguration.VolumePath(builder.Configuration);
 
 // logaffe does not log into itself — the failures worth diagnosing are the ones
 // in which it could not record anything (ADR 0002). The file log is bounded:

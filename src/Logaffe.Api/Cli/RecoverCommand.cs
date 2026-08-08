@@ -43,17 +43,12 @@ public static class RecoverCommand
 
     public static async Task<int> RunAsync(string[] args)
     {
-        // Without args: a bare verb is not a configuration argument, and the
-        // command line provider refuses one. Everything this needs — the
-        // connection string and the volume — comes from the environment and the
-        // settings file beside the binary.
-        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
-        {
-            ContentRootPath = AppContext.BaseDirectory,
-        });
+        // Everything this needs — the connection string and the volume — comes
+        // from the environment and the settings files beside the binary, read
+        // the way the server reads them (see HostConfiguration).
+        var builder = Host.CreateApplicationBuilder(HostConfiguration.ForAVerb());
 
-        var volumePath = builder.Configuration["Logaffe:VolumePath"]
-            ?? throw new InvalidOperationException("Logaffe:VolumePath is not configured.");
+        var volumePath = HostConfiguration.VolumePath(builder.Configuration);
 
         builder.Services.AddLogaffeInfrastructure(builder.Configuration);
         builder.Services.AddSingleton(TimeProvider.System);
