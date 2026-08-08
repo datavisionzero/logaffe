@@ -27,7 +27,7 @@ public sealed class OperatorEndpointTests(PostgresFixture postgres) : IAsyncLife
 {
     private const string TheirPassword = "a passphrase they typed";
 
-    private readonly string _volume = Directory.CreateTempSubdirectory("logaffe-volume-").FullName;
+    private readonly string _volume = InstallationVolume.Create(nameof(OperatorEndpointTests));
 
     private WebApplicationFactory<Program> _installation = null!;
     private string _secondFactorSecret = null!;
@@ -50,7 +50,7 @@ public sealed class OperatorEndpointTests(PostgresFixture postgres) : IAsyncLife
     public async ValueTask DisposeAsync()
     {
         await _installation.DisposeAsync();
-        Directory.Delete(_volume, recursive: true);
+        InstallationVolume.Delete(_volume);
     }
 
     [Theory]

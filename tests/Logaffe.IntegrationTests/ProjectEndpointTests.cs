@@ -31,7 +31,7 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : IAsyncLifet
     private const string TheirPassword = "a passphrase they typed";
     private const string NoSuchProject = "0195f0d4-0000-7000-8000-000000000000";
 
-    private readonly string _volume = Directory.CreateTempSubdirectory("logaffe-volume-").FullName;
+    private readonly string _volume = InstallationVolume.Create(nameof(ProjectEndpointTests));
 
     private WebApplicationFactory<Program> _installation = null!;
     private string _secondFactorSecret = null!;
@@ -56,7 +56,7 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : IAsyncLifet
     public async ValueTask DisposeAsync()
     {
         await _installation.DisposeAsync();
-        Directory.Delete(_volume, recursive: true);
+        InstallationVolume.Delete(_volume);
     }
 
     [Theory]

@@ -48,7 +48,33 @@ jobs:
           global-json-file: global.json
       - run: dotnet restore Logaffe.slnx
       - run: dotnet build Logaffe.slnx -c Release --no-restore
-      - run: dotnet test tests/Logaffe.IntegrationTests -c Release --no-build
+
+      - name: Integration tests
+        # Emptied first, because this runner is long-lived and a log from the
+        # run before would be read as this one's.
+        run: |
+          rm -rf "${{ runner.temp }}/installations"
+          dotnet test tests/Logaffe.IntegrationTests -c Release --no-build
+        env:
+          # Every test here that starts an installation gives it a host volume,
+          # and logaffe writes its own account of itself there rather than into
+          # itself (ADR 0002). Naming a directory keeps those volumes instead of
+          # deleting them with the test, so that a failure on this runner can be
+          # read from the installation's side as well as the caller's — which is
+          # what #46 has no way of answering today.
+          LOGAFFE_TEST_VOLUMES: ${{ runner.temp }}/installations
+
+      - name: Keep what the installations wrote
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installation-logs
+          # The logs and nothing else. The same volumes hold the key that makes
+          # a token readable (ADR 0022) — a test one, but an artifact is a thing
+          # that gets downloaded, and a key does not belong in one.
+          path: ${{ runner.temp }}/installations/**/logs/*.log
+          if-no-files-found: warn
+          retention-days: 14
 
   web:
     name: Web

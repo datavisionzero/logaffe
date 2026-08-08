@@ -27,9 +27,9 @@ public sealed class RetentionServiceTests(PostgresFixture postgres) : IDisposabl
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
 
-    private readonly string _volume = Directory.CreateTempSubdirectory("logaffe-volume-").FullName;
+    private readonly string _volume = InstallationVolume.Create(nameof(RetentionServiceTests));
 
-    public void Dispose() => Directory.Delete(_volume, recursive: true);
+    public void Dispose() => InstallationVolume.Delete(_volume);
 
     [Fact]
     public async Task Starting_the_installation_removes_what_fell_outside_its_window()
