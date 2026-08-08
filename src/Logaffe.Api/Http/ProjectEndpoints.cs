@@ -47,12 +47,18 @@ public sealed record ProjectResponse(
 /// project whose door is closed — which is the reading this column is on the
 /// list for.
 /// </param>
+/// <param name="LastReceivedAt">
+/// When the project last received an entry, or <c>null</c> when it never has.
+/// This is the fact the row is read for: whether the application behind it is
+/// still delivering.
+/// </param>
 public sealed record ListedProjectResponse(
     Guid Id,
     string Name,
     int RetentionDays,
     DateTimeOffset CreatedAt,
-    int IngestTokens);
+    int IngestTokens,
+    DateTimeOffset? LastReceivedAt);
 
 /// <summary>
 /// The operator's project acts, reached over HTTP.
@@ -123,12 +129,16 @@ public static class ProjectEndpoints
                 // No count of entries beside a project. That is a query over the
                 // largest table in the database for a number nobody asked for,
                 // and it is what makes this a list rather than a dashboard.
+                // When it last received one is the opposite kind of read — one
+                // lookup at the end of an index — and it is the fact the row is
+                // read for.
                 return Results.Ok(held.Select(project => new ListedProjectResponse(
                     project.Id,
                     project.Name,
                     project.Retention.Days,
                     project.CreatedAt,
-                    project.IngestTokens)));
+                    project.IngestTokens,
+                    project.LastReceivedAt)));
             })
             .WithName("ListProjects")
             .WithSummary("Every project the installation holds.")

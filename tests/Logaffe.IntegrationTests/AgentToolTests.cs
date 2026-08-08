@@ -190,6 +190,33 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
         Assert.Equal(created.Id, project.Id);
         Assert.Equal("orders", project.Name);
         Assert.Equal(7, project.RetentionDays);
+
+        // Nothing has been delivered to it, which is a fact and not a missing
+        // one: an agent reads this before asking anything else.
+        Assert.Null(project.LastReceivedAt);
+    }
+
+    [Fact]
+    public async Task Every_project_says_when_it_last_received_an_entry()
+    {
+        using var client = await SignedInAsync();
+        var orders = await CreateAsync(client, "orders");
+        var quiet = await CreateAsync(client, "billing");
+
+        await StoreAsync(orders.Id, Ten.AddMinutes(-5));
+        await StoreAsync(orders.Id, Ten);
+
+        await using var agent = await ConnectAsync();
+
+        var listed = await CallAsync<ProjectsBody>(agent, "list_projects", []);
+
+        // The cheapest health question there is about a project, answered on the
+        // one tool that does not name one — and answered per project, so the
+        // silent one is visible beside the live one.
+        Assert.Equal(
+            Ten,
+            listed.Projects.Single(project => project.Id == orders.Id).LastReceivedAt);
+        Assert.Null(listed.Projects.Single(project => project.Id == quiet.Id).LastReceivedAt);
     }
 
     [Fact]
@@ -705,7 +732,11 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
     private sealed record ProjectsBody(IReadOnlyList<AgentProjectBody> Projects);
 
     private sealed record AgentProjectBody(
-        Guid Id, string Name, int RetentionDays, DateTimeOffset CreatedAt);
+        Guid Id,
+        string Name,
+        int RetentionDays,
+        DateTimeOffset CreatedAt,
+        DateTimeOffset? LastReceivedAt);
 
     private sealed record SearchBody(
         string Verbosity,

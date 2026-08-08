@@ -26,9 +26,9 @@ public static class ProjectTools
     [Description(
         """
         Every project in this logaffe installation, with the identity that names
-        it in the other tools and the retention window that says how far back it
-        can be asked about. Call this first: every other tool reads one project
-        and is given it by identity.
+        it in the other tools, the retention window that says how far back it can
+        be asked about, and when it last received an entry. Call this first:
+        every other tool reads one project and is given it by identity.
         """)]
     public static async Task<ProjectsAnswer> ListAsync(
         ListProjects projects, CancellationToken cancellationToken)

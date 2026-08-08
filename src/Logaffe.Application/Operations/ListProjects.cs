@@ -12,12 +12,18 @@ namespace Logaffe.Application.Operations;
 /// why the number is on the list at all — an operator should not have to open
 /// each project to find the one nothing can deliver to.
 /// </param>
+/// <param name="LastReceivedAt">
+/// When the project last received an entry, or <c>null</c> when it has never
+/// received one — the one fact both consumers want at a glance, because it is
+/// what says whether an application is still delivering.
+/// </param>
 public sealed record ListedProject(
     Guid Id,
     string Name,
     RetentionWindow Retention,
     DateTimeOffset CreatedAt,
-    int IngestTokens);
+    int IngestTokens,
+    DateTimeOffset? LastReceivedAt);
 
 /// <summary>
 /// Every project the installation holds.
@@ -30,13 +36,16 @@ public sealed record ListedProject(
 /// asked for.
 /// </para>
 /// <para>
-/// Two reads, neither of them per row: the projects, and the token counts of
-/// all of them at once. When that project last received an entry joins them
-/// once the entry table exists — one indexed lookup per project, which is the
-/// one fact <c>docs/ui.md</c> wants at a glance.
+/// Two reads that are not per row — the projects, and the token counts of all
+/// of them at once — and then one lookup per project for when it last received
+/// an entry. That last one is per row on purpose: the reader takes the project
+/// because a query always runs inside one, and an installation holds projects in
+/// tens rather than in thousands, so the choice is between ten reads at the end
+/// of an index and a read across every project the reader is not allowed to
+/// have.
 /// </para>
 /// </remarks>
-public sealed class ListProjects(IProjects projects, ITokens tokens)
+public sealed class ListProjects(IProjects projects, ITokens tokens, IEntryReader entries)
 {
     public async Task<IReadOnlyList<ListedProject>> ExecuteAsync(
         CancellationToken cancellationToken)
@@ -44,11 +53,22 @@ public sealed class ListProjects(IProjects projects, ITokens tokens)
         var held = await projects.ListAsync(cancellationToken);
         var counts = await tokens.CountIngestTokensAsync(cancellationToken);
 
-        return [.. held.Select(project => new ListedProject(
-            project.Id,
-            project.Name,
-            project.Retention,
-            project.CreatedAt,
-            counts.TryGetValue(project.Id, out var count) ? count : 0))];
+        var listed = new List<ListedProject>(held.Count);
+
+        // One after another rather than all at once: these run on the one
+        // connection the request holds, and asking it for ten answers in
+        // parallel is the way to be told it is already in use.
+        foreach (var project in held)
+        {
+            listed.Add(new ListedProject(
+                project.Id,
+                project.Name,
+                project.Retention,
+                project.CreatedAt,
+                counts.TryGetValue(project.Id, out var count) ? count : 0,
+                await entries.LastReceivedAsync(project.Id, cancellationToken)));
+        }
+
+        return listed;
     }
 }

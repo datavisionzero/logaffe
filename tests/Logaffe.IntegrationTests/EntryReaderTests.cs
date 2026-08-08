@@ -560,6 +560,35 @@ public sealed class EntryReaderTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task When_a_project_last_received_an_entry_is_the_receipt_and_not_the_event()
+    {
+        var reader = await ReadingAsync(
+            // The entry that happened last is not the one that arrived last: a
+            // delivery that was queued behind a network is received after an
+            // event that came later on the sender's clock.
+            Entry(1, Ten, received: Ten.AddSeconds(4)),
+            Entry(2, Ten.AddMinutes(5), received: Ten.AddSeconds(2)),
+            Entry(3, Ten, projectId: _other, received: Ten.AddMinutes(9)));
+
+        // Inside this project and no other, which is what makes it a per-project
+        // lookup rather than one statement over the table.
+        Assert.Equal(
+            Ten.AddSeconds(4),
+            await reader.LastReceivedAsync(_project, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_project_that_has_received_nothing_has_no_last_receipt()
+    {
+        var reader = await ReadingAsync(Entry(1, Ten, projectId: _other));
+
+        // Absent rather than the beginning of time: the list distinguishes a
+        // project nothing has ever delivered to from one that fell quiet.
+        Assert.Null(await reader.LastReceivedAsync(
+            _project, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Every_read_is_cut_off_after_five_seconds()
     {
         var connectionString = await MigratedAsync();
@@ -588,6 +617,8 @@ public sealed class EntryReaderTests(PostgresFixture postgres)
         await Assert.ThrowsAsync<ReadExpiredException>(() => ArrivalsAsync(reader));
         await Assert.ThrowsAsync<ReadExpiredException>(() =>
             reader.NewestArrivalAsync(_project, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ReadExpiredException>(() =>
+            reader.LastReceivedAsync(_project, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ReadExpiredException>(() =>
             reader.FindAsync(_project, 1, TestContext.Current.CancellationToken));
     }

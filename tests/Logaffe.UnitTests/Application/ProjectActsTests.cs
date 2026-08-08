@@ -13,6 +13,7 @@ public sealed class ProjectActsTests
 
     private readonly InMemoryProjects _projects = new();
     private readonly InMemoryTokens _tokens = new();
+    private readonly RecordingReader _entries = new();
     private readonly StoppedClock _clock = new(Now);
 
     [Fact]
@@ -178,6 +179,38 @@ public sealed class ProjectActsTests
     }
 
     [Fact]
+    public async Task Each_row_says_when_that_project_last_received_an_entry()
+    {
+        var api = await CreateAsync("api", 7);
+        var web = await CreateAsync("web", 30);
+        _entries.Received[api!.Id] = Now.AddMinutes(-3);
+
+        var listed = await Listing().ExecuteAsync(TestContext.Current.CancellationToken);
+
+        // One lookup per project and each inside its own: the fact is asked for
+        // by project, because there is no reading across them.
+        Assert.Equal([api.Id, web!.Id], _entries.Receipts);
+        Assert.Equal(
+            [Now.AddMinutes(-3), null],
+            listed.Select(project => project.LastReceivedAt));
+    }
+
+    [Fact]
+    public async Task A_project_that_has_never_received_anything_says_so_rather_than_a_time()
+    {
+        // Distinct from a project that received something long ago, which is
+        // the difference an operator reads the column for. A project created a
+        // minute ago has no receipt, and its creation time is not one.
+        var project = await CreateAsync("api", 7);
+
+        var listed = Assert.Single(await Listing().ExecuteAsync(
+            TestContext.Current.CancellationToken));
+
+        Assert.Null(listed.LastReceivedAt);
+        Assert.Equal(project!.CreatedAt, listed.CreatedAt);
+    }
+
+    [Fact]
     public async Task One_project_is_read_back_by_the_identity_and_nothing_else()
     {
         var project = await CreateAsync("api", 7);
@@ -198,7 +231,7 @@ public sealed class ProjectActsTests
         new IssueIngestToken(_projects, _tokens, new ReversingCipher(), _clock)
             .ExecuteAsync(project, TestContext.Current.CancellationToken);
 
-    private ListProjects Listing() => new(_projects, _tokens);
+    private ListProjects Listing() => new(_projects, _tokens, _entries);
 
     private RenameProject Renaming() => new(_projects);
 

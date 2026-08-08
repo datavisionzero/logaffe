@@ -126,6 +126,21 @@ public interface IEntryReader
     Task<TailCursor?> NewestArrivalAsync(Guid projectId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// When the project last received an entry, or <c>null</c> when it has never
+    /// received one.
+    /// </summary>
+    /// <remarks>
+    /// The receipt time and not the event time: the question this answers is
+    /// whether an application is still delivering, and an entry that arrives
+    /// carrying yesterday's clock arrived today. It is the end of the receipt
+    /// index that <see cref="NewestArrivalAsync"/> reads too, so it costs the
+    /// same one lookup — which is what lets the project list ask it per project
+    /// (<c>docs/ui.md</c>, <c>docs/mcp.md</c>) without becoming the dashboard
+    /// that list refuses to be.
+    /// </remarks>
+    Task<DateTimeOffset?> LastReceivedAsync(Guid projectId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// One entry by its identity, or <c>null</c> when the project holds no such
     /// entry.
     /// </summary>

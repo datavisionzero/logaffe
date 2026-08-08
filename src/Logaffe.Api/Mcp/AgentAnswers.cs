@@ -53,10 +53,19 @@ public sealed record AgentProject(
     string Name,
     [property: Description("How long the project keeps its entries, counted from receipt.")]
     int RetentionDays,
-    DateTimeOffset CreatedAt)
+    DateTimeOffset CreatedAt,
+    [property: Description(
+        "When this project last received an entry, or absent when it never has. "
+        + "Whether it is still being delivered to, which is the cheapest health "
+        + "question there is about one.")]
+    DateTimeOffset? LastReceivedAt)
 {
     public static AgentProject Of(ListedProject project) => new(
-        project.Id, project.Name, project.Retention.Days, project.CreatedAt);
+        project.Id,
+        project.Name,
+        project.Retention.Days,
+        project.CreatedAt,
+        project.LastReceivedAt);
 }
 
 /// <summary>Every project the installation holds.</summary>

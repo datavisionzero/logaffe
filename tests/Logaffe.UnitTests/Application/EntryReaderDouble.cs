@@ -33,6 +33,9 @@ internal sealed class RecordingReader : IEntryReader
     /// <summary>Every entry asked for by identity, in order.</summary>
     public List<(Guid ProjectId, long Id)> Lookups { get; } = [];
 
+    /// <summary>Every project asked when it last received an entry, in order.</summary>
+    public List<Guid> Receipts { get; } = [];
+
     /// <summary>What a page comes back as.</summary>
     public IReadOnlyList<LogEntry> Paging { get; set; } = [];
 
@@ -47,6 +50,12 @@ internal sealed class RecordingReader : IEntryReader
 
     /// <summary>What a lookup comes back as.</summary>
     public LogEntry? Finding { get; set; }
+
+    /// <summary>
+    /// When a project last received an entry, by project — absent from it is a
+    /// project that never has.
+    /// </summary>
+    public Dictionary<Guid, DateTimeOffset> Received { get; } = [];
 
     /// <summary>Whether the reads run out of their five seconds instead of answering.</summary>
     public bool Expiring { get; set; }
@@ -107,6 +116,15 @@ internal sealed class RecordingReader : IEntryReader
         return Expiring
             ? Task.FromException<TailCursor?>(Expired())
             : Task.FromResult(Newest);
+    }
+
+    public Task<DateTimeOffset?> LastReceivedAsync(
+        Guid projectId, CancellationToken cancellationToken)
+    {
+        Receipts.Add(projectId);
+
+        return Task.FromResult(
+            Received.TryGetValue(projectId, out var received) ? received : (DateTimeOffset?)null);
     }
 
     public Task<LogEntry?> FindAsync(

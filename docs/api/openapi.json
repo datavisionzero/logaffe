@@ -2024,7 +2024,8 @@
           "name",
           "retentionDays",
           "createdAt",
-          "ingestTokens"
+          "ingestTokens",
+          "lastReceivedAt"
         ],
         "type": "object",
         "properties": {
@@ -2054,6 +2055,13 @@
               "string"
             ],
             "format": "int32"
+          },
+          "lastReceivedAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
           }
         }
       },

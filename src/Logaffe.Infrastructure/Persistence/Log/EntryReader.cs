@@ -153,6 +153,32 @@ public sealed class EntryReader(LogaffeDbContext context) : IEntryReader
             : new TailCursor(new DateTimeOffset(rows[0].ReceiptTime, TimeSpan.Zero), rows[0].Id);
     }
 
+    public async Task<DateTimeOffset?> LastReceivedAsync(
+        Guid projectId, CancellationToken cancellationToken)
+    {
+        // The same end of the same receipt index the arming above reads, asked
+        // for the fact rather than for a position: one column back, because
+        // nothing on the row is shown. `max` over the identity would order by
+        // the wrong half of the index.
+        var sql =
+            """
+            select receipt_time
+            from log_entry
+            where project_id = @projectId
+            order by receipt_time desc
+            limit 1
+            """;
+
+        var parameters = new DynamicParameters();
+        parameters.Add("projectId", projectId);
+
+        var rows = await QueryAsync<DateTime?>(sql, parameters, cancellationToken);
+
+        return rows.Count == 0 || rows[0] is not { } received
+            ? null
+            : new DateTimeOffset(received, TimeSpan.Zero);
+    }
+
     public async Task<IReadOnlyList<CountedGroup>> CountAsync(
         Guid projectId,
         EntryFilters filters,

@@ -220,6 +220,11 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : IAsyncLifet
         Assert.Equal(created.Id, listed.Id);
         Assert.Equal(0, listed.IngestTokens);
 
+        // Nor has it received anything, which the row says rather than leaves
+        // out: a project that has never been delivered to is not one that fell
+        // quiet, and the creation time is not a receipt.
+        Assert.Null(listed.LastReceivedAt);
+
         using var renamed = await client.PatchAsJsonAsync(
             $"/projects/{created.Id}",
             new { name = "orders-api" },
@@ -464,7 +469,12 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : IAsyncLifet
         Guid Id, string Name, int RetentionDays, DateTimeOffset CreatedAt);
 
     private sealed record ListedProjectBody(
-        Guid Id, string Name, int RetentionDays, DateTimeOffset CreatedAt, int IngestTokens);
+        Guid Id,
+        string Name,
+        int RetentionDays,
+        DateTimeOffset CreatedAt,
+        int IngestTokens,
+        DateTimeOffset? LastReceivedAt);
 
     private sealed record IssuedIngestTokenBody(Guid Id, string Token, DateTimeOffset IssuedAt);
 }
