@@ -31,7 +31,7 @@ public static class Verbs
 
     public static Task<int> RunAsync(string verb, string[] args) => verb switch
     {
-        "backup" => BackupCommand.RunAsync(),
+        "backup" => BackupCommand.RunAsync(args),
         "recover" => RecoverCommand.RunAsync(args),
         _ => Task.FromResult(NotImplemented),
     };

@@ -34,6 +34,11 @@ public static class InfrastructureServices
         services.AddScoped<ISessions, Sessions>();
         services.AddScoped<SchemaMigrator>();
 
+        // The database as something that can be written out and read back. It is
+        // registered here rather than only where the verbs build their host,
+        // because what answers it is this layer's business either way (ADR 0037).
+        services.AddScoped<IDatabaseDump, PostgresDump>();
+
         // The one table EF Core declares and does not serve (ADR 0003). It is
         // registered beside the stores because the layer above asks for it the
         // same way; what is different is on the other side of the interface.
@@ -53,9 +58,13 @@ public static class InfrastructureServices
         // token is sealed or opened — the same deferral as the connection string
         // above, and for the same reason.
         services.AddSingleton(provider => new HostVolumeKey(
-            configuration["Logaffe:VolumePath"]
-            ?? throw new InvalidOperationException("Logaffe:VolumePath is not configured."),
+            VolumePath(configuration),
             provider.GetRequiredService<ILogger<HostVolumeKey>>()));
+
+        // The rest of the same directory. The key is what makes an artifact worth
+        // having; everything beside it goes into the artifact too, because both
+        // halves or neither is the whole of ADR 0024.
+        services.AddSingleton<IHostVolume>(_ => new HostVolume(VolumePath(configuration)));
         services.AddSingleton<ISecretCipher, AesGcmSecretCipher>();
 
         // Neither of these holds anything: one is PBKDF2 with its parameters
@@ -66,4 +75,8 @@ public static class InfrastructureServices
 
         return services;
     }
+
+    private static string VolumePath(IConfiguration configuration) =>
+        configuration["Logaffe:VolumePath"]
+        ?? throw new InvalidOperationException("Logaffe:VolumePath is not configured.");
 }

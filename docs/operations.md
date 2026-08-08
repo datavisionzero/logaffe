@@ -59,12 +59,24 @@ the operator decides when to run it, where to put it, and how long to keep it. A
 scheduler, a destination and a retention policy for backups are all still theirs;
 what is not theirs is the chance to back up one half and believe they are covered.
 
+It is safe to run beside a serving installation — it reads and takes no lock —
+and it writes the tar to standard output, so it has to be redirected somewhere.
+**The artifact holds the key material, which makes it as sensitive as the
+installation itself.**
+
 **Not everything is equally worth saving.** Entries are expendable: they are
 short-lived by design, they are additive to the applications' own local files,
 and losing them costs little. The operator's account, the configuration and the
 tokens are not — losing those means losing the installation. An operator who
 backs up only the small, slow-changing part is making a legitimate choice, and
-the command supports it.
+the command supports it:
+
+```
+docker compose exec logaffe logaffe backup --without-entries > logaffe-backup.tar
+```
+
+The artifact says which of the two it is, so a restore does not have to guess
+whether an installation's log is missing or was never taken.
 
 **Restoring** puts both halves back and starts a version **no older than** the one
 that produced the artifact. Restoring into an older logaffe is refused rather
