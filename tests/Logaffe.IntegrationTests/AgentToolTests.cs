@@ -37,7 +37,7 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
 
     private static readonly DateTimeOffset Ten = new(2026, 8, 8, 10, 0, 0, TimeSpan.Zero);
 
-    private readonly string _volume = Directory.CreateTempSubdirectory("logaffe-volume-").FullName;
+    private readonly string _volume = InstallationVolume.Create(nameof(AgentToolTests));
 
     private WebApplicationFactory<Program> _installation = null!;
     private string _secondFactorSecret = null!;
@@ -66,7 +66,7 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
     public async ValueTask DisposeAsync()
     {
         await _installation.DisposeAsync();
-        Directory.Delete(_volume, recursive: true);
+        InstallationVolume.Delete(_volume);
     }
 
     [Fact]

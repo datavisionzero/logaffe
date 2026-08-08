@@ -38,7 +38,7 @@ public sealed class IngestEndpointTests(PostgresFixture postgres) : IAsyncLifeti
 {
     private const string Happened = "2026-08-07T09:15:00.417Z";
 
-    private readonly string _volume = Directory.CreateTempSubdirectory("logaffe-volume-").FullName;
+    private readonly string _volume = InstallationVolume.Create(nameof(IngestEndpointTests));
 
     private string _connectionString = null!;
     private WebApplicationFactory<Program> _installation = null!;
@@ -61,7 +61,7 @@ public sealed class IngestEndpointTests(PostgresFixture postgres) : IAsyncLifeti
     public async ValueTask DisposeAsync()
     {
         await _installation.DisposeAsync();
-        Directory.Delete(_volume, recursive: true);
+        InstallationVolume.Delete(_volume);
     }
 
     [Fact]

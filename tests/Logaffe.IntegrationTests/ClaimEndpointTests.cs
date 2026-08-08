@@ -29,7 +29,7 @@ public sealed class ClaimEndpointTests(PostgresFixture postgres) : IAsyncLifetim
 {
     private const string TheirPassword = "a passphrase they typed";
 
-    private readonly string _volume = Directory.CreateTempSubdirectory("logaffe-volume-").FullName;
+    private readonly string _volume = InstallationVolume.Create(nameof(ClaimEndpointTests));
 
     private string _connectionString = null!;
     private WebApplicationFactory<Program> _installation = null!;
@@ -50,7 +50,7 @@ public sealed class ClaimEndpointTests(PostgresFixture postgres) : IAsyncLifetim
     public async ValueTask DisposeAsync()
     {
         await _installation.DisposeAsync();
-        Directory.Delete(_volume, recursive: true);
+        InstallationVolume.Delete(_volume);
     }
 
     [Fact]

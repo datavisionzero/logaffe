@@ -22,9 +22,9 @@ public sealed class ExpiredSessionSweepTests(PostgresFixture postgres) : IDispos
 {
     private const string TheirPassword = "a passphrase they typed";
 
-    private readonly string _volume = Directory.CreateTempSubdirectory("logaffe-volume-").FullName;
+    private readonly string _volume = InstallationVolume.Create(nameof(ExpiredSessionSweepTests));
 
-    public void Dispose() => Directory.Delete(_volume, recursive: true);
+    public void Dispose() => InstallationVolume.Delete(_volume);
 
     [Fact]
     public async Task Starting_the_installation_removes_what_went_thirty_days_untouched()
