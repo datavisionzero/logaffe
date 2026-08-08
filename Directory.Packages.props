@@ -27,6 +27,11 @@
          reaches it. Stays on the 2.x line the ASP.NET Core package compiled
          against; drop the pin once that package moves past the advisory. -->
     <PackageVersion Include="Microsoft.OpenApi" Version="2.7.6" />
+    <!-- The MCP adapter. The protocol is a wire format with a version
+         negotiation and a transport, and none of that is product behaviour
+         worth hand-writing; the official SDK carries it and the four tools sit
+         on top. -->
+    <PackageVersion Include="ModelContextProtocol.AspNetCore" Version="2.1.0" />
     <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
   </ItemGroup>
@@ -37,6 +42,11 @@
          Program.cs says so. -->
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.10" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <!-- The client half of the same SDK, so that the MCP surface is asked the
+         way an agent asks it — a handshake, a tool list and a call over the
+         wire — rather than by calling the tool methods directly, which would
+         prove nothing about the endpoint. -->
+    <PackageVersion Include="ModelContextProtocol" Version="2.1.0" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />

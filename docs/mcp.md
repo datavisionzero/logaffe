@@ -6,7 +6,9 @@ same query surface the UI uses ([Querying](./querying.md)), and it can do nothin
 else at all.
 
 The endpoint is publicly reachable and authenticated, like everything else this
-product exposes.
+product exposes, and it carries a rate limit like every other public surface —
+below the operator's, because every call behind it may be a five-second read and
+an agent calls a handful of times to answer a question.
 
 ## The agent token
 
@@ -105,6 +107,11 @@ event time, a level threshold, an instance, a logger name, a trace, a search
 text, and an exception text, all combining with AND and nothing else
 ([ADR 0011](./adr/0011-filters-only-narrow-and-only-with-and.md)).
 
+The project is named by the identity `list_projects` gives, and so is every
+other tool's. A name would be friendlier to write and would mean this adapter
+resolving one, which is a query it is not allowed to have — the first tool
+exists so that the other three do not need to look anything up.
+
 **`count_entries`** — the same filters, answered as a number, optionally grouped
 by level, logger name, instance or time bucket. This is what turns *"were there
 critical errors in the last three days"* into an answer instead of forty thousand
@@ -125,10 +132,38 @@ exception and the properties behind it.
 - **Full** — everything: both timestamps, the message template, all properties,
   the exception, and the truncation flag. Up to 50 entries.
 
+Both carry the entry's identity as well, because `get_entry` is asked with it and
+the follow-up after a compact search is the whole reason the compact shape
+exists. What compact leaves out is **absent rather than null**: it exists to save
+context, and writing out the fields it does not carry would spend a good part of
+what it saved.
+
+The two caps are this door's and are not the page size of
+[Querying](./querying.md). They sit above it — a tool fills its cap from as many
+pages as that takes — and they differ from each other because the entries behind
+them are different sizes.
+
 **Every response says how many entries matched in total and whether it was
 capped.** An agent that receives fifty entries and is not told there were nine
 thousand will answer as though there were fifty, and that is the quietest way
-this product could produce a wrong answer.
+this product could produce a wrong answer. Where an answer was capped, it also
+carries the cursor to carry on from.
+
+**The count behind that number is run only when the answer does not already
+contain it.** A first call that was not capped returned every entry the filters
+match, so the total is the length of what came back, and a second statement over
+the largest table in the database would be paying to be told something already in
+hand. Everything else is counted: an answer that stopped at its cap, and a
+continuation, whose earlier entries are not in it.
+[Querying](./querying.md) refuses a total beside a page for the operator; the cap
+is why the rule differs here, and the cap is also what keeps the count from being
+run on the reads that do not need it.
+
+**A capped answer is never handed over without its total.** A count is the read
+most likely to use up its five seconds, and when it is the one that does, the
+whole call comes back as an expired read saying what to narrow — rather than as
+entries with an unknown number behind them, which would be the failure the number
+exists to prevent, wearing the shape of a success.
 
 ## Entries reach the agent as data
 
@@ -136,6 +171,18 @@ Entries are structured values in named fields — never markdown, never a
 formatted transcript, never text folded into a sentence addressed to the agent
 ([ADR 0012](./adr/0012-log-content-reaches-an-agent-as-data-never-as-prose.md)).
 The rendered message is a field carrying text, and nothing in it is interpreted.
+
+## A read that runs out of its five seconds
+
+Every read on this surface gets five seconds, the same five as the operator's,
+with no setting that raises them
+([ADR 0026](./adr/0026-a-read-has-five-seconds.md)). One that uses them up is not
+an error to report: it comes back with the adjustments that would make the next
+one finish — set a time range, make the one already set smaller, take off the
+exception filter — in the order to try them. They are **named values and not a
+sentence**, for the same reason entries are: the operator's screen writes the
+sentence from these values, and the agent is handed the fact
+([ADR 0012](./adr/0012-log-content-reaches-an-agent-as-data-never-as-prose.md)).
 
 ## What the agent cannot do
 
@@ -148,7 +195,9 @@ The rendered message is a field carrying text, and nothing in it is interpreted.
 - **It cannot follow logs live.** There is no tail, no subscription and no
   polling loop offered to an agent. `VISION.md` is explicit that the agent looks
   because the operator asked, and that passive continuous monitoring is not part
-  of the product.
+  of the product. A client that opens a stream on the endpoint expecting to be
+  told something is answered that there is no such stream, rather than being left
+  holding one that will never carry anything.
 - **It cannot read across projects.** Every tool names one, exactly as the UI
   does.
 

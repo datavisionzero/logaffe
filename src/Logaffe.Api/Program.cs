@@ -1,6 +1,7 @@
 using Logaffe.Api.Cli;
 using Logaffe.Api.Hosting;
 using Logaffe.Api.Http;
+using Logaffe.Api.Mcp;
 using Logaffe.Application.Operations;
 using Logaffe.Infrastructure;
 using Serilog;
@@ -88,8 +89,8 @@ builder.Services.AddScoped<CountEntriesOutsideWindow>();
 builder.Services.AddScoped<DeleteProject>();
 
 // The read the ingestion path exists for, and the one surface both consumers
-// meet: the MCP tools, when they come, call exactly these and add no query
-// behaviour of their own (`docs/querying.md`).
+// meet: the four MCP tools call exactly these and add no query behaviour of
+// their own (`docs/querying.md`).
 builder.Services.AddScoped<SearchEntries>();
 builder.Services.AddScoped<CountEntries>();
 builder.Services.AddScoped<ReadEntry>();
@@ -139,8 +140,14 @@ builder.Services.AddHostedService<RetentionService>();
 
 builder.Services.AddLogaffeRequestSource(builder.Configuration);
 builder.Services.AddLogaffeSessionAuthentication();
+builder.Services.AddLogaffeAgentAuthentication();
 builder.Services.AddLogaffeRateLimits();
 builder.Services.AddLogaffeOpenApi();
+
+// The second adapter over the reads above. It is registered beside them rather
+// than inside them: what an agent may call is a fact about this composition
+// root, and the four tools are the whole of it (ADR 0018).
+builder.Services.AddLogaffeAgentTools();
 
 var app = builder.Build();
 
@@ -164,6 +171,7 @@ app.MapProjects();
 app.MapEntries();
 app.MapTokens();
 app.MapIngest();
+app.MapAgentTools();
 
 // The single-page application is built by its own toolchain and copied into
 // wwwroot at image build time; in development the Vite dev server serves it and

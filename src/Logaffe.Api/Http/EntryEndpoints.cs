@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Logaffe.Api.Queries;
 using Logaffe.Application.Operations;
 using Logaffe.Application.Ports;
 using Logaffe.Domain.Entries;
@@ -155,9 +156,10 @@ public sealed record ReadExpiredResponse(IEnumerable<string> Narrow);
 /// These sit on the use cases of <c>docs/querying.md</c> and add no query
 /// behaviour of their own — which is what makes the promise that the operator
 /// and the agent share one surface structural rather than a matter of
-/// discipline. When the MCP adapter arrives it calls the same three; the fourth,
-/// the tail, is the operator's alone, because an agent reads on request and does
-/// not watch (<c>docs/mcp.md</c>).
+/// discipline. The MCP tools call the same three, and read the filters back with
+/// the same <see cref="EntryFilterText"/>; the fourth, the tail, is the
+/// operator's alone, because an agent reads on request and does not watch
+/// (<c>docs/mcp.md</c>).
 /// </para>
 /// <para>
 /// <b>The tail is the one request that repeats.</b> It is polling on the order of
@@ -305,7 +307,7 @@ public static class EntryEndpoints
                     ? Expired(read.Narrow)
                     : Results.Ok(new CountResponse(
                         read.Answer!.Select(group => new CountedGroupResponse(
-                            Named(grouping, group.Value), group.Entries))));
+                            EntryFilterText.NamedGroup(grouping, group.Value), group.Entries))));
             })
             .WithName("CountEntries")
             .WithSummary("How many entries a filter set matches, optionally grouped.")
@@ -338,120 +340,33 @@ public static class EntryEndpoints
     /// The filters as the domain holds them, or the problem to answer with.
     /// </summary>
     /// <remarks>
-    /// Every rule below is one the domain refuses as a backstop. A caller taking
-    /// filters from a person says which one they got wrong first, which is what
-    /// the operator's screen needs and what an agent correcting itself needs.
+    /// The reading itself is <see cref="EntryFilterText"/>'s, which the MCP
+    /// tools call as well — one reading of what a level, a trace and a search
+    /// text are, for the one surface both consumers meet. What is this
+    /// endpoint's is the shape of the refusal: a validation problem naming the
+    /// query parameter the operator's screen put the value in.
     /// </remarks>
     private static bool TryRead(
         EntryFiltersRequest request, out EntryFilters filters, out IResult invalid)
     {
-        filters = EntryFilters.None;
-        invalid = Results.Empty;
-
-        Level? minimum = null;
-        if (request.MinimumLevel is not null)
+        if (EntryFilterText.TryRead(
+                request.From,
+                request.Until,
+                request.MinimumLevel,
+                request.Instance,
+                request.LoggerName,
+                request.Trace,
+                request.Search,
+                request.Exception,
+                out filters,
+                out var complaint))
         {
-            if (!Levels.TryParse(request.MinimumLevel, out var level))
-            {
-                invalid = Problem("minimumLevel", "A level is one of the six severities.");
-                return false;
-            }
-
-            minimum = level;
-        }
-
-        byte[]? traceId = null;
-        if (request.Trace is not null)
-        {
-            if (!TryReadTrace(request.Trace, out traceId))
-            {
-                invalid = Problem(
-                    "trace",
-                    $"A trace is {LogEntry.TraceIdLength * 2} hexadecimal characters.");
-                return false;
-            }
-        }
-
-        if (!TryReadText(request.Search, out var search))
-        {
-            invalid = Problem("search", TooShort);
-            return false;
-        }
-
-        if (!TryReadText(request.Exception, out var exception))
-        {
-            invalid = Problem("exception", TooShort);
-            return false;
-        }
-
-        filters = new EntryFilters
-        {
-            From = request.From,
-            Until = request.Until,
-            MinimumLevel = minimum,
-            Instance = request.Instance,
-            LoggerName = request.LoggerName,
-            TraceId = traceId,
-            Search = search,
-            ExceptionText = exception,
-        };
-
-        if (!filters.HasARange)
-        {
-            // A malformed question rather than an empty answer: a caller told
-            // "no entries" would go looking for a delivery problem.
-            invalid = Problem("until", "A time range ends after it starts.");
-            return false;
-        }
-
-        return true;
-    }
-
-    /// <summary>
-    /// A trace as it is written on the wire, back to the bytes it is. An
-    /// ill-formed one is refused rather than passed on: promotion required a
-    /// well-formed value, so a filter carrying anything else could only match
-    /// nothing, and answering "no entries" to a question that was never asked is
-    /// the wrong answer.
-    /// </summary>
-    private static bool TryReadTrace(string value, out byte[]? traceId)
-    {
-        traceId = null;
-
-        if (value.Length != LogEntry.TraceIdLength * 2)
-        {
-            return false;
-        }
-
-        try
-        {
-            traceId = Convert.FromHexString(value);
-            return true;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
-
-    private static bool TryReadText(string? value, out SearchText? text)
-    {
-        text = null;
-
-        if (value is null)
-        {
+            invalid = Results.Empty;
             return true;
         }
 
-        // Two characters is not a narrower search, it is a scan of the project
-        // (ADR 0025), so it is refused where it was typed rather than run.
-        if (!SearchText.TryCreate(value, out var created))
-        {
-            return false;
-        }
-
-        text = created;
-        return true;
+        invalid = Problem(complaint!.Parameter, complaint.Message);
+        return false;
     }
 
     private static bool TryReadGrouping(string? value, out Grouping grouping) =>
@@ -466,16 +381,6 @@ public static class EntryEndpoints
             ? (bucket = TimeBucket.Hour) is TimeBucket.Hour
             : Enum.TryParse(value, ignoreCase: true, out bucket)
               && Enum.IsDefined(bucket);
-
-    /// <summary>
-    /// A grouped value as it is read. The level is stored as a number and
-    /// grouped as one, and this is where it becomes the name the rest of the
-    /// contract uses.
-    /// </summary>
-    private static string? Named(Grouping grouping, string? value) =>
-        grouping is Grouping.Level && short.TryParse(value, out var level)
-            ? ((Level)level).ToString()
-            : value;
 
     private static ListedEntryResponse Listed(LogEntry entry) => new(
         entry.Id,
@@ -517,9 +422,6 @@ public static class EntryEndpoints
     private static IResult Expired(IReadOnlyList<Narrowing> narrow) => Results.Json(
         new ReadExpiredResponse(narrow.Select(one => one.ToString())),
         statusCode: StatusCodes.Status408RequestTimeout);
-
-    private static readonly string TooShort =
-        $"A search text is at least {SearchText.MinimumLength} characters.";
 
     private static IResult Problem(string parameter, string message) =>
         Results.ValidationProblem(new Dictionary<string, string[]> { [parameter] = [message] });

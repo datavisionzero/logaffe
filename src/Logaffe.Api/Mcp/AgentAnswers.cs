@@ -1,0 +1,240 @@
+using System.ComponentModel;
+using System.Text.Json.Nodes;
+using Logaffe.Api.Queries;
+using Logaffe.Application.Operations;
+using Logaffe.Application.Ports;
+using Logaffe.Domain.Entries;
+using Logaffe.Domain.Queries;
+
+namespace Logaffe.Api.Mcp;
+
+/// <summary>
+/// Which shape a search answers entries in, chosen per call.
+/// </summary>
+public enum Verbosity
+{
+    /// <summary>
+    /// Event time, level, logger name, instance and the rendered message. The
+    /// default, because a broad search that silently spends an agent's whole
+    /// context is worse than one that needs a second call.
+    /// </summary>
+    Compact = 0,
+
+    /// <summary>Both clocks, the template, the properties, the exception and the truncation.</summary>
+    Full,
+}
+
+/// <summary>
+/// How many entries one call may answer with, which is this adapter's number and
+/// not <see cref="Page.Size"/>.
+/// </summary>
+/// <remarks>
+/// These sit above the page: a tool pages the use case underneath it until it is
+/// full or the log runs out. They bound one answer to an agent, and the reason
+/// the two shapes have different ones is that the entries behind them are
+/// different sizes — a full entry drags its properties and its exception along.
+/// </remarks>
+public static class AgentCap
+{
+    public const int Compact = 200;
+
+    public const int Full = 50;
+
+    public static int Of(Verbosity verbosity) =>
+        verbosity is Verbosity.Full ? Full : Compact;
+}
+
+/// <summary>
+/// One project, as <c>list_projects</c> answers with it.
+/// </summary>
+public sealed record AgentProject(
+    [property: Description("Names this project in every other tool.")]
+    Guid Id,
+    string Name,
+    [property: Description("How long the project keeps its entries, counted from receipt.")]
+    int RetentionDays,
+    DateTimeOffset CreatedAt)
+{
+    public static AgentProject Of(ListedProject project) => new(
+        project.Id, project.Name, project.Retention.Days, project.CreatedAt);
+}
+
+/// <summary>Every project the installation holds.</summary>
+public sealed record ProjectsAnswer(IReadOnlyList<AgentProject> Projects);
+
+/// <summary>
+/// One entry, in whichever of the two shapes was asked for.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Named fields, and nothing folded into a sentence</b> (ADR 0012). The
+/// rendered message is a field carrying text and nothing in it is interpreted:
+/// no markdown, no transcript, no formatting applied on the way out. This type
+/// and <c>Http/EntryEndpoints</c> are the two places that claim is enforced, and
+/// therefore the two places it can be audited.
+/// </para>
+/// <para>
+/// The compact shape is the five fields <c>docs/mcp.md</c> names, plus the
+/// identity. The identity is not one of the five, but <c>get_entry</c> is asked
+/// with it and the whole point of the compact shape is the follow-up after it —
+/// an agent that saw a promising line and cannot name it has been given a list
+/// it can only read.
+/// </para>
+/// <para>
+/// The fields the compact shape leaves out are absent rather than null, so a
+/// broad search does not spend the context it was made compact to save.
+/// <see cref="SearchAnswer.Verbosity"/> is what says which shape an answer is
+/// in, so that a missing exception is never mistaken for an entry that has one.
+/// </para>
+/// </remarks>
+public sealed record AgentEntry
+{
+    public required long Id { get; init; }
+
+    public required DateTimeOffset EventTime { get; init; }
+
+    public required string Level { get; init; }
+
+    public string? LoggerName { get; init; }
+
+    public string? Instance { get; init; }
+
+    public required string Message { get; init; }
+
+    public DateTimeOffset? ReceiptTime { get; init; }
+
+    public string? Trace { get; init; }
+
+    public string? Span { get; init; }
+
+    public string? MessageTemplate { get; init; }
+
+    public string? Exception { get; init; }
+
+    public JsonNode? Properties { get; init; }
+
+    public bool? MessageTruncated { get; init; }
+
+    public bool? ExceptionTruncated { get; init; }
+
+    public static AgentEntry Of(LogEntry entry, Verbosity verbosity) =>
+        verbosity is Verbosity.Full ? Full(entry) : Compact(entry);
+
+    private static AgentEntry Compact(LogEntry entry) => new()
+    {
+        Id = entry.Id,
+        EventTime = entry.EventTime,
+        Level = entry.Level.ToString(),
+        LoggerName = entry.LoggerName,
+        Instance = entry.Instance,
+        Message = entry.RenderedMessage,
+    };
+
+    public static AgentEntry Full(LogEntry entry) => new()
+    {
+        Id = entry.Id,
+        EventTime = entry.EventTime,
+        ReceiptTime = entry.ReceiptTime,
+        Level = entry.Level.ToString(),
+        LoggerName = entry.LoggerName,
+        Instance = entry.Instance,
+        Trace = Hex(entry.TraceId),
+        Span = Hex(entry.SpanId),
+        MessageTemplate = entry.MessageTemplate,
+        Message = entry.RenderedMessage,
+        Exception = entry.Exception,
+
+        // The object it was delivered as, handed back as one. Nothing here reads
+        // inside it and nothing renders it (ADR 0010, ADR 0012).
+        Properties = entry.Properties is null ? null : JsonNode.Parse(entry.Properties),
+        MessageTruncated = entry.MessageTruncated,
+        ExceptionTruncated = entry.ExceptionTruncated,
+    };
+
+    private static string? Hex(byte[]? value) =>
+        value is null ? null : Convert.ToHexStringLower(value);
+}
+
+/// <summary>
+/// What a search answers with.
+/// </summary>
+/// <param name="Matched">
+/// How many entries the filters match in the project — not how many are in
+/// <paramref name="Entries"/>. An agent that receives fifty entries and is not
+/// told there were nine thousand will answer as though there were fifty, and
+/// that is the quietest way this product could produce a wrong answer. Absent
+/// only on a read that expired, which answered nothing to count against.
+/// </param>
+/// <param name="Capped">
+/// Whether this answer stopped at the cap with more still to read.
+/// <paramref name="Cursor"/> is where to continue from.
+/// </param>
+/// <param name="Cursor">
+/// What to hand the next call to carry on, or absent when this answer reached
+/// the end of the matches. Opaque: it is passed back unread.
+/// </param>
+/// <param name="Narrow">
+/// Present when the read used up its five seconds, and then the only thing
+/// present besides the verbosity. These are the adjustments to make, in the
+/// order to try them — values rather than a sentence, because the operator's
+/// screen writes the sentence and an agent gets the fact (ADR 0012).
+/// </param>
+public sealed record SearchAnswer(
+    Verbosity Verbosity,
+    IReadOnlyList<AgentEntry> Entries,
+    long? Matched,
+    bool Capped,
+    string? Cursor,
+    IReadOnlyList<Narrowing>? Narrow)
+{
+    public static SearchAnswer Of(
+        Verbosity verbosity,
+        IReadOnlyList<LogEntry> entries,
+        long matched,
+        bool capped,
+        EntryCursor? cursor) => new(
+            verbosity,
+            [.. entries.Select(entry => AgentEntry.Of(entry, verbosity))],
+            matched,
+            capped,
+            cursor?.ToString(),
+            null);
+
+    /// <summary>
+    /// A read that met the five seconds, and what to change so that the next one
+    /// does not (ADR 0026).
+    /// </summary>
+    public static SearchAnswer RanOut(
+        Verbosity verbosity, IReadOnlyList<Narrowing> narrow) =>
+        new(verbosity, [], null, false, null, narrow);
+}
+
+/// <summary>
+/// One row of a count.
+/// </summary>
+/// <param name="Value">
+/// The value that was grouped by, or absent both for the ungrouped count and for
+/// the entries carrying no value in the grouped column.
+/// </param>
+public sealed record CountedGroupAnswer(string? Value, long Entries);
+
+/// <summary>
+/// What a count answers with.
+/// </summary>
+/// <param name="Groups">
+/// One row for an ungrouped count, one per value otherwise, so that every count
+/// is read the same way.
+/// </param>
+/// <inheritdoc cref="SearchAnswer" path="/param[@name='Narrow']"/>
+public sealed record CountAnswer(
+    IReadOnlyList<CountedGroupAnswer> Groups, IReadOnlyList<Narrowing>? Narrow)
+{
+    public static CountAnswer Of(IReadOnlyList<CountedGroup> groups, Grouping grouping) =>
+        new(
+            [.. groups.Select(group => new CountedGroupAnswer(
+                EntryFilterText.NamedGroup(grouping, group.Value), group.Entries))],
+            null);
+
+    /// <inheritdoc cref="SearchAnswer.RanOut"/>
+    public static CountAnswer RanOut(IReadOnlyList<Narrowing> narrow) => new([], narrow);
+}

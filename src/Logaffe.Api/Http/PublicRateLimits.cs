@@ -52,6 +52,15 @@ public static class PublicRateLimits
     public const string Ingest = "ingest";
 
     /// <summary>
+    /// The throttle in front of the four MCP tools, which are publicly reachable
+    /// like everything else this product exposes. An agent calls because the
+    /// operator asked — there is no poll and no subscription behind this door
+    /// (<c>docs/mcp.md</c>) — so what it stands in front of is a loop that got
+    /// away from a model rather than ordinary use.
+    /// </summary>
+    public const string Agent = "agent";
+
+    /// <summary>
     /// A burst of attempts a person mistyping their password actually makes.
     /// </summary>
     private const int Burst = 5;
@@ -66,6 +75,14 @@ public static class PublicRateLimits
 
     /// <summary>How many requests a signed-in browser gets per minute.</summary>
     private const int OperatorPerMinute = 300;
+
+    /// <summary>
+    /// How many tool calls one source gets per minute. Below the operator's,
+    /// because every one of these may be a five-second read and a hundred of
+    /// them a minute is already more than the store can serve — and well above
+    /// what answering a question takes, which is a handful.
+    /// </summary>
+    private const int AgentPerMinute = 120;
 
     /// <summary>
     /// How often the claim screen may ask whether the installation is still
@@ -149,6 +166,23 @@ public static class PublicRateLimits
                     // Nothing waits here. Holding an operator's request open to
                     // smooth a burst would make the interface feel broken, and
                     // there is no guessing to slow down behind the door.
+                    QueueLimit = 0,
+                }));
+
+            // By source and not by the agent token, for the reason the ingest
+            // limit below is: the limiter runs before anything is
+            // authenticated, so a partition read off the header would be one an
+            // unauthenticated caller chooses.
+            limiter.AddPolicy(Agent, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.SeenFrom() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = AgentPerMinute,
+                    Window = TimeSpan.FromMinutes(1),
+
+                    // Nothing waits. A tool call held open to smooth a burst
+                    // spends the agent's own timeout on a request that has not
+                    // started, and being told to come back is the better answer.
                     QueueLimit = 0,
                 }));
 
