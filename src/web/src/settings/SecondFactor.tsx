@@ -205,14 +205,39 @@ function Confirm({
       {usingBackupCode ? (
         <label>
           A backup code off the sheet you have now
-          <input value={backupCode} onChange={(e) => setBackupCode(e.target.value)} />
+          <input
+            name="backup-code"
+            autoComplete="off"
+            value={backupCode}
+            onChange={(e) => setBackupCode(e.target.value)}
+          />
         </label>
       ) : (
         <label>
           The six digits from the authenticator you have now
+          {/* Neither code field here is offered to a password manager, and that
+              is deliberate -- it is the one screen that opts out.
+
+              `SignInScreen` explains why the sign-in field is named `totp`. The
+              same naming here made things worse rather than better: two code
+              fields side by side, same stem and same length, read to a manager
+              as one segmented input -- the box-per-digit pattern -- and it
+              spread a single code one digit per field. Breaking that grouping
+              would be enough to stop it, but it would not make the fill right:
+              these two codes come from two different phones, and a manager
+              holds at most one of them. Re-enrolling replaces the secret it
+              holds, so which field it would be right about depends on whether
+              the operator scanned the new code before clicking this one.
+
+              A manager that is right half the time is worse than none on the
+              screen where six wrong digits cost the operator their way in, and
+              they have both authenticators in front of them anyway. */}
           <input
+            id="current-code"
+            name="current-code"
             inputMode="numeric"
-            autoComplete="one-time-code"
+            maxLength={6}
+            autoComplete="off"
             value={secondFactorCode}
             onChange={(e) => setSecondFactorCode(e.target.value)}
             aria-invalid={problems.secondFactorCode !== undefined || undefined}
@@ -239,8 +264,11 @@ function Confirm({
       <label>
         The six digits from the authenticator you just enrolled
         <input
+          id="enrolled-code"
+          name="enrolled-code"
           inputMode="numeric"
-          autoComplete="one-time-code"
+          maxLength={6}
+          autoComplete="off"
           value={newSecondFactorCode}
           onChange={(e) => setNewSecondFactorCode(e.target.value)}
           aria-invalid={problems.newSecondFactorCode !== undefined || undefined}

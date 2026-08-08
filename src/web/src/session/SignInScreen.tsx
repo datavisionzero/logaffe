@@ -70,6 +70,7 @@ export function SignInScreen({
           Password
           <input
             type="password"
+            name="password"
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -79,13 +80,33 @@ export function SignInScreen({
         {usingBackupCode ? (
           <label>
             Backup code
-            <input value={backupCode} onChange={(e) => setBackupCode(e.target.value)} />
+            <input
+              name="backup-code"
+              autoComplete="off"
+              value={backupCode}
+              onChange={(e) => setBackupCode(e.target.value)}
+            />
           </label>
         ) : (
           <label>
             The six digits from the app
+            {/* `autocomplete` is the standard's answer and browsers honour it,
+                but password managers find this field by their own heuristics,
+                and those read `name` and `id` before anything else.
+
+                The name is `totp` and not the standard's `one-time-code`,
+                which reads like the tidier choice and was measured to be the
+                broken one: a field named `one-time-code` is not offered a code,
+                with or without a password field beside it, while `totp` is.
+                `totp` is also what ADR 0016 and `Rfc6238SecondFactor` already
+                call the mechanism, and unlike `otp` and `2fa` it is not a term
+                `CONTEXT.md` tells us to avoid. Tidying this back to match the
+                attribute below it would silently cost the operator the fill. */}
             <input
+              id="totp"
+              name="totp"
               inputMode="numeric"
+              maxLength={6}
               autoComplete="one-time-code"
               value={secondFactorCode}
               onChange={(e) => setSecondFactorCode(e.target.value)}

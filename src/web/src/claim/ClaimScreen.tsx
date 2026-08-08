@@ -263,7 +263,10 @@ function FinishTheClaim({
       <label>
         The six digits from the app
         <input
+          id="totp"
+          name="totp"
           inputMode="numeric"
+          maxLength={6}
           autoComplete="one-time-code"
           value={secondFactorCode}
           onChange={(e) => setSecondFactorCode(e.target.value)}
@@ -276,7 +279,12 @@ function FinishTheClaim({
 
       <label>
         One backup code off the sheet
+        {/* Off, and named for what it is: this is the one screen where a backup
+            code stands beside the six digits rather than in place of them, so a
+            manager filling the one into the other has somewhere to go wrong. */}
         <input
+          name="backup-code"
+          autoComplete="off"
           value={backupCode}
           onChange={(e) => setBackupCode(e.target.value)}
           aria-invalid={problems.backupCode !== undefined || undefined}
