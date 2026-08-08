@@ -26,4 +26,18 @@ public interface IHostVolume
     /// held open by the installation this is running beside.
     /// </summary>
     Stream OpenRead(string relativePath);
+
+    /// <summary>
+    /// Opens one for writing, replacing whatever was there and making the
+    /// directories above it.
+    /// </summary>
+    /// <remarks>
+    /// A restore puts the artifact's files over the volume's rather than
+    /// emptying it first. What has to be right is that the key the restored
+    /// database was sealed under is the key that ends up here, and overwriting
+    /// says that exactly; a file the artifact does not carry cannot make the
+    /// restored installation wrong, and one of them is the log this command is
+    /// writing its own account of itself into (ADR 0002).
+    /// </remarks>
+    Stream Create(string relativePath);
 }

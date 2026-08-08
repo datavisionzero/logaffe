@@ -1,4 +1,4 @@
-namespace Logaffe.Infrastructure.Persistence;
+namespace Logaffe.Application.Operations;
 
 /// <summary>
 /// One comparison, asked in two places: are there migrations here that this
@@ -6,12 +6,13 @@ namespace Logaffe.Infrastructure.Persistence;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <see cref="SchemaMigrator"/> asks it of the live database on startup, which
-/// is what makes an old image refuse a schema a later version already migrated
-/// (<c>docs/operations.md</c>). The restore verb asks it of a backup artifact's
-/// manifest, which is what makes an artifact from a newer logaffe refused rather
-/// than replayed. The two are the same question about the same kind of
-/// identifier, so they are the same function.
+/// <c>SchemaMigrator</c> asks it of the live database on startup, which is what
+/// makes an old image refuse a schema a later version already migrated
+/// (<c>docs/operations.md</c>). <see cref="RestoreABackup"/> asks it of an
+/// artifact's manifest, which is what makes an artifact from a newer logaffe
+/// refused rather than replayed. The two are the same question about the same
+/// kind of identifier, so they are the same function — and it sits in this layer
+/// because that is the one both the use case and the adapter below can reach.
 /// </para>
 /// <para>
 /// The identifiers are EF Core's migration ids, which begin with the timestamp

@@ -33,6 +33,12 @@ public interface IDatabaseDump
     Task<string> LatestMigrationAsync(CancellationToken cancellationToken);
 
     /// <summary>
+    /// Every migration this binary was built with, which is what an artifact's
+    /// is compared against.
+    /// </summary>
+    IReadOnlyList<string> KnownMigrations { get; }
+
+    /// <summary>
     /// Every table, in an order a replay can follow without tripping over a
     /// foreign key.
     /// </summary>
@@ -44,4 +50,24 @@ public interface IDatabaseDump
     /// </summary>
     Task CopyOutAsync(
         DumpedTable table, Stream destination, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Empties the database and builds the schema back up to the migration the
+    /// artifact was taken at — not to the newest one this binary knows.
+    /// </summary>
+    /// <remarks>
+    /// The shape the bytes came out of is the shape they have to go back into,
+    /// and an artifact from an older logaffe is one a newer one is documented to
+    /// accept. Building the schema to the artifact's own migration is what makes
+    /// those two statements compatible: the replay fills the tables it was taken
+    /// from, and the first start afterwards migrates the rest of the way, which
+    /// is the ordinary upgrade path and not a second mechanism.
+    /// </remarks>
+    Task ResetToAsync(string migration, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Reads one table back in, from the bytes <see cref="CopyOutAsync"/> wrote.
+    /// </summary>
+    Task CopyInAsync(
+        DumpedTable table, Stream source, CancellationToken cancellationToken);
 }

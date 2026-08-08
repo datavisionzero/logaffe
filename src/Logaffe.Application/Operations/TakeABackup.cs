@@ -19,6 +19,11 @@ namespace Logaffe.Application.Operations;
 /// than a broken artifact (<c>docs/operations.md</c>), so it is stated rather
 /// than left to be inferred from a missing file.
 /// </param>
+/// <param name="Volume">
+/// The files the artifact carries off the host volume. A restore reads this
+/// before it touches anything, so that an artifact holding no key is refused
+/// rather than half applied — which is the whole of ADR 0024 read backwards.
+/// </param>
 /// <param name="Tables">
 /// The tables the artifact carries, in the order a replay can follow them, each
 /// naming the columns its bytes fill.
@@ -28,6 +33,7 @@ public sealed record BackupManifest(
     string Migration,
     DateTimeOffset TakenAt,
     bool Entries,
+    IReadOnlyList<string> Volume,
     IReadOnlyList<DumpedTable> Tables);
 
 /// <summary>
@@ -58,7 +64,7 @@ public sealed class TakeABackup(IDatabaseDump database, IHostVolume volume, Time
     /// Without this the artifact is half of one, so its absence stops the
     /// command rather than producing something that only looks like a backup.
     /// </summary>
-    private const string KeyFile = "keys/token.key";
+    public const string KeyFile = "keys/token.key";
 
     private static readonly JsonSerializerOptions ManifestFormat = new()
     {
@@ -92,6 +98,7 @@ public sealed class TakeABackup(IDatabaseDump database, IHostVolume volume, Time
             await database.LatestMigrationAsync(cancellationToken),
             clock.GetUtcNow(),
             withEntries,
+            files,
             tables);
 
         await using var tar = new TarWriter(destination, TarEntryFormat.Pax, leaveOpen: true);

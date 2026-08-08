@@ -1,7 +1,9 @@
 using System.Data;
 using Logaffe.Application.Ports;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 
 namespace Logaffe.Infrastructure.Persistence;
@@ -42,6 +44,8 @@ public sealed class PostgresDump(LogaffeDbContext context) : IDatabaseDump
                 "This database has no migrations applied, so there is no installation "
                 + "here to back up.");
     }
+
+    public IReadOnlyList<string> KnownMigrations => [.. context.Database.GetMigrations()];
 
     public Task<IReadOnlyList<DumpedTable>> TablesAsync(CancellationToken cancellationToken)
     {
@@ -100,6 +104,54 @@ public sealed class PostgresDump(LogaffeDbContext context) : IDatabaseDump
                 cancellationToken);
 
             await copy.CopyToAsync(destination, cancellationToken);
+        }
+        finally
+        {
+            if (wasClosed)
+            {
+                await context.Database.CloseConnectionAsync();
+            }
+        }
+    }
+
+    public async Task ResetToAsync(string migration, CancellationToken cancellationToken)
+    {
+        // The whole schema rather than the tables the model happens to name:
+        // what is being replaced is an installation, and an artifact from an
+        // older logaffe would leave behind exactly the tables its own model
+        // never had. Recreating the schema also takes the extensions and the
+        // migration history with it, which is what makes the rebuild below start
+        // from nothing.
+        await context.Database.ExecuteSqlRawAsync(
+            "drop schema public cascade; create schema public", cancellationToken);
+
+        await context.Database.GetService<IMigrator>()
+            .MigrateAsync(migration, cancellationToken);
+    }
+
+    public async Task CopyInAsync(
+        DumpedTable table, Stream source, CancellationToken cancellationToken)
+    {
+        var connection = (NpgsqlConnection)context.Database.GetDbConnection();
+
+        var wasClosed = connection.State is not ConnectionState.Open;
+        if (wasClosed)
+        {
+            await context.Database.OpenConnectionAsync(cancellationToken);
+        }
+
+        try
+        {
+            await using var copy = await connection.BeginRawBinaryCopyAsync(
+                $"copy {Quote(table.Name)} ({Columns(table)}) from stdin (format binary)",
+                cancellationToken);
+
+            await source.CopyToAsync(copy, cancellationToken);
+
+            // Ending the stream is what commits the copy; letting it be disposed
+            // without this would be Npgsql's way of hearing that the caller
+            // changed its mind.
+            await copy.FlushAsync(cancellationToken);
         }
         finally
         {

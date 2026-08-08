@@ -78,10 +78,29 @@ docker compose exec logaffe logaffe backup --without-entries > logaffe-backup.ta
 The artifact says which of the two it is, so a restore does not have to guess
 whether an installation's log is missing or was never taken.
 
-**Restoring** puts both halves back and starts a version **no older than** the one
-that produced the artifact. Restoring into an older logaffe is refused rather
-than attempted, for the same reason a downgrade is: the schema has moved and the
-code behind it has not.
+**Restoring** puts both halves back:
+
+```
+docker compose down
+docker compose run --rm logaffe logaffe restore --yes < logaffe-backup.tar
+docker compose up -d
+```
+
+`run`, not `exec`. `backup` is safe beside a serving installation; a restore is
+not, and a one-off container while the serving one is down makes the dangerous
+case impossible rather than merely unlikely. **It replaces what is there** — the
+database is dropped and rebuilt from the artifact, and the artifact's key
+material is written over the volume's — so it says as much before it starts.
+Standard input is the artifact, which leaves no terminal to answer a question
+from, and `--yes` is what answers it.
+
+It starts a version **no older than** the one that produced the artifact:
+the schema is rebuilt to the migration the artifact was taken at, and the start
+afterwards migrates the rest of the way by the ordinary upgrade path. Restoring
+into an older logaffe is refused rather than attempted, for the same reason a
+downgrade is: the schema has moved and the code behind it has not. So is an
+artifact that holds no key material, before anything is written — half an
+artifact is worse than none, because it looks like one.
 
 ## Upgrades
 

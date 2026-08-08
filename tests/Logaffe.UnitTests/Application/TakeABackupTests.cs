@@ -1,5 +1,4 @@
 using System.Formats.Tar;
-using System.Text;
 using System.Text.Json;
 using Logaffe.Application.Operations;
 using Logaffe.Application.Ports;
@@ -143,43 +142,5 @@ public sealed class TakeABackupTests
         }
 
         throw new InvalidOperationException($"{name} is not in the artifact.");
-    }
-
-    /// <summary>Three tables, in the order a replay can follow them.</summary>
-    private sealed class Dump : IDatabaseDump
-    {
-        private static readonly DumpedTable[] Tables =
-        [
-            new("project", ["id", "name"]),
-            new("ingest_token", ["id", "project_id"]),
-            new(TakeABackup.EntryTable, ["id", "project_id", "rendered_message"]),
-        ];
-
-        public Task<string> LatestMigrationAsync(CancellationToken cancellationToken) =>
-            Task.FromResult("20260807182839_LogEntries");
-
-        public Task<IReadOnlyList<DumpedTable>> TablesAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<DumpedTable>>(Tables);
-
-        public async Task CopyOutAsync(
-            DumpedTable table, Stream destination, CancellationToken cancellationToken) =>
-            await destination.WriteAsync(
-                Encoding.UTF8.GetBytes($"the bytes of {table.Name}"), cancellationToken);
-    }
-
-    private sealed class Volume(Dictionary<string, string>? contents = null) : IHostVolume
-    {
-        public Dictionary<string, string> Contents { get; } = contents ?? new()
-        {
-            ["keys/token.key"] = "a key",
-            ["logs/logaffe.log"] = "a line",
-        };
-
-        public string Path => "/var/lib/logaffe";
-
-        public IReadOnlyList<string> Files() => [.. Contents.Keys.Order(StringComparer.Ordinal)];
-
-        public Stream OpenRead(string relativePath) =>
-            new MemoryStream(Encoding.UTF8.GetBytes(Contents[relativePath]));
     }
 }
