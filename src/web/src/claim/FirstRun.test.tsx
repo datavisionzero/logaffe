@@ -1,0 +1,110 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { BrowserRouter } from "react-router";
+import { FirstRun } from "./FirstRun";
+import { anInstallationAnswering } from "../shared/testing";
+
+const SNIPPET =
+  'curl -X POST https://logs.example.com/ingest -H "Authorization: Bearer logaffe_ingest_abc"';
+
+function open(onDone = () => undefined) {
+  window.history.pushState({}, "", "/");
+
+  return render(
+    <BrowserRouter>
+      <FirstRun onDone={onDone} />
+    </BrowserRouter>,
+  );
+}
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("the first-run guide", () => {
+  it("walks the project and the token, and hands over the delivery", async () => {
+    const installation = anInstallationAnswering({
+      "POST /projects": { body: { id: "3f0", name: "orders-api", retentionDays: 30 } },
+      "POST /projects/3f0/ingest-tokens": { body: { deliverySnippet: SNIPPET } },
+    });
+
+    let done = false;
+    open(() => {
+      done = true;
+    });
+
+    const operator = userEvent.setup();
+
+    await operator.type(screen.getByLabelText(/name/i), "orders-api");
+    await operator.click(screen.getByRole("button", { name: /create the project/i }));
+
+    await operator.click(
+      await screen.findByRole("button", { name: /issue an ingest token/i }),
+    );
+
+    // The handover, with the address and the token already in it.
+    expect(await screen.findByText(SNIPPET)).toBeInTheDocument();
+
+    await operator.click(screen.getByRole("button", { name: /take me to orders-api/i }));
+
+    expect(done).toBe(true);
+    expect(window.location.pathname).toBe("/project/3f0");
+
+    // Two acts and nothing else: the guide is the interface's, and the backend
+    // knows nothing about it.
+    expect(installation.asked).toEqual([
+      "POST /projects",
+      "POST /projects/3f0/ingest-tokens",
+    ]);
+  });
+
+  it("can be left before anything is made, and makes nothing", async () => {
+    const installation = anInstallationAnswering({});
+
+    let done = false;
+    open(() => {
+      done = true;
+    });
+
+    await userEvent.setup().click(screen.getByRole("button", { name: /skip this/i }));
+
+    expect(done).toBe(true);
+    expect(installation.asked).toEqual([]);
+  });
+
+  /**
+   * Nothing is half-configured when it is abandoned: the installation was fully
+   * claimed the moment the claim completed, and a project without a token is
+   * one the ordinary screens already offer to issue one for.
+   */
+  it("can be left after the project, which stays", async () => {
+    const installation = anInstallationAnswering({
+      "POST /projects": { body: { id: "3f0", name: "orders-api", retentionDays: 30 } },
+    });
+
+    open();
+
+    const operator = userEvent.setup();
+
+    await operator.type(screen.getByLabelText(/name/i), "orders-api");
+    await operator.click(screen.getByRole("button", { name: /create the project/i }));
+
+    await operator.click(await screen.findByRole("button", { name: /skip this/i }));
+
+    expect(installation.asked).toEqual(["POST /projects"]);
+    expect(window.location.pathname).toBe("/project/3f0");
+  });
+
+  it("says a name the installation already holds, in place", async () => {
+    anInstallationAnswering({ "POST /projects": { status: 409 } });
+
+    open();
+
+    const operator = userEvent.setup();
+
+    await operator.type(screen.getByLabelText(/name/i), "orders-api");
+    await operator.click(screen.getByRole("button", { name: /create the project/i }));
+
+    expect(await screen.findByText(/already holds a project by that name/i))
+      .toBeInTheDocument();
+  });
+});
