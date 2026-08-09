@@ -120,7 +120,18 @@ public sealed record AgentEntry
 
     public string? Exception { get; init; }
 
-    public JsonNode? Properties { get; init; }
+    /// <summary>
+    /// The properties the sender delivered, as the object they arrived as.
+    /// </summary>
+    /// <remarks>
+    /// <b>Declared as the object it is rather than as any JSON at all.</b> A
+    /// <see cref="JsonNode"/> here exports as the boolean schema <c>true</c> —
+    /// legal JSON Schema meaning "anything", and refused by clients that hold
+    /// tool schemas to being schema objects. One field like that costs the whole
+    /// tool list, because a client that cannot read the list does not get to keep
+    /// the three tools it could read.
+    /// </remarks>
+    public JsonObject? Properties { get; init; }
 
     public bool? MessageTruncated { get; init; }
 
@@ -155,7 +166,9 @@ public sealed record AgentEntry
 
         // The object it was delivered as, handed back as one. Nothing here reads
         // inside it and nothing renders it (ADR 0010, ADR 0012).
-        Properties = entry.Properties is null ? null : JsonNode.Parse(entry.Properties),
+        Properties = entry.Properties is null
+            ? null
+            : JsonNode.Parse(entry.Properties)?.AsObject(),
         MessageTruncated = entry.MessageTruncated,
         ExceptionTruncated = entry.ExceptionTruncated,
     };

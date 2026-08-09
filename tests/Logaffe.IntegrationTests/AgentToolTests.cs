@@ -150,6 +150,72 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Every_schema_a_tool_carries_is_a_schema_object_all_the_way_down()
+    {
+        await using var agent = await ConnectAsync();
+
+        var tools = await agent.ListToolsAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // JSON Schema allows `true` and `false` where a schema goes, and a field
+        // typed as any JSON at all exports as exactly that. It is legal and it is
+        // refused by clients that hold a tool schema to being an object — and
+        // what they refuse is the list, so one such field costs all four tools
+        // rather than the one that carries it.
+        foreach (var tool in tools)
+        {
+            SchemaObjectsAllTheWayDown($"{tool.Name}.inputSchema", tool.ProtocolTool.InputSchema);
+
+            if (tool.ProtocolTool.OutputSchema is { } output)
+            {
+                SchemaObjectsAllTheWayDown($"{tool.Name}.outputSchema", output);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Walks the places a schema may hold another schema and asserts every one
+    /// of them is an object.
+    /// </summary>
+    private static void SchemaObjectsAllTheWayDown(string path, JsonElement schema)
+    {
+        Assert.True(
+            schema.ValueKind is JsonValueKind.Object,
+            $"{path} is {schema.ValueKind} where a schema object belongs.");
+
+        foreach (var keyword in (ReadOnlySpan<string>)["items", "additionalProperties", "not"])
+        {
+            if (schema.TryGetProperty(keyword, out var nested))
+            {
+                SchemaObjectsAllTheWayDown($"{path}.{keyword}", nested);
+            }
+        }
+
+        foreach (var keyword in (ReadOnlySpan<string>)["properties", "$defs", "definitions"])
+        {
+            if (schema.TryGetProperty(keyword, out var map))
+            {
+                foreach (var member in map.EnumerateObject())
+                {
+                    SchemaObjectsAllTheWayDown($"{path}.{keyword}.{member.Name}", member.Value);
+                }
+            }
+        }
+
+        foreach (var keyword in (ReadOnlySpan<string>)["anyOf", "oneOf", "allOf", "prefixItems"])
+        {
+            if (schema.TryGetProperty(keyword, out var branches))
+            {
+                var index = 0;
+                foreach (var branch in branches.EnumerateArray())
+                {
+                    SchemaObjectsAllTheWayDown($"{path}.{keyword}[{index++}]", branch);
+                }
+            }
+        }
+    }
+
+    [Fact]
     public async Task There_are_no_resources_and_no_prompts()
     {
         await using var agent = await ConnectAsync();
