@@ -37,11 +37,27 @@ public sealed class PostgresFixture : IAsyncLifetime
             Database = name,
 
             // Npgsql pools per connection string and a database of its own makes
-            // a connection string of its own, so a pooled run leaves one idle
-            // pool per test behind for five minutes and the run walks into
-            // `too many clients already` on the way through. Nothing here opens
-            // a connection often enough for a pool to be worth that.
-            Pooling = false,
+            // a connection string of its own, so a run leaves one pool per test
+            // behind. That is why pooling was off here — with the default idle
+            // lifetime of five minutes, the pools outlive the tests that made
+            // them and the run walks into `too many clients already`.
+            //
+            // What it cost was invisible until #46: with no pool, every request
+            // an installation serves opens a physical connection, TLS setup
+            // included, and on a loaded runner that occasionally took longer
+            // than the caller was willing to wait. The request the caller gave
+            // up on was the one authenticating an agent token, which stands in
+            // front of every MCP request — so the failure moved between tests
+            // and looked like anything but a connection.
+            //
+            // So: a pool, bounded rather than absent. A short idle lifetime and
+            // a pruner that runs against it take the connections back within
+            // seconds of a test finishing, which is the problem the pool was
+            // turned off for, and a small ceiling means one test's pool cannot
+            // be what exhausts the server.
+            ConnectionIdleLifetime = 5,
+            ConnectionPruningInterval = 1,
+            MaxPoolSize = 10,
         }.ConnectionString;
     }
 }
