@@ -17,6 +17,26 @@ it does before it does it. Projects, ingest tokens and log entries survive — t
 installation changes hands, it does not lose its contents, and senders keep
 delivering throughout.
 
+**The two kinds of token part company here, and this is the only place they do.**
+An ingest token survives because the whole point of the sentence above is that an
+application shipping logs through this installation does not notice; an agent
+token is **removed**, because it reads every entry in every project and runs past
+the password and the second factor
+([ADR 0021](./0021-an-agent-token-is-a-copied-secret.md)). One credential model
+pointing in two directions is what makes the asymmetry legible rather than
+arbitrary: the direction that survives protects the record, and the direction that
+does not would hand the reading of it to whoever held the token before the
+installation changed hands. It costs the operator one paste per agent, in an act
+they perform once in an installation's life, and the product hands back the
+finished client configuration ([MCP](../mcp.md)).
+
+The removal is a **step in the command** rather than a cascade, because an agent
+token names no operator to be cascaded from. It runs before the account is
+removed, so that a failure between the two leaves an installation that still has
+its operator and has lost its agent configurations — recoverable by running the
+command again — rather than live read-everything credentials on an installation
+anybody can claim.
+
 The installation is briefly claimable by anyone again, exactly as it was on first
 boot. That is the same exposure, accepted for the same reason and bounded by the
 same 30-minute window — and the operator running the command is at the keyboard,

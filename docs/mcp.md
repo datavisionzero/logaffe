@@ -87,8 +87,11 @@ An agent token is ended by revoking it, which **removes the row** exactly as
 revoking an ingest token does
 ([Projects and tokens](./projects.md#rotation-and-knowing-when-it-is-done)) — a
 retired agent leaves no entry in the list and no sealed secret behind it. It also
-ends when [Host Recovery](./setup.md#host-recovery) removes the account it
-belongs to. A password change does **not** end it: an operator who has to
+ends when [Host Recovery](./setup.md#host-recovery) hands the installation to a
+new operator, which is the one act that removes every agent token at once — a
+credential that reads everything must not outlive the operator who issued it
+([ADR 0013](./adr/0013-host-recovery-returns-the-installation-to-unclaimed.md)).
+A password change does **not** end it: an operator who has to
 reconnect every agent whenever they change their password is an operator who
 changes their password less often.
 

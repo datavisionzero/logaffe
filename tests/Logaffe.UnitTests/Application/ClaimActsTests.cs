@@ -2,6 +2,7 @@ using System.Buffers.Text;
 using System.Text;
 using Logaffe.Application.Operations;
 using Logaffe.Domain.Operators;
+using Logaffe.Domain.Tokens;
 
 namespace Logaffe.UnitTests.Application;
 
@@ -246,6 +247,32 @@ public sealed class ClaimActsTests
     }
 
     [Fact]
+    public async Task Host_recovery_takes_the_agent_tokens_and_leaves_the_ingest_tokens()
+    {
+        var installation = await new Unclaimed().StartedAsync();
+        await installation.ClaimWith(await installation.EnrolAsync());
+
+        await installation.IssueAgentTokenAsync("terminal agent");
+        await installation.IssueAgentTokenAsync("desktop agent");
+        var delivering = installation.HoldIngestToken();
+
+        var recovered = await installation.Recover.ExecuteAsync(
+            TestContext.Current.CancellationToken);
+
+        // An agent token reads every entry in every project, past the password
+        // and the second factor, and this is the act by which an installation
+        // changes hands (docs/mcp.md). Leaving one behind hands the reading to
+        // whoever held it.
+        Assert.Empty(installation.Tokens.StoredAgentTokens);
+        Assert.Equal(2, recovered.AgentTokensRemoved);
+
+        // The ingest token stays for the reason the agent token goes: it keeps
+        // an application delivering, and the installation losing its contents is
+        // not what this command is for (ADR 0013).
+        Assert.Equal([delivering], installation.Tokens.Stored);
+    }
+
+    [Fact]
     public async Task Host_recovery_on_an_installation_nobody_claimed_still_arms_the_window()
     {
         var installation = await new Unclaimed().StartedAsync();
@@ -273,6 +300,7 @@ public sealed class ClaimActsTests
             Installation = new InMemoryInstallation();
             Operators = new InMemoryOperators();
             Sessions = new InMemorySessions();
+            Tokens = new InMemoryTokens();
             Cipher = new ReversingCipher();
             SecondFactor = new StubSecondFactor(TheCode);
 
@@ -287,7 +315,7 @@ public sealed class ClaimActsTests
                 SecondFactor,
                 Cipher,
                 Clock);
-            Recover = new Recover(Operators, Installation, Clock);
+            Recover = new Recover(Operators, Tokens, Installation, Clock);
         }
 
         public StoppedClock Clock { get; }
@@ -297,6 +325,8 @@ public sealed class ClaimActsTests
         public InMemoryOperators Operators { get; }
 
         public InMemorySessions Sessions { get; }
+
+        public InMemoryTokens Tokens { get; }
 
         public ReversingCipher Cipher { get; }
 
@@ -311,6 +341,30 @@ public sealed class ClaimActsTests
         public ClaimTheInstallation Claim { get; }
 
         public Recover Recover { get; }
+
+        /// <summary>
+        /// An agent the operator connected, issued the way they issue one.
+        /// </summary>
+        public Task<IssuedToken> IssueAgentTokenAsync(string name) =>
+            new IssueAgentToken(Tokens, Cipher, Clock)
+                .ExecuteAsync(name, TestContext.Current.CancellationToken);
+
+        /// <summary>
+        /// A project's ingest token, put in the store directly: which project it
+        /// belongs to is not this test's business, and recovery is not allowed
+        /// to have an opinion about it either.
+        /// </summary>
+        public IngestToken HoldIngestToken()
+        {
+            var minted = TokenText.Mint(TokenKind.Ingest);
+            var token = IngestToken.Issue(
+                Guid.CreateVersion7(), minted.Identifier, Cipher.Encrypt(minted.Secret),
+                Clock.GetUtcNow());
+
+            Tokens.AddAsync(token, TestContext.Current.CancellationToken).GetAwaiter().GetResult();
+
+            return token;
+        }
 
         public async Task<Unclaimed> StartedAsync()
         {

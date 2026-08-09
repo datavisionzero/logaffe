@@ -12,8 +12,15 @@ namespace Logaffe.Application.Operations;
 /// anyone claimed the installation — and it is not a failure: the window is
 /// armed either way, which is the whole of what that case needs.
 /// </param>
+/// <param name="AgentTokensRemoved">
+/// How many agent tokens went with the account. It is reported rather than
+/// counted silently because every one of them is a client configuration
+/// somewhere that has just stopped working, and the operator is the only person
+/// who can go and paste a new one in.
+/// </param>
 /// <param name="Window">The fresh window, which is what the operator is told.</param>
-public sealed record Recovered(bool ThereWasAnOperator, ClaimWindow Window);
+public sealed record Recovered(
+    bool ThereWasAnOperator, int AgentTokensRemoved, ClaimWindow Window);
 
 /// <summary>
 /// The way back into an installation nobody can sign in to.
@@ -32,6 +39,16 @@ public sealed record Recovered(bool ThereWasAnOperator, ClaimWindow Window);
 /// database's doing rather than a step this has to remember.
 /// </para>
 /// <para>
+/// <b>The agent tokens go too, and that one is a step</b>, because an agent
+/// token names no operator to be cascaded from — it is installation-scoped, the
+/// way an ingest token is (ADR 0021). It goes for the reason the ingest token
+/// stays: this is the act by which an installation changes hands, and an ingest
+/// token surviving keeps an application delivering, while an agent token
+/// surviving leaves whoever held it reading every entry in every project, past
+/// the password and the second factor of an operator who no longer exists
+/// (<c>docs/mcp.md</c>).
+/// </para>
+/// <para>
 /// <b>It is not a security boundary.</b> Whoever can run a command in the
 /// container already owns the database and could do this and more by hand. This
 /// exists so that the operator does not have to, and its whole security property
@@ -40,7 +57,7 @@ public sealed record Recovered(bool ThereWasAnOperator, ClaimWindow Window);
 /// </para>
 /// </remarks>
 public sealed class Recover(
-    IOperators operators, IInstallation installation, TimeProvider clock)
+    IOperators operators, ITokens tokens, IInstallation installation, TimeProvider clock)
 {
     public async Task<Recovered> ExecuteAsync(CancellationToken cancellationToken)
     {
@@ -54,12 +71,25 @@ public sealed class Recover(
         // (ADR 0034).
         var window = await installation.ArmClaimWindowAsync(now, cancellationToken);
 
+        // And the agent tokens before the account, by the same reading of what a
+        // failure in between leaves standing. Stopping here leaves an
+        // installation that still has its operator and has lost its agent
+        // configurations, which is a paste each and a command that can simply be
+        // run again; stopping after would leave read-everything credentials on an
+        // installation anybody can now claim, which is the one outcome this step
+        // exists to prevent.
+        var agentTokens = await tokens.ListAgentTokensAsync(cancellationToken);
+        foreach (var token in agentTokens)
+        {
+            await tokens.RemoveAsync(token, cancellationToken);
+        }
+
         var theOperator = await operators.FindAsync(cancellationToken);
         if (theOperator is not null)
         {
             await operators.RemoveAsync(theOperator, cancellationToken);
         }
 
-        return new Recovered(theOperator is not null, window);
+        return new Recovered(theOperator is not null, agentTokens.Count, window);
     }
 }

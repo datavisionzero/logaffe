@@ -13,9 +13,9 @@ namespace Logaffe.Api.Cli;
 /// <remarks>
 /// <para>
 /// Returns the installation to unclaimed and arms a fresh claim window, keeping
-/// its projects, tokens and entries (ADR 0013). It is the only route back into a
-/// claimed installation, and every use is written to logaffe's own file log,
-/// which is the one place a record of it survives the reset it performs
+/// its projects, ingest tokens and entries (ADR 0013). It is the only route back
+/// into a claimed installation, and every use is written to logaffe's own file
+/// log, which is the one place a record of it survives the reset it performs
 /// (ADR 0002).
 /// </para>
 /// <para>
@@ -82,16 +82,30 @@ public static class RecoverCommand
             log.Warning(
                 "Host Recovery returned this installation to unclaimed. There "
                 + "{ThereWasAnOperator} an operator account, and it is gone along with its "
-                + "sessions and backup codes. Projects, tokens and entries are untouched. "
-                + "The installation can be claimed by anyone who can reach it until "
-                + "{ClosesAt:u}.",
+                + "sessions and backup codes. {AgentTokens} agent tokens were removed with "
+                + "it. Projects, ingest tokens and entries are untouched. The installation "
+                + "can be claimed by anyone who can reach it until {ClosesAt:u}.",
                 recovered.ThereWasAnOperator ? "was" : "was no",
+                recovered.AgentTokensRemoved,
                 recovered.Window.ClosesAt);
 
             Console.WriteLine(
                 recovered.ThereWasAnOperator
                     ? "The operator account is gone, along with its sessions and backup codes."
                     : "There was no operator account; this installation was already unclaimed.");
+
+            // Said as its own line and with the number in it, because it is the
+            // one consequence of this command that leaves work behind: each of
+            // these is a client configuration to go and replace.
+            if (recovered.AgentTokensRemoved > 0)
+            {
+                Console.WriteLine(
+                    recovered.AgentTokensRemoved == 1
+                        ? "Its one agent token went with it, and that agent reads nothing "
+                        + "until it is given a new one."
+                        : $"Its {recovered.AgentTokensRemoved} agent tokens went with it, and "
+                        + "those agents read nothing until they are given new ones.");
+            }
 
             Console.WriteLine(
                 $"Anyone who can reach this installation can claim it until "
@@ -129,9 +143,12 @@ public static class RecoverCommand
             """
             This does not reset a password.
 
-            It removes the operator account. The sessions and the backup codes go with
-            it. Projects, ingest tokens and log entries are untouched — the installation
-            changes hands, it does not lose what it holds.
+            It removes the operator account. The sessions, the backup codes and the
+            agent tokens go with it, so every agent connected to this installation
+            stops reading until it is given a new one. Projects, ingest tokens and log
+            entries are untouched — the installation changes hands, it does not lose
+            what it holds, and an application shipping logs through it does not
+            notice.
 
             The installation then belongs to nobody for the next 30 minutes, and anyone
             who can reach it in that time can claim it.

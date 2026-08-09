@@ -166,6 +166,12 @@ the installation belongs to, not what it holds, and an application shipping logs
 through it does not notice. Existing sessions end, since the account they belong
 to no longer exists.
 
+**The agent tokens end with it**, and the command says how many went, because
+each one is a client configuration somewhere that has just stopped reading. An
+agent token reads every entry in every project ([MCP](./mcp.md)), so it is the
+one thing the installation holds that must not survive changing hands — and
+issuing a new one is a paste per agent.
+
 **It is not a security boundary, and it is not treated as one.** Whoever can run
 a command in the container already owns the database and could do this and more
 by hand. The command exists so that the operator does not have to, and its whole
