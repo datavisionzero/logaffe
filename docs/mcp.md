@@ -115,10 +115,25 @@ other tool's. A name would be friendlier to write and would mean this adapter
 resolving one, which is a query it is not allowed to have — the first tool
 exists so that the other three do not need to look anything up.
 
+**The level threshold is offered as the six names themselves**, in the tool
+schema rather than only in the description, and spelled the way an entry answers
+its own level — so a level read out of one answer narrows the next call without
+being translated. It is the only filter a schema can state: a cursor is opaque, a
+trace is a length, a search text is a minimum, and those are refused in a
+sentence naming the argument. This one is refused by the contract, before the
+read is entered.
+
 **`count_entries`** — the same filters, answered as a number, optionally grouped
 by level, logger name, instance or time bucket. This is what turns *"were there
 critical errors in the last three days"* into an answer instead of forty thousand
 rows in a context window.
+
+**The number and the groups are two answers, and only one of them is present.**
+An ungrouped count is the number itself rather than a single row under the
+grouped answer's key, because a row that carries no value to be grouped under is
+the grouped shape with the grouping taken out — and it asks the agent to reach
+into a collection for the one thing it asked for directly. Which of the two is
+there says which question was asked.
 
 **`get_entry`** — one entry by its identity, always in full. It exists for the
 follow-up after a compact search: the agent sees a promising line and wants the

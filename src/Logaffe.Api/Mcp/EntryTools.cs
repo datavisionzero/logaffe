@@ -73,8 +73,8 @@ public static class EntryTools
         DateTimeOffset? until = null,
         [Description(
             "A threshold and not a selection: Warning means warning and above. "
-            + "One of Verbose, Debug, Information, Warning, Error, Fatal.")]
-        string? minimumLevel = null,
+            + "The six the schema names are the six an entry answers with.")]
+        Level? minimumLevel = null,
         [Description("One running copy of a sender, matched whole.")]
         string? instance = null,
         [Description("The logger the entry came from, matched whole.")]
@@ -205,8 +205,8 @@ public static class EntryTools
         DateTimeOffset? until = null,
         [Description(
             "A threshold and not a selection: Warning means warning and above. "
-            + "One of Verbose, Debug, Information, Warning, Error, Fatal.")]
-        string? minimumLevel = null,
+            + "The six the schema names are the six an entry answers with.")]
+        Level? minimumLevel = null,
         [Description("One running copy of a sender, matched whole.")]
         string? instance = null,
         [Description("The logger the entry came from, matched whole.")]
@@ -331,15 +331,25 @@ public static class EntryTools
     /// is not a filter.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The reading is <see cref="EntryFilterText"/>'s and is the operator's
     /// screen's as well. What is this adapter's is that a filter the caller got
     /// wrong is an error naming the argument, so that a model correcting itself
     /// has something to correct.
+    /// </para>
+    /// <para>
+    /// <b>The level is not among them, because it is the one filter a schema can
+    /// state.</b> The others are refused in a sentence for want of anywhere else
+    /// to say it — a cursor is opaque, a trace is a length, a search text is a
+    /// minimum. A level is six names, so they are in the tool schema and a value
+    /// outside them is refused before this method is entered at all. That is the
+    /// same no, said earlier and by the contract rather than by prose.
+    /// </para>
     /// </remarks>
     private static EntryFilters Read(
         DateTimeOffset? from,
         DateTimeOffset? until,
-        string? minimumLevel,
+        Level? minimumLevel,
         string? instance,
         string? loggerName,
         string? trace,

@@ -216,6 +216,53 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_level_is_a_closed_set_in_the_schema_and_not_a_sentence_about_one()
+    {
+        await using var agent = await ConnectAsync();
+
+        var tools = await agent.ListToolsAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        foreach (var tool in tools.Where(tool => tool.Name is "search_entries" or "count_entries"))
+        {
+            var level = tool.ProtocolTool.InputSchema
+                .GetProperty("properties")
+                .GetProperty("minimumLevel");
+
+            // Named in the schema rather than only in the description, so that a
+            // model composing a call is told the six rather than left to read
+            // them out of prose — and spelled the way an answer spells them, so
+            // that a level taken out of one entry narrows the next call.
+            // The null is the filter being optional — leaving it out does not
+            // narrow by it — and the six beside it are the whole of what may be
+            // sent, spelled the way an entry answers them.
+            Assert.Equal(
+                ["Verbose", "Debug", "Information", "Warning", "Error", "Fatal", null],
+                level.GetProperty("enum").EnumerateArray().Select(name => name.GetString()));
+        }
+    }
+
+    [Fact]
+    public async Task A_level_outside_the_six_is_refused_before_the_tool_is_entered()
+    {
+        using var client = await SignedInAsync();
+        var project = await CreateAsync(client, "orders");
+
+        await using var agent = await ConnectAsync();
+
+        var refused = await agent.CallToolAsync(
+            "search_entries",
+            new Dictionary<string, object?> { ["projectId"] = project.Id, ["minimumLevel"] = "loud" },
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // The other filters are refused in a sentence naming the argument, for
+        // want of anywhere else to say it. This one the schema says, so a value
+        // outside the six never reaches the read — which is why this asserts
+        // that nothing ran rather than what the sentence was.
+        Assert.True(refused.IsError is true);
+    }
+
+    [Fact]
     public async Task There_are_no_resources_and_no_prompts()
     {
         await using var agent = await ConnectAsync();
@@ -451,14 +498,21 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
         var plain = await CallAsync<CountBody>(
             agent, "count_entries", new() { ["projectId"] = project.Id });
 
-        Assert.Null(Assert.Single(plain.Groups).Value);
-        Assert.Equal(3, plain.Groups[0].Entries);
+        // The number itself, and no rows to reach through for it: the tool was
+        // asked how many, not how many of each.
+        Assert.Equal(3, plain.Entries);
+        Assert.Null(plain.Groups);
 
         var byLevel = await CallAsync<CountBody>(
             agent,
             "count_entries",
             new() { ["projectId"] = project.Id, ["groupBy"] = "level" });
 
+        Assert.Null(byLevel.Entries);
+        Assert.NotNull(byLevel.Groups);
+
+        // The level is named rather than numbered, and it is spelled the way the
+        // entries and the filter spell it.
         Assert.Equal(["Fatal", "Information"], byLevel.Groups.Select(group => group.Value));
         Assert.Equal([1, 2], byLevel.Groups.Select(group => group.Entries));
     }
@@ -527,8 +581,9 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
     [InlineData("count_entries", "exception", "ab")]
 
     // Values that could only ever match nothing, refused where they were
-    // written rather than run.
-    [InlineData("search_entries", "minimumLevel", "loud")]
+    // written rather than run. The level is not here: it is six names, so the
+    // schema states it and the refusal is the contract's rather than this
+    // adapter's (see above).
     [InlineData("search_entries", "trace", "nothex")]
     [InlineData("search_entries", "cursor", "not-a-cursor")]
     public async Task A_filter_that_cannot_be_read_is_refused_rather_than_run(
@@ -833,7 +888,7 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
         bool? ExceptionTruncated);
 
     private sealed record CountBody(
-        IReadOnlyList<CountedGroupBody> Groups, IReadOnlyList<string>? Narrow);
+        long? Entries, IReadOnlyList<CountedGroupBody>? Groups, IReadOnlyList<string>? Narrow);
 
     private sealed record CountedGroupBody(string? Value, long Entries);
 }

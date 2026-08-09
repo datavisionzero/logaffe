@@ -241,22 +241,44 @@ public sealed record SearchAnswer(
 public sealed record CountedGroupAnswer(string? Value, long Entries);
 
 /// <summary>
-/// What a count answers with.
+/// What a count answers with: a number, or the rows it was broken into.
 /// </summary>
+/// <remarks>
+/// <b>The two are exclusive, and an ungrouped count is the number.</b>
+/// <c>docs/mcp.md</c> promises a count answered "as a number instead of as the
+/// entries", and a one-row list under a <c>groups</c> key, whose single row
+/// carries no value to be grouped under, is not that — it is the shape of the
+/// grouped answer with the grouping taken out, and it asks the agent to reach
+/// through a collection for something the tool was asked for directly. Which
+/// one is present says which question was asked, the way
+/// <see cref="SearchAnswer.Narrow"/> says a read ran out.
+/// </remarks>
+/// <param name="Entries">
+/// How many entries matched, on a count that was not grouped.
+/// </param>
 /// <param name="Groups">
-/// One row for an ungrouped count, one per value otherwise, so that every count
-/// is read the same way.
+/// One row per value, on a count that was — and absent rather than empty when it
+/// was not.
 /// </param>
 /// <inheritdoc cref="SearchAnswer" path="/param[@name='Narrow']"/>
 public sealed record CountAnswer(
-    IReadOnlyList<CountedGroupAnswer> Groups, IReadOnlyList<Narrowing>? Narrow)
+    long? Entries,
+    IReadOnlyList<CountedGroupAnswer>? Groups,
+    IReadOnlyList<Narrowing>? Narrow)
 {
     public static CountAnswer Of(IReadOnlyList<CountedGroup> groups, Grouping grouping) =>
-        new(
-            [.. groups.Select(group => new CountedGroupAnswer(
-                EntryFilterText.NamedGroup(grouping, group.Value), group.Entries))],
-            null);
+        grouping is Grouping.None
+
+            // An ungrouped count is one row of SQL and always exactly one, so
+            // this is the number itself rather than a row that has to be read
+            // out of a list of one.
+            ? new(groups.Single().Entries, null, null)
+            : new(
+                null,
+                [.. groups.Select(group => new CountedGroupAnswer(
+                    EntryFilterText.NamedGroup(grouping, group.Value), group.Entries))],
+                null);
 
     /// <inheritdoc cref="SearchAnswer.RanOut"/>
-    public static CountAnswer RanOut(IReadOnlyList<Narrowing> narrow) => new([], narrow);
+    public static CountAnswer RanOut(IReadOnlyList<Narrowing> narrow) => new(null, null, narrow);
 }

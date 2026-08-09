@@ -37,8 +37,16 @@ public static class EntryFilterText
 {
     /// <summary>
     /// The filters as the domain holds them, or the first thing wrong with
-    /// them.
+    /// them, for a caller whose level arrives as text.
     /// </summary>
+    /// <remarks>
+    /// This is the query string's overload. A level written into one is a
+    /// spelling that may or may not be a level, so it is read here and refused
+    /// here — <see cref="Levels.TryParse"/> forgives the two names
+    /// <c>Microsoft.Extensions.Logging</c> uses, which is a kindness to somebody
+    /// typing rather than a second vocabulary. A caller that already holds a
+    /// <see cref="Level"/> takes the overload below and meets none of this.
+    /// </remarks>
     public static bool TryRead(
         DateTimeOffset? from,
         DateTimeOffset? until,
@@ -51,14 +59,12 @@ public static class EntryFilterText
         out EntryFilters filters,
         out FilterComplaint? complaint)
     {
-        filters = EntryFilters.None;
-        complaint = null;
-
         Level? minimum = null;
         if (minimumLevel is not null)
         {
             if (!Levels.TryParse(minimumLevel, out var level))
             {
+                filters = EntryFilters.None;
                 complaint = new FilterComplaint(
                     "minimumLevel", "A level is one of the six severities.");
                 return false;
@@ -66,6 +72,35 @@ public static class EntryFilterText
 
             minimum = level;
         }
+
+        return TryRead(
+            from, until, minimum, instance, loggerName, trace, search, exception,
+            out filters, out complaint);
+    }
+
+    /// <summary>
+    /// The same, for a caller whose level is already one.
+    /// </summary>
+    /// <remarks>
+    /// The agent surface declares the level as the closed set it is, so the six
+    /// severities are in the tool schema and a model composing a call is told
+    /// them rather than left to read them out of a sentence. There is nothing
+    /// left to refuse by the time a value gets here, which is the point.
+    /// </remarks>
+    public static bool TryRead(
+        DateTimeOffset? from,
+        DateTimeOffset? until,
+        Level? minimumLevel,
+        string? instance,
+        string? loggerName,
+        string? trace,
+        string? search,
+        string? exception,
+        out EntryFilters filters,
+        out FilterComplaint? complaint)
+    {
+        filters = EntryFilters.None;
+        complaint = null;
 
         byte[]? traceId = null;
         if (trace is not null && !TryReadTrace(trace, out traceId))
@@ -91,7 +126,7 @@ public static class EntryFilterText
         {
             From = from,
             Until = until,
-            MinimumLevel = minimum,
+            MinimumLevel = minimumLevel,
             Instance = instance,
             LoggerName = loggerName,
             TraceId = traceId,

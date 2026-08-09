@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Logaffe.Api.Http;
+using Logaffe.Domain.Entries;
 using Microsoft.AspNetCore.RateLimiting;
 using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
@@ -131,6 +132,13 @@ internal static class AgentJson
         // sets, and their names are what the tool schemas offer and what the
         // answers carry. A number would make an agent guess at a mapping.
         options.Converters.Insert(0, new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
+
+        // Except the level, which keeps the spelling it is declared with, ahead
+        // of the rule above. An entry answers `"level": "Fatal"` and a count
+        // groups under `"Fatal"`, so a schema offering `fatal` to filter by
+        // would be one closed set in two spellings — and taking a level out of
+        // one answer to narrow the next call is most of the traffic here.
+        options.Converters.Insert(0, new JsonStringEnumConverter<Level>());
 
         options.MakeReadOnly();
 
