@@ -4,6 +4,7 @@ using Logaffe.Api.Http;
 using Logaffe.Api.Mcp;
 using Logaffe.Application.Operations;
 using Logaffe.Infrastructure;
+using Microsoft.AspNetCore.DataProtection;
 using Serilog;
 
 // One binary, two jobs. A recognized verb runs host-locally and exits; anything
@@ -31,6 +32,33 @@ builder.Host.UseSerilog((context, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
     .WriteTo.Console()
     .WriteTo.WriteToLogaffeFile(volumePath));
+
+// Nothing in this product reads the ASP.NET Core key ring today: the session
+// cookie carries a secret checked against a row (`SessionCookie`), both
+// authentication schemes are handlers of our own, and there is no antiforgery,
+// no session state and no MVC. The framework builds the ring anyway, and left
+// alone it builds it inside the container, under a home directory that goes
+// when the container does — and says so on every start:
+//
+//   [WRN] Storing keys in a directory '/home/app/.aspnet/DataProtection-Keys'
+//         that may not be persisted outside of the container.
+//
+// Which is a warning about losing something nobody is using. It is put on the
+// volume rather than silenced because the day some feature does reach for it —
+// antiforgery is the likely one — a ring that resets on every upgrade would
+// fail in a way nobody would connect to this, and the warning that would have
+// said so has been on the screen all along, meaning nothing.
+//
+// Under `keys/` deliberately: that is where the volume keeps material of this
+// kind, it is what a backup carries (ADR 0024), and it is the prefix a restore
+// writes back readable by its owner alone.
+builder.Services
+    .AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(volumePath, "keys", "data-protection")))
+    // The ring is discriminated by application name, which otherwise defaults to
+    // the content root path — a path this happens to run from, not a fact about
+    // the installation.
+    .SetApplicationName("logaffe");
 
 builder.Services.AddLogaffeInfrastructure(builder.Configuration);
 
