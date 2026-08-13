@@ -27,6 +27,9 @@
     <PackageReference Include="ModelContextProtocol" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Testcontainers.PostgreSql" />
+    <!-- Unused here, and present to raise Testcontainers' own SSH.NET past
+         GHSA-q939-rpr3-3284. See Directory.Packages.props. -->
+    <PackageReference Include="SSH.NET" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="xunit.v3" />
   </ItemGroup>

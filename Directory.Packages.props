@@ -72,6 +72,22 @@
     <PackageVersion Include="ModelContextProtocol" Version="2.1.0" />
     <PackageVersion Include="Npgsql" Version="10.0.3" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
+
+    <!-- Nothing here calls SSH.NET. It arrives under Testcontainers, and
+         GHSA-q939-rpr3-3284 made 2025.1.0 — the version Testcontainers 4.13.0
+         asks for, and 4.13.0 is the newest there is — a high-severity finding
+         that `TreatWarningsAsErrors` turns into a failed restore. Naming it
+         here lifts the transitive reference to the patched 2026.0.0.
+
+         The exposure was never real: the advisory is about `ScpClient`
+         downloading recursively from a server that picks the filenames, and
+         this is a test dependency that never reaches the image. What is real
+         is that a red trunk stops the release of everything else, which is why
+         this is pinned rather than waited out or suppressed.
+
+         Drop both lines once Testcontainers ships a version that asks for the
+         patched one itself. -->
+    <PackageVersion Include="SSH.NET" Version="2026.0.0" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
   </ItemGroup>
