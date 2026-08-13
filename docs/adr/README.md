@@ -61,3 +61,4 @@ material value to understanding the decision.
 - [0035 – The claim hands its enrolment back sealed](./0035-the-claim-hands-its-enrolment-back-sealed.md)
 - [0036 – A re-enrolment carries its own sealed ticket](./0036-a-re-enrolment-carries-its-own-sealed-ticket.md)
 - [0037 – The installation dumps its own database](./0037-the-installation-dumps-its-own-database.md)
+- [0038 – The trunk deploys itself to staging, a tag is deployed by hand](./0038-the-trunk-deploys-itself-to-staging-a-tag-is-deployed-by-hand.md)
