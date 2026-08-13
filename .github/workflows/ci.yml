@@ -31,6 +31,13 @@ permissions:
 #
 # The real fix is ephemeral runners. Until then, the approval gate is the thing
 # to keep switched on.
+#
+# Owning the runners also means owning what the actions below may require of
+# them. Every action this repository uses now runs on Node 24, and the majors
+# that made that switch state a floor of Actions Runner 2.327.1 — so a runner
+# rolled back past it stops being able to run this workflow at all, rather than
+# running it slightly older. Both are on 2.336.0. `gh api
+# /repos/datavisionzero/logaffe/actions/runners` is what answers the question.
 
 # One run at a time, across every branch. The contract job starts a real
 # installation and a real database on the runner's host, each on a port it
@@ -88,7 +95,7 @@ jobs:
 
       - name: Keep what the installations wrote
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: installation-logs
           # The logs and nothing else. The same volumes hold the key that makes
@@ -180,7 +187,7 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - id: what
         name: Whether this is published, and under which names
@@ -211,7 +218,7 @@ jobs:
 
       - name: Sign in to the registry
         if: steps.what.outputs.publish == 'true'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -227,7 +234,7 @@ jobs:
       # installation upgrades into; `release.yml` already refuses to move it for
       # a prerelease, and the trunk has less claim on it than a prerelease does.
       - name: Build, and push from the trunk
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: deploy/Dockerfile
