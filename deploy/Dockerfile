@@ -49,6 +49,22 @@ RUN dotnet publish src/Logaffe.Api/Logaffe.Api.csproj -c Release -o /app -p:Vers
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 WORKDIR /app
 
+# Npgsql probes for GSSAPI when it opens a connection, whatever the connection
+# string says about authentication. Without the library the probe writes two
+# lines straight to stderr, past the logger and its levels:
+#
+#   Cannot load library libgssapi_krb5.so.2
+#   Error: Error loading shared library libgssapi_krb5.so.2: No such file...
+#
+# It then falls back and connects normally, so nothing is broken — but the word
+# `Error` appears on every start of a run that is going fine, and the next
+# person reading the journal during a real outage has to rule it out first. Three
+# megabytes to keep the log honest. This is not Kerberos authentication being
+# enabled: nothing here asks for it, and satisfying the probe does not.
+#
+# Ahead of the COPY on purpose, so a source change does not re-run apk.
+RUN apk add --no-cache krb5-libs
+
 COPY --from=build /app ./
 COPY --from=web /web/dist ./wwwroot
 
