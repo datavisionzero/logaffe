@@ -278,4 +278,6 @@ way for a logging product to take its own installation down.
   its own operator. The file log and the health endpoint are the whole of what
   logaffe says about itself.
 - **No self-update.** logaffe does not check for versions, announce them, or
-  update itself. `docker compose pull` is the operator's to run.
+  update itself. `docker compose pull` is the operator's to run — on a schedule
+  if they want one, since a timer they wrote is still them running it. What is
+  refused is the installation deciding for itself that it is time.
