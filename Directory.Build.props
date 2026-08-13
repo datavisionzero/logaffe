@@ -33,4 +33,18 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
+  <!-- Each client package carries its own README, which is the page a reader
+       lands on at nuget.org and the only description most of them will read.
+
+       Conditioned on the file rather than on `IsPackable`: the project decides
+       that, and it decides it after this file has been imported, so a condition
+       on it here would always see the default. -->
+  <PropertyGroup Condition="Exists('$(MSBuildProjectDirectory)/README.md')">
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)/README.md')">
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
 </Project>

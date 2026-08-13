@@ -19,9 +19,25 @@ backup` writes both halves of an installation into one artifact and `logaffe
 restore` puts them back; `logaffe recover` is the way back in when the sign-in
 is lost. All of it has been exercised end to end against a running installation.
 
-**What is not there yet is a release.** No version has been tagged, so neither
-the image nor the three client packages have been published, and today logaffe
-is run by building this repository. Pushing a tag is what changes that.
+**The first prerelease is out**, and it is a prerelease in the way the word
+should mean: published, installable, and not yet the version to point an
+installation you care about at.
+
+```
+ghcr.io/datavisionzero/logaffe:0.1.0-alpha.1
+```
+
+[`Logaffe.Client`](https://www.nuget.org/packages/Logaffe.Client),
+[`Logaffe.Serilog`](https://www.nuget.org/packages/Logaffe.Serilog) and
+[`Logaffe.Extensions.Logging`](https://www.nuget.org/packages/Logaffe.Extensions.Logging)
+carry the same number.
+
+**`:latest` does not exist yet**, deliberately: a prerelease tag does not move
+it, so nobody is upgraded into one they did not ask for. Since
+[`deploy/docker-compose.yml`](deploy/docker-compose.yml) pulls `:latest`, running
+an installation today means naming the version above in that file — or building
+this repository. The first stable tag is what makes the documented `docker
+compose pull` work as written.
 
 See [VISION.md](VISION.md) for where it is going and
 [docs/codebase.md](docs/codebase.md) for how the repository is laid out.
