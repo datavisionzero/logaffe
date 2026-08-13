@@ -132,6 +132,16 @@ jobs:
     name: Packages
     needs: version
     runs-on: [self-hosted, logaffe]
+    permissions:
+      contents: read
+      # Trusted Publishing. This job asks the Actions service for an OIDC token
+      # describing which repository and which workflow file is running, and
+      # trades it at nuget.org for a key that lives an hour. Without this
+      # permission the token is never issued and the login step below fails.
+      #
+      # `packages: write` is not inherited here on purpose: this job publishes
+      # to nuget.org and has no business with the container registry.
+      id-token: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -156,6 +166,24 @@ jobs:
               -o packages
           done
 
+      # There is no stored publishing credential. nuget.org holds a policy
+      # naming this repository, this workflow file and this account, and hands
+      # back a key valid for an hour to a run that matches it — so the thing an
+      # attacker would want to steal from this repository does not exist, and
+      # there is nothing to rotate on a calendar.
+      #
+      # The policy is bound to the file name `release.yml`. Renaming this file
+      # breaks publishing until the policy is updated to match, which is worth
+      # knowing before somebody tidies it into `publish.yml`.
+      #
+      # The account name is not secret, but this repository is public and there
+      # is no reason to write it down here for a reader who has no use for it.
+      - name: A key that expires in an hour
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       # nuget.org rather than this repository's own package feed, because the
       # problem being solved is that these are unreachable to anyone who is not
       # building the repository — and a feed that has to be configured and
@@ -163,18 +191,14 @@ jobs:
       # sense that matters.
       - name: Push
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: |
           set -euo pipefail
 
-          if [ -z "${NUGET_API_KEY}" ]; then
-            echo "NUGET_API_KEY is not set on this repository, so there is nowhere"
-            echo "to push. The image was published; the packages were not."
-            exit 1
-          fi
-
           # `--skip-duplicate`, so that re-running a release whose image
-          # succeeded and whose packages half did is not an error.
+          # succeeded and whose packages half did is not an error. A re-run gets
+          # a fresh key: the exchanged token is single-use and the key it bought
+          # is an hour old at most, so there is no reusing one from last time.
           dotnet nuget push "packages/*.nupkg" \
             --source https://api.nuget.org/v3/index.json \
             --api-key "$NUGET_API_KEY" \
