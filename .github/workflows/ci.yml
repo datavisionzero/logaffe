@@ -10,6 +10,28 @@ on:
 permissions:
   contents: read
 
+# Every job below picks its runner the same way: a pull request from a fork gets
+# a GitHub-hosted runner, and everything else — a push to the trunk, a tag, a
+# manual run — gets the pair this repository owns.
+#
+# The self-hosted runners are ordinary machines on a home network, and they are
+# not ephemeral: the integration job has to empty `runner.temp` before it starts
+# precisely because state survives between runs, and so would anything a
+# stranger left there on purpose. On a public repository `on: pull_request` is
+# reachable by anyone, so a fork's code must not land on them.
+#
+# **This is not the control, and must not be mistaken for one.** A
+# `pull_request` run uses the workflow file from the merge commit, which
+# includes whatever the fork changed — so a fork can point `runs-on` back at the
+# self-hosted pair by editing these lines. What actually holds is the repository
+# setting requiring approval for all outside collaborators, which stops any
+# workflow of theirs from starting until a maintainer says so. This is what
+# limits the damage of approving one that turns out to be hostile, and it makes
+# an honest fork's pull request run on GitHub's hardware rather than ours.
+#
+# The real fix is ephemeral runners. Until then, the approval gate is the thing
+# to keep switched on.
+
 # One run at a time, across every branch. The contract job starts a real
 # installation and a real database on the runner's host, each on a port it
 # names, and the runners share that host — so two runs overlapping would have
@@ -26,7 +48,7 @@ jobs:
   # Seconds, and no Docker. Domain rules and use cases against substituted ports.
   unit:
     name: Unit tests
-    runs-on: [self-hosted, logaffe]
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "logaffe"]') }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -40,7 +62,7 @@ jobs:
   # actually does on the Postgres an installation runs.
   integration:
     name: Integration tests
-    runs-on: [self-hosted, logaffe]
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "logaffe"]') }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -78,7 +100,7 @@ jobs:
 
   web:
     name: Web
-    runs-on: [self-hosted, logaffe]
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "logaffe"]') }}
     defaults:
       run:
         working-directory: src/web
@@ -100,7 +122,7 @@ jobs:
   # checked in.
   contract:
     name: OpenAPI contract
-    runs-on: [self-hosted, logaffe]
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "logaffe"]') }}
     services:
       db:
         image: postgres:18
@@ -152,7 +174,7 @@ jobs:
     # it here costs nothing beyond building an image nobody will pull, which is
     # cheaper than a second workflow or a `workflow_run` trigger.
     needs: [unit, integration, web, contract]
-    runs-on: [self-hosted, logaffe]
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "logaffe"]') }}
     permissions:
       contents: read
       packages: write
