@@ -142,17 +142,74 @@ jobs:
       - name: The checked-in contract is the one being served
         run: git diff --exit-code -- docs/api/openapi.json
 
+  # The image a staging installation follows. `release.yml` publishes one for
+  # every tag; this publishes one for every trunk commit that passed, which is
+  # the only thing an environment tracking `main` can pull.
   image:
     name: Image
+    # This is the whole of the deployment gate. A red trunk does not move
+    # `:main`, so staging stays on the last commit that passed — and expressing
+    # it here costs nothing beyond building an image nobody will pull, which is
+    # cheaper than a second workflow or a `workflow_run` trigger.
+    needs: [unit, integration, web, contract]
     runs-on: [self-hosted, logaffe]
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
-      - name: Build (not pushed)
+
+      - id: what
+        name: Whether this is published, and under which names
+        env:
+          # A pull request's ref is `refs/pull/<n>/merge` and never this, so the
+          # one comparison covers it: a pull request builds and publishes
+          # nothing, which is the behaviour this job already had and the reason
+          # it exists.
+          PUBLISH: ${{ github.ref == 'refs/heads/main' }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "publish=$PUBLISH"
+            echo "tags<<TAGS"
+
+            if [ "$PUBLISH" = "true" ]; then
+              # What a staging installation pulls.
+              echo "ghcr.io/datavisionzero/logaffe:main"
+              # And a name for this one build, so a staging installation can be
+              # pinned away from a bad trunk without waiting for the next commit.
+              echo "ghcr.io/datavisionzero/logaffe:sha-${SHA:0:7}"
+            fi
+
+            echo "TAGS"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Sign in to the registry
+        if: steps.what.outputs.publish == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # No `VERSION` build argument, deliberately. `Directory.Build.props` keeps
+      # `0.0.0-dev` for a build nobody released, and the number a release stamps
+      # is load-bearing beyond the registry — a backup manifest records it
+      # (ADR 0024). A trunk build is not a release and should not claim a number.
+      #
+      # `:latest` is not among the tags either. It is what
+      # `deploy/docker-compose.yml` pulls and therefore what a stranger's
+      # installation upgrades into; `release.yml` already refuses to move it for
+      # a prerelease, and the trunk has less claim on it than a prerelease does.
+      - name: Build, and push from the trunk
         uses: docker/build-push-action@v6
         with:
           context: .
           file: deploy/Dockerfile
-          push: false
+          push: ${{ steps.what.outputs.publish == 'true' }}
+          tags: ${{ steps.what.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
