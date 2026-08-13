@@ -269,7 +269,10 @@ way for a logging product to take its own installation down.
 ## What is deliberately not here
 
 - **No scheduled or automated backups**, no destinations, no retention policy for
-  backup artifacts. Settled in `VISION.md`.
+  backup artifacts. Settled in `VISION.md`. The schedule is the operator's, as
+  [Backup](#backup) says — a timer of theirs running the command is them taking
+  one. What logaffe does not do is take a backup nobody asked for, or decide
+  where it goes.
 - **No downgrade.** Going back a version is restoring a backup.
 - **No maintenance mode.** There is no state in which the installation is up but
   refusing service on purpose; it is either serving or it is not running.
