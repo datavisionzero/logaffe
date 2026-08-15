@@ -15,13 +15,18 @@ one that works.
 
 ## The installation pulls; CI does not push
 
-The self-hosted runners are machines on a home network, and none of them is the
-host the installations run on. A deploy job would therefore mean an SSH key as a
-repository secret and an inbound path from CI into that host — on a repository
-that is about to be public, whose runners are not ephemeral, that is a
-credential worth stealing. A timer on the host that pulls needs no secret in
-GitHub, no inbound connection, and no change when the repository's visibility
-changes.
+No runner is the host the installations run on. A deploy job would therefore
+mean an SSH key as a repository secret and an inbound path from CI into that
+host — on a public repository, that is a credential worth stealing. A timer on
+the host that pulls needs no secret in GitHub, no inbound connection, and no
+change when the repository's visibility changes.
+
+This was written while CI ran on two self-hosted runners on the same home
+network as those installations, and the argument then was partly that those
+runners were not ephemeral. #69 moved CI to GitHub-hosted runners, which does
+not weaken it: the inbound path a deploy job would need now crosses the
+internet rather than a LAN, and the secret would sit in a repository anyone can
+read the workflows of.
 
 What that accepts is roughly a minute between a green trunk and a running
 staging, and a deployment whose outcome is not visible in the Actions run that
