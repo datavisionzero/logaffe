@@ -258,6 +258,12 @@ sharing the container's network namespace; a proxy in its own container on the
 Compose network arrives from that network's address range and has to be named
 like any other.
 
+Which range that is depends on how the two are deployed rather than on anything
+the product decides, and the arrangement in which the answer is a range the
+operator chose rather than one Docker did is
+[Deploying](./deployment.md) — including the arrangement that looks tighter and
+is not.
+
 ## Sizing the disk
 
 The store is bounded by the retention window and the delivery rate, so its size
