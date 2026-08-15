@@ -82,13 +82,20 @@ whether an installation's log is missing or was never taken.
 
 ```
 docker compose down
-docker compose run --rm logaffe logaffe restore --yes < logaffe-backup.tar
+docker compose run --rm logaffe restore --yes < logaffe-backup.tar
 docker compose up -d
 ```
 
 `run`, not `exec`. `backup` is safe beside a serving installation; a restore is
 not, and a one-off container while the serving one is down makes the dangerous
-case impossible rather than merely unlikely. **It replaces what is there** — the
+case impossible rather than merely unlikely.
+
+**The two are not typed the same way, and the difference is easy to miss.**
+`exec` runs the command it is given, so the binary is named — `exec logaffe
+logaffe backup`, the service and then the command. `run` passes what follows to
+the image's entrypoint, which is the binary already, so `run --rm logaffe
+restore --yes` names it once. Naming it twice there does not fail: the extra
+word is read as the verb, is not one, and starts a server that restores nothing. **It replaces what is there** — the
 database is dropped and rebuilt from the artifact, and the artifact's key
 material is written over the volume's — so it says as much before it starts.
 Standard input is the artifact, which leaves no terminal to answer a question
