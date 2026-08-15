@@ -64,6 +64,12 @@ and it writes the tar to standard output, so it has to be redirected somewhere.
 **The artifact holds the key material, which makes it as sensitive as the
 installation itself.**
 
+What it does not hold is logaffe's own log, which shares the volume with the
+key. It is diagnostic output rather than state, it is allowed to reach several
+hundred megabytes, and a restore writes the volume back — so carrying it would
+mean landing an old log on top of the one describing the failure that led to the
+restore.
+
 **Not everything is equally worth saving.** Entries are expendable: they are
 short-lived by design, they are additive to the applications' own local files,
 and losing them costs little. The operator's account, the configuration and the

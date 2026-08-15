@@ -40,6 +40,7 @@ public sealed class RestoreABackupTests
         var volume = new Volume(new(StringComparer.Ordinal)
         {
             [TakeABackup.KeyFile] = "somebody else's key",
+            ["logs/logaffe.log"] = "why this restore is happening",
         });
 
         var restored = await new RestoreABackup(into, volume)
@@ -47,7 +48,11 @@ public sealed class RestoreABackupTests
 
         Assert.Equal(Dump.Migration, into.ResetTo);
         Assert.Equal(3, restored.Tables);
-        Assert.Equal(2, restored.Files);
+        Assert.Equal(1, restored.Files);
+
+        // The log is not in the artifact and so is not written back over: a
+        // restore happens during the failure this file is the record of (#66).
+        Assert.Equal("why this restore is happening", volume.Contents["logs/logaffe.log"]);
 
         // Both halves. The key above all, because a database without it is an
         // installation whose every token is undecryptable (ADR 0024).

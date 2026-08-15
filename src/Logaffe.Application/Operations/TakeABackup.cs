@@ -66,6 +66,20 @@ public sealed class TakeABackup(IDatabaseDump database, IHostVolume volume, Time
     /// </summary>
     public const string KeyFile = "keys/token.key";
 
+    /// <summary>
+    /// logaffe's own log shares the volume with the key (ADR 0002) and is the
+    /// one thing there an artifact does not carry.
+    /// </summary>
+    /// <remarks>
+    /// It is bounded, but generously — fourteen files of up to 32 MiB — so an
+    /// artifact would be mostly log and would say nothing about how large the
+    /// installation is. The stronger reason is what a restore would do with it:
+    /// it writes the volume back, so an old log would land on top of the one
+    /// describing the failure that led to the restore, which
+    /// <c>docs/operations.md</c> sends the operator to read.
+    /// </remarks>
+    public const string LogDirectory = "logs/";
+
     private static readonly JsonSerializerOptions ManifestFormat = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -79,7 +93,17 @@ public sealed class TakeABackup(IDatabaseDump database, IHostVolume volume, Time
         bool withEntries,
         CancellationToken cancellationToken)
     {
-        var files = volume.Files();
+        // Everything on the volume is state worth carrying, except the log,
+        // which is this installation talking about itself rather than anything
+        // it would lose. Stated as what is left out rather than as a list of
+        // what goes in: state added to the volume later has to end up in an
+        // artifact by default, because the way to find out it did not is to
+        // need it.
+        string[] files =
+        [
+            .. volume.Files()
+                .Where(file => !file.StartsWith(LogDirectory, StringComparison.Ordinal)),
+        ];
 
         if (!files.Contains(KeyFile, StringComparer.Ordinal))
         {

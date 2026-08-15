@@ -36,12 +36,59 @@ public sealed class TakeABackupTests
             [
                 "manifest.json",
                 "volume/keys/token.key",
-                "volume/logs/logaffe.log",
                 "data/project",
                 "data/ingest_token",
                 "data/log_entry",
             ],
             await NamesIn(artifact));
+    }
+
+    /// <summary>
+    /// The volume's own log is the one file there an artifact leaves behind. It
+    /// was carried once, and on an installation with almost nothing in it that
+    /// made the log 98% of the artifact (#66).
+    /// </summary>
+    [Fact]
+    public async Task The_artifact_leaves_logaffes_own_log_on_the_volume()
+    {
+        var volume = new Volume(new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [TakeABackup.KeyFile] = "a key",
+            ["keys/data-protection/key-1.xml"] = "a ring",
+            ["logs/logaffe-20260815.log"] = "a line",
+            ["logs/logaffe-20260814.log"] = "an older line",
+        });
+
+        var artifact = new MemoryStream();
+
+        var manifest = await Backup(volume: volume).ExecuteAsync(
+            artifact, "1.4.0", withEntries: true, TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            ["keys/data-protection/key-1.xml", TakeABackup.KeyFile],
+            manifest.Volume);
+
+        Assert.DoesNotContain(
+            await NamesIn(artifact),
+            name => name.StartsWith("volume/logs/", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The key is what makes the rest of the artifact readable, so its absence
+    /// stops the command — and the log being skipped must not be what decides
+    /// that. A volume of nothing but log is still a volume without a key.
+    /// </summary>
+    [Fact]
+    public async Task A_volume_holding_only_a_log_is_still_a_missing_key()
+    {
+        var volume = new Volume(new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["logs/logaffe-20260815.log"] = "a line",
+        });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Backup(volume: volume).ExecuteAsync(
+                new MemoryStream(), "1.4.0", withEntries: true, TestContext.Current.CancellationToken));
     }
 
     /// <summary>

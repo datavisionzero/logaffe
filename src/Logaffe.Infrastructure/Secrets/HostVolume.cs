@@ -8,10 +8,11 @@ namespace Logaffe.Infrastructure.Secrets;
 /// </summary>
 /// <remarks>
 /// It sits beside <see cref="HostVolumeKey"/> because it is the same directory:
-/// the key is the file that makes an artifact worth having, and everything else
-/// on the volume goes with it rather than being sorted through. What is on the
-/// volume is the installation's, and deciding which parts of it are worth
-/// keeping is not this command's call to make.
+/// the key is the file that makes an artifact worth having, and this reports
+/// what is there beside it without judging any of it. Which of those files an
+/// artifact carries is decided one layer up, by
+/// <c>TakeABackup</c> — the volume knows what it holds, not what a backup is
+/// for.
 /// </remarks>
 public sealed class HostVolume(string volumePath) : IHostVolume
 {
