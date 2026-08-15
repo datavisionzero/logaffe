@@ -271,6 +271,29 @@ They are two screens and the bar keeps them apart: a project's sit on the second
 level beside its log, and the installation's are on the first, where they are
 true of every project at once.
 
+### Each screen is its areas
+
+Both screens are three **areas**, listed beside what is being read and marked
+while it is: *the project*, *ingest tokens* and *delete this project*; *signed-in
+browsers*, *agent tokens* and *your credentials*. One is on the screen at a time.
+Stacked, the answer to *where is the retention window* was to read the page.
+
+**An area is an address**, so a reload comes back to it and the back button walks
+the ones just opened — the same thing the log view does with a filter set. The
+first area of a screen answers to the screen's own address rather than to one of
+its own, so the ordinary way in stays one place.
+
+**Only the area being read asks the installation for anything.** Every one of
+them asks for something on the way in — the sessions, the agent tokens, a
+project's ingest tokens — and the stacked screen asked for all of it whenever it
+was opened, most of it for something nobody had looked at. The rule below is not
+only about the log view.
+
+**Deleting a project is an area rather than the end of one**, because an act that
+destroys data and cannot be undone should be arrived at rather than scrolled
+past. The three credentials stay together on one area, because they are three
+acts on one account rather than three subjects.
+
 Per project: the name, the retention window with its warning about what lowering
 it removes, the ingest tokens with when each was last used, and deletion
 confirmed by typing the project's name ([Projects and tokens](./projects.md)).
@@ -307,9 +330,11 @@ running on two cores has better things to do than answer questions nobody asked.
 - **No column configuration, no layout settings, no theme setting.** The row is
   what it is, and the interface follows the colour scheme the operating system
   asks for.
-- **No navigation sidebar.** There are three surfaces and one of them is a list
+- **No sidebar in the shell.** There are three surfaces and one of them is a list
   of lines that must not wrap; a permanent column beside it would spend the width
-  the log is read in on a menu of three entries.
+  the log is read in on a menu of three entries. The settings screen lists its own
+  areas down its left, which is a column inside one screen and not the frame
+  around all of them.
 - **No export of a filtered result to a file.** A single entry copies as JSON,
   and an agent reads through [MCP](./mcp.md); a bulk export is a second read path
   with its own limits and its own answer to what happens at ten million rows.

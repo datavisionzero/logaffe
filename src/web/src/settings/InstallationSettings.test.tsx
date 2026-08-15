@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, Route, Routes } from "react-router";
 import { InstallationSettings } from "./InstallationSettings";
 import { anInstallationAnswering, type Answer } from "../shared/testing";
 
@@ -47,7 +47,8 @@ const ENROLMENT: Answer = {
   },
 };
 
-function open(routes: Record<string, Answer | Answer[]> = {}) {
+/** The screen at one of its areas, which is an address like any other. */
+function open(routes: Record<string, Answer | Answer[]> = {}, at = "/settings") {
   const installation = anInstallationAnswering({
     "GET /sessions": { body: [aSession({ id: "s1", isCurrent: true })] },
     "GET /agent-tokens": { body: [] },
@@ -55,12 +56,25 @@ function open(routes: Record<string, Answer | Answer[]> = {}) {
   });
 
   render(
-    <MemoryRouter>
-      <InstallationSettings />
+    <MemoryRouter initialEntries={[at]}>
+      <Routes>
+        <Route path="/settings" element={<InstallationSettings />} />
+        <Route path="/settings/:section" element={<InstallationSettings />} />
+      </Routes>
     </MemoryRouter>,
   );
 
   return installation;
+}
+
+/** The area holding the tokens agents read with. */
+function openAgents(routes: Record<string, Answer | Answer[]> = {}) {
+  return open(routes, "/settings/agents");
+}
+
+/** The area holding the operator\'s own three credentials. */
+function openCredentials(routes: Record<string, Answer | Answer[]> = {}) {
+  return open(routes, "/settings/credentials");
 }
 
 /** One section of the screen, since three of them ask for a password. */
@@ -69,6 +83,42 @@ function section(name: string) {
 }
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe("the areas", () => {
+  it("asks only for what the area being read needs", async () => {
+    const installation = open();
+
+    await screen.findByText("203.0.113.7");
+
+    // The stacked screen asked for the sessions and the agent tokens both,
+    // whichever of them the operator had come for. The interface asks for
+    // nothing unasked (`docs/ui.md`), and an area nobody opened is unasked.
+    expect(installation.asked).toEqual(["GET /sessions"]);
+  });
+
+  it("walks from one area to another, and marks the one being read", async () => {
+    open();
+
+    const operator = userEvent.setup();
+    const rail = within(screen.getByRole("navigation", { name: "Settings" }));
+
+    await operator.click(rail.getByRole("link", { name: "Agent tokens" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Agent tokens", level: 2 }),
+    ).toBeInTheDocument();
+    expect(rail.getByRole("link", { name: "Agent tokens" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("answers an address naming no area with the screen's own", async () => {
+    open({}, "/settings/nothing-by-that-name");
+
+    expect(await screen.findByText("203.0.113.7")).toBeInTheDocument();
+  });
+});
 
 describe("the sessions", () => {
   it("marks the browser being read from, because nothing else could", async () => {
@@ -131,7 +181,7 @@ describe("the sessions", () => {
 
 describe("the agent tokens", () => {
   it("hands over the finished configuration rather than the bare token", async () => {
-    open({
+    openAgents({
       "POST /agent-tokens": {
         status: 201,
         body: {
@@ -157,7 +207,7 @@ describe("the agent tokens", () => {
   });
 
   it("reads a token back, because that and being able to use it are one errand", async () => {
-    open({
+    openAgents({
       "GET /agent-tokens": { body: [anAgentToken({ id: "a1", name: "terminal" })] },
       "GET /agent-tokens/a1/token": {
         body: {
@@ -177,7 +227,7 @@ describe("the agent tokens", () => {
   });
 
   it("renames one, which the agent holding it does not notice", async () => {
-    const installation = open({
+    const installation = openAgents({
       "GET /agent-tokens": [
         { body: [anAgentToken({ id: "a1", name: "terminal" })] },
         { body: [anAgentToken({ id: "a1", name: "the laptop" })] },
@@ -205,7 +255,7 @@ describe("the agent tokens", () => {
   });
 
   it("revokes one only after saying what it ends", async () => {
-    const installation = open({
+    const installation = openAgents({
       "GET /agent-tokens": [
         { body: [anAgentToken({ id: "a1", name: "terminal" })] },
         { body: [] },
@@ -226,7 +276,7 @@ describe("the agent tokens", () => {
 
 describe("the operator's own credentials", () => {
   it("says which of the two passwords the installation refused", async () => {
-    open({
+    openCredentials({
       "PUT /password": {
         status: 400,
         body: { errors: { currentPassword: ["That is not your current password."] } },
@@ -250,7 +300,7 @@ describe("the operator's own credentials", () => {
   });
 
   it("refuses a new password typed twice differently before sending it", async () => {
-    const installation = open();
+    const installation = openCredentials();
 
     const operator = userEvent.setup();
     const password = section("Password");
@@ -267,7 +317,7 @@ describe("the operator's own credentials", () => {
   });
 
   it("shows a fresh sheet once, and says it replaces the one before it", async () => {
-    open({ "POST /backup-codes": { body: { codes: ["4RTY-8HQ2", "9KDP-2LMN"] } } });
+    openCredentials({ "POST /backup-codes": { body: { codes: ["4RTY-8HQ2", "9KDP-2LMN"] } } });
 
     const operator = userEvent.setup();
     const codes = section("Backup codes");
@@ -280,7 +330,7 @@ describe("the operator's own credentials", () => {
   });
 
   it("stores nothing of a re-enrolment until the confirming request", async () => {
-    const installation = open({ "POST /second-factor/enrolment": ENROLMENT });
+    const installation = openCredentials({ "POST /second-factor/enrolment": ENROLMENT });
 
     const operator = userEvent.setup();
 
@@ -297,7 +347,7 @@ describe("the operator's own credentials", () => {
   });
 
   it("says which of the three credentials a re-enrolment refused", async () => {
-    open({
+    openCredentials({
       "POST /second-factor/enrolment": ENROLMENT,
       "PUT /second-factor": {
         status: 400,
@@ -332,7 +382,7 @@ describe("the operator's own credentials", () => {
   });
 
   it("offers the backup code for the phone that is already gone", async () => {
-    open({ "POST /second-factor/enrolment": ENROLMENT });
+    openCredentials({ "POST /second-factor/enrolment": ENROLMENT });
 
     const operator = userEvent.setup();
 

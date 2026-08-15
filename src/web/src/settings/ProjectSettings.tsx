@@ -4,21 +4,26 @@ import { DeleteProject } from "./DeleteProject";
 import { IngestTokens } from "./IngestTokens";
 import { ProjectName } from "./ProjectName";
 import { RetentionWindow } from "./RetentionWindow";
+import { SettingsScreen } from "./SettingsScreen";
 
 /**
  * What is changed rarely about one project.
  *
  * It is a screen over acts that already exist, and it is the second of the two
  * surfaces a project has — reached from the shell's project tabs beside the log,
- * not from somewhere a session starts: the name, the window entries leave by,
- * the tokens they arrive on, and the end of the project — in the order an
- * operator is likely to want them, with the irreversible one last.
+ * not from somewhere a session starts.
+ *
+ * Three areas, in the order an operator is likely to want them: what the project
+ * is, what it is delivered to on, and its end. **The end is an area of its own
+ * rather than the bottom of the first**, because an act that destroys data and
+ * cannot be undone should be arrived at rather than scrolled past.
  *
  * The project is read off the list the shell already fetched, so opening these
- * settings asks the installation for the tokens and nothing else.
+ * settings asks the installation for nothing until an area that needs something
+ * is opened.
  */
 export function ProjectSettings() {
-  const { id } = useParams();
+  const { id, section } = useParams();
   const at = useProjectAtHand(id);
   const { reload } = useProjects();
 
@@ -33,13 +38,32 @@ export function ProjectSettings() {
   const project = at.project;
 
   return (
-    <section className="narrow settings">
-      <h1>{project.name}</h1>
-
-      <ProjectName project={project} onRenamed={reload} />
-      <RetentionWindow project={project} onChanged={reload} />
-      <IngestTokens projectId={project.id} onChanged={reload} />
-      <DeleteProject project={project} onDeleted={reload} />
-    </section>
+    <SettingsScreen
+      heading={project.name}
+      at={`/project/${project.id}/settings`}
+      section={section}
+      groups={[
+        {
+          at: null,
+          name: "The project",
+          panel: (
+            <>
+              <ProjectName project={project} onRenamed={reload} />
+              <RetentionWindow project={project} onChanged={reload} />
+            </>
+          ),
+        },
+        {
+          at: "tokens",
+          name: "Ingest tokens",
+          panel: <IngestTokens projectId={project.id} onChanged={reload} />,
+        },
+        {
+          at: "delete",
+          name: "Delete this project",
+          panel: <DeleteProject project={project} onDeleted={reload} />,
+        },
+      ]}
+    />
   );
 }

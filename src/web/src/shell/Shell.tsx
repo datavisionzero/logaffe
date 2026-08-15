@@ -99,7 +99,12 @@ export function Shell({
           <Route path="/" element={<ProjectList />} />
           <Route path="/project/:id" element={<ProjectScreen />} />
           <Route path="/project/:id/settings" element={<ProjectSettings />} />
+          {/* An area of a settings screen is an address of its own, so that a
+              reload comes back to it and the back button walks the ones just
+              opened. The screen without a segment is its first area. */}
+          <Route path="/project/:id/settings/:section" element={<ProjectSettings />} />
           <Route path="/settings" element={<InstallationSettings />} />
+          <Route path="/settings/:section" element={<InstallationSettings />} />
           <Route path="*" element={<ProjectList />} />
         </Routes>
       </main>

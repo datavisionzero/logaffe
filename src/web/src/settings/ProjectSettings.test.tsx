@@ -25,7 +25,8 @@ const ONE_TOKEN: Answer = {
   body: [anIngestToken({ id: "t1", identifier: "3kf9q2" })],
 };
 
-function open(routes: Record<string, Answer | Answer[]>) {
+/** The screen at one of its areas, which is an address like any other. */
+function open(routes: Record<string, Answer | Answer[]>, at = "/project/p1/settings") {
   const installation = anInstallationAnswering({
     "GET /projects": { body: [aProject({ id: "p1", name: "checkout", retentionDays: 30 })] },
     "GET /projects/p1/ingest-tokens": ONE_TOKEN,
@@ -33,10 +34,11 @@ function open(routes: Record<string, Answer | Answer[]>) {
   });
 
   render(
-    <MemoryRouter initialEntries={["/project/p1/settings"]}>
+    <MemoryRouter initialEntries={[at]}>
       <ProjectsProvider>
         <Routes>
           <Route path="/project/:id/settings" element={<ProjectSettings />} />
+          <Route path="/project/:id/settings/:section" element={<ProjectSettings />} />
           <Route path="/" element={<h1>Projects</h1>} />
         </Routes>
       </ProjectsProvider>
@@ -46,7 +48,39 @@ function open(routes: Record<string, Answer | Answer[]>) {
   return installation;
 }
 
+/** The area holding the tokens a project is delivered to on. */
+function openTokens(routes: Record<string, Answer | Answer[]> = {}) {
+  return open(routes, "/project/p1/settings/tokens");
+}
+
 afterEach(() => vi.unstubAllGlobals());
+
+describe("the areas", () => {
+  it("keeps the act that cannot be undone off the area the screen opens at", async () => {
+    open({});
+
+    await screen.findByLabelText("Name");
+
+    // It is arrived at rather than scrolled past: the rail names it, and
+    // nothing on the way in offers it.
+    expect(screen.queryByRole("button", { name: "Delete checkout" })).toBeNull();
+    expect(
+      within(screen.getByRole("navigation", { name: "Settings" })).getByRole("link", {
+        name: "Delete this project",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("asks the installation for nothing until an area needs something", async () => {
+    const installation = open({});
+
+    await screen.findByLabelText("Name");
+
+    // The project is read off the list the shell already fetched, and the
+    // tokens belong to an area nobody has opened.
+    expect(installation.asked).toEqual(["GET /projects"]);
+  });
+});
 
 describe("the retention window", () => {
   it("says how many entries lowering it removes, before it is applied", async () => {
@@ -134,7 +168,7 @@ describe("the name", () => {
 
 describe("the ingest tokens", () => {
   it("shows a last use to the minute and never finer", async () => {
-    open({
+    openTokens({
       "GET /projects/p1/ingest-tokens": {
         body: [
           anIngestToken({
@@ -156,13 +190,13 @@ describe("the ingest tokens", () => {
   });
 
   it("tells a token never deployed from one that has gone quiet", async () => {
-    open({});
+    openTokens();
 
     expect(await screen.findByText("Never used")).toBeInTheDocument();
   });
 
   it("hands over the delivery that arrives with the token", async () => {
-    open({
+    openTokens({
       "GET /ingest-tokens/t1/token": {
         body: {
           token: "logaffe_ingest_3kf9q2_secret",
@@ -179,7 +213,7 @@ describe("the ingest tokens", () => {
   });
 
   it("refuses a third token in the project's own terms", async () => {
-    open({
+    openTokens({
       "GET /projects/p1/ingest-tokens": {
         body: [
           anIngestToken({ id: "t1", identifier: "3kf9q2" }),
@@ -195,7 +229,7 @@ describe("the ingest tokens", () => {
   });
 
   it("names the closed door of a project holding none", async () => {
-    open({ "GET /projects/p1/ingest-tokens": { body: [] } });
+    openTokens({ "GET /projects/p1/ingest-tokens": { body: [] } });
 
     expect(await screen.findByText(/nothing can deliver to it/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /issue an ingest token/i })).toBeInTheDocument();
@@ -204,7 +238,7 @@ describe("the ingest tokens", () => {
 
 describe("deleting a project", () => {
   it("is guarded by typing the name, and the route is told none of it", async () => {
-    const installation = open({ "DELETE /projects/p1": {} });
+    const installation = open({ "DELETE /projects/p1": {} }, "/project/p1/settings/delete");
 
     const operator = userEvent.setup();
     const act = await screen.findByRole("button", { name: "Delete checkout" });

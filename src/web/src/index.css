@@ -733,14 +733,62 @@ button.level.narrows {
 
 /* ----------------------------------------------------------- the settings ---
    The third surface: what is changed rarely, per project and per installation.
-   It is a column of prose with an act at the end of each section, because
-   every one of these is a sentence about what the act does followed by the
-   act. */
+   Each area is a column of prose with an act at the end of each section,
+   because every one of these is a sentence about what the act does followed by
+   the act. */
 
-.settings > section {
+/* The areas beside what is being read. The rail wraps above the panel on a
+   window too narrow to hold both, which is the whole of what this needs to do
+   about width. */
+.settings-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2.5rem;
+  margin-top: 1.5rem;
+}
+
+.settings-rail {
+  display: flex;
+  flex: 0 0 12rem;
+  flex-direction: column;
+}
+
+.settings-rail a {
+  padding: 0.35rem 0.7rem;
+  color: var(--quiet);
+  text-decoration: none;
+  border-left: 2px solid var(--rule);
+}
+
+.settings-rail a:hover {
+  color: var(--ink);
+}
+
+/* Which area is being read, said by the ink and the mark both. */
+.settings-rail a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 500;
+  background: var(--raised);
+  border-left-color: var(--ink);
+}
+
+.settings-panel {
+  flex: 1 1 24rem;
+  min-width: 0;
+}
+
+.settings-panel > section {
   margin: 2rem 0;
   padding-top: 1.5rem;
   border-top: 1px solid var(--rule);
+}
+
+/* The first section of an area starts under the heading of the area, and a rule
+   above it would be dividing it from nothing. */
+.settings-panel > section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .settings p {
@@ -790,11 +838,14 @@ table.listing input {
   border-radius: 999px;
 }
 
-/* An act that destroys data and cannot be undone. It is last on the screen, it
-   is marked, and it is not reached by pressing the same button as everything
-   else. */
-section.grave {
-  border-color: var(--refusal);
+/* An act that destroys data and cannot be undone. It is the last area of the
+   screen, it is arrived at rather than scrolled past, it is marked, and it is
+   not reached by pressing the same button as everything else. */
+.settings-panel > section.grave {
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--refusal);
+  border-radius: 4px;
 }
 
 button.grave {
