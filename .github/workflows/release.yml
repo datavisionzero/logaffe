@@ -116,6 +116,14 @@ jobs:
             echo "TAGS"
           } >> "$GITHUB_OUTPUT"
 
+      # Read off the checkout rather than from `github.sha`, which is the commit
+      # that started the run: for the `workflow_dispatch` route that is the
+      # default branch and not the tag being released. The checkout above is the
+      # tag, so this is the commit the image is actually built from.
+      - id: commit
+        name: Which commit this image is
+        run: echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
@@ -124,6 +132,7 @@ jobs:
           push: true
           build-args: |
             VERSION=${{ needs.version.outputs.version }}
+            REVISION=${{ steps.commit.outputs.revision }}
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -30,6 +30,19 @@ WORKDIR /src
 # that it is not a release.
 ARG VERSION=0.0.0-dev
 
+# Which commit it was built from, which the SDK appends to the informational
+# version behind a `+`. Both workflows pass it, because this build has no
+# repository to read it out of — `Dockerfile.dockerignore` excludes `.git/`, and
+# a build that cannot see one otherwise says only what it is called. That is
+# enough for a release, whose tag names its commit, and not enough for a trunk
+# build, of which many call themselves `0.0.0-dev`.
+#
+# Left empty it stamps nothing — no dangling `+` — so a build by hand is
+# unaffected. Nothing downstream has to cope with the suffix either: `Build.cs`
+# already cuts it off for the backup manifest, on the grounds that the commit is
+# the build's business and not the artifact's (ADR 0024).
+ARG REVISION=
+
 # Restore against the manifests alone, so that a change to a source file does
 # not invalidate the package layer.
 COPY global.json Directory.Build.props Directory.Packages.props ./
@@ -43,7 +56,8 @@ COPY src/Logaffe.Domain/ src/Logaffe.Domain/
 COPY src/Logaffe.Application/ src/Logaffe.Application/
 COPY src/Logaffe.Infrastructure/ src/Logaffe.Infrastructure/
 COPY src/Logaffe.Api/ src/Logaffe.Api/
-RUN dotnet publish src/Logaffe.Api/Logaffe.Api.csproj -c Release -o /app -p:Version=$VERSION
+RUN dotnet publish src/Logaffe.Api/Logaffe.Api.csproj -c Release -o /app \
+    -p:Version=$VERSION -p:SourceRevisionId=$REVISION
 
 # ------------------------------------------------------------ the runtime ----
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime

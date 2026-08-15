@@ -229,6 +229,14 @@ jobs:
       # is load-bearing beyond the registry — a backup manifest records it
       # (ADR 0024). A trunk build is not a release and should not claim a number.
       #
+      # `REVISION` is passed for the same reason `VERSION` is not. Staging
+      # follows this tag and moves through many of these builds between releases
+      # (ADR 0038), and every one of them calls itself `0.0.0-dev` — so the
+      # commit is what tells them apart, and it says which build answered
+      # without claiming a number nobody released. The container cannot work it
+      # out on its own: `Dockerfile.dockerignore` excludes `.git/`, so there is
+      # no repository in the build for the SDK to read a revision out of.
+      #
       # `:latest` is not among the tags either. It is what
       # `deploy/docker-compose.yml` pulls and therefore what a stranger's
       # installation upgrades into; `release.yml` already refuses to move it for
@@ -239,6 +247,8 @@ jobs:
           context: .
           file: deploy/Dockerfile
           push: ${{ steps.what.outputs.publish == 'true' }}
+          build-args: |
+            REVISION=${{ github.sha }}
           tags: ${{ steps.what.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
