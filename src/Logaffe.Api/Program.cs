@@ -7,11 +7,21 @@ using Logaffe.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
 using Serilog;
 
-// One binary, two jobs. A recognized verb runs host-locally and exits; anything
-// else is the server.
+// One binary, two jobs. A recognized verb runs host-locally and exits; no
+// arguments is the server.
 if (Verbs.TryRead(args, out var verb))
 {
     return await Verbs.RunAsync(verb, args);
+}
+
+// A word that was meant as a verb and is not one stops here. Serving instead
+// would be the worst available answer: it succeeds, it reports itself healthy,
+// and whatever the command was going to do — restore an installation, say — has
+// silently not happened.
+if (Verbs.WasMeantAsAVerb(args))
+{
+    await Console.Error.WriteLineAsync(Verbs.NotAVerb(args[0]));
+    return Verbs.Usage;
 }
 
 // Built from the same settings the verbs are, so that the server and the
