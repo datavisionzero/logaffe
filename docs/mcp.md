@@ -24,9 +24,12 @@ for a machine credential, pointing in two directions — an ingest token writes 
 one project, an agent token reads everything
 ([ADR 0021](./adr/0021-an-agent-token-is-a-copied-secret.md)).
 
-The name is pre-filled with what the client calls itself and can be overwritten.
-It is a label for the list and nothing more — it does not identify the token to
-the server and changing it changes nothing else.
+The name is the operator's own, and naming a token after the client it was issued
+for is what makes the list readable. It is a label for the list and nothing
+more — it does not identify the token to the server and changing it changes
+nothing else. The installation never learns what a client calls itself: a token
+is issued before any client has connected with it, and nothing about a call is
+remembered afterwards.
 
 ### Connecting is one paste
 

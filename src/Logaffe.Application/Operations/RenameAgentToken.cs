@@ -10,9 +10,9 @@ namespace Logaffe.Application.Operations;
 /// It changes nothing else, and that is the point of it being a whole act rather
 /// than a field: the name does not identify the token to the server — the
 /// identifier does — so an agent whose token is renamed does not notice, and
-/// nothing has to be reconnected. It exists because the name is pre-filled with
-/// what a client called itself, and "claude-code" is not what the operator will
-/// call it in six months.
+/// nothing has to be reconnected. It exists because a name chosen while wiring a
+/// client up — "claude-code", whatever was in front of the operator that
+/// afternoon — is not what they will want to read in the list six months later.
 /// </remarks>
 public sealed class RenameAgentToken(ITokens tokens)
 {

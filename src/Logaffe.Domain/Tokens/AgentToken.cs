@@ -35,10 +35,11 @@ public sealed class AgentToken
     public Guid Id { get; private init; }
 
     /// <summary>
-    /// Pre-filled with what the client calls itself and overwritable. It is a
-    /// label for the operator's list and nothing more — it does not identify the
-    /// token to the server, which is what <see cref="Identifier"/> is for, and
-    /// changing it changes nothing else. Two agents may share one.
+    /// What the operator called this token, conventionally the client it was
+    /// issued for, and renameable. It is a label for the operator's list and
+    /// nothing more — it does not identify the token to the server, which is
+    /// what <see cref="Identifier"/> is for, and changing it changes nothing
+    /// else. Two agents may share one.
     /// </summary>
     public string Name { get; private set; } = null!;
 

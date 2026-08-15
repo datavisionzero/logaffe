@@ -16,9 +16,9 @@ namespace Logaffe.Application.Operations;
 /// separately (<c>docs/mcp.md</c>).
 /// </para>
 /// <para>
-/// The name is pre-filled by whoever is issuing with what the client calls
-/// itself, and it is a label for the list and nothing more: it does not identify
-/// the token to the server, and two agents may share one.
+/// The name comes from the operator, conventionally the client it is being
+/// issued for, and it is a label for the list and nothing more: it does not
+/// identify the token to the server, and two agents may share one.
 /// </para>
 /// <para>
 /// What the operator is handed is a token; what the product hands over is the

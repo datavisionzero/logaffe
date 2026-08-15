@@ -49,8 +49,8 @@ public sealed record ListedIngestTokenResponse(
 public sealed record ReadIngestTokenResponse(string Token, string DeliverySnippet);
 
 /// <param name="Name">
-/// Pre-filled by whoever is issuing with what the client calls itself. It is a
-/// label for the list and nothing the server acts on.
+/// The operator's name for the token, conventionally the client it is being
+/// issued for. It is a label for the list and nothing the server acts on.
 /// </param>
 public sealed record IssueAgentTokenRequest(string? Name);
 
