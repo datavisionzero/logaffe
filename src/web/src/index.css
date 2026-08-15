@@ -383,12 +383,29 @@ main.surface {
   padding: 0;
 }
 
-/* The screens that are a column of prose rather than a list of log lines. */
+/* The screens that are a column of prose rather than a list of log lines.
+
+   **The width is its own and not its content's.** This is a flex item of the
+   surface, where the auto margins that centre it also stop it stretching — so
+   without a width it is sized by what is in it, and a settings area holding a
+   table sat wider, and centred differently, than one holding prose. The maximum
+   applies to the border box, so the measure of the prose is the 60rem it has
+   always been. */
 .narrow {
   display: block;
-  max-width: 60rem;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 62rem;
   margin: 0 auto;
   padding: 1.5rem 1rem;
+}
+
+/* The settings carry a rail beside the panel, and the rail gets its own width
+   rather than taking it out of the panel's — so a listing is as wide as it was
+   before the screen had areas. The prose in there is capped at 40rem regardless
+   and does not get a longer line out of this. */
+.narrow.settings {
+  max-width: 76rem;
 }
 
 /* It takes what the shell left rather than subtracting a header height, which
@@ -785,9 +802,14 @@ button.level.narrows {
   border-left-color: var(--ink);
 }
 
+/* A name the operator chose can be long enough to push a listing past the panel
+   whatever it is given, and the cells are deliberately `nowrap` so that a time
+   stays one thing to read. It scrolls in here when that happens, rather than
+   widening the screen or scrolling the page sideways. */
 .settings-panel {
   flex: 1 1 24rem;
   min-width: 0;
+  overflow-x: auto;
 }
 
 .settings-panel > section {
