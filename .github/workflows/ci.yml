@@ -10,41 +10,29 @@ on:
 permissions:
   contents: read
 
-# Every job below picks its runner the same way: a pull request from a fork gets
-# a GitHub-hosted runner, and everything else — a push to the trunk, a tag, a
-# manual run — gets the pair this repository owns.
+# Every job below runs on a GitHub-hosted runner. This repository owned a pair
+# of them for as long as it was private, where CI is metered against a monthly
+# allowance; a public repository runs on standard hosted runners for nothing, so
+# what owning them bought no longer exists.
 #
-# The self-hosted runners are ordinary machines on a home network, and they are
-# not ephemeral: the integration job has to empty `runner.temp` before it starts
-# precisely because state survives between runs, and so would anything a
-# stranger left there on purpose. On a public repository `on: pull_request` is
-# reachable by anyone, so a fork's code must not land on them.
+# What it cost did. A hosted runner is a fresh virtual machine per job, thrown
+# away afterwards — which is what makes `on: pull_request` safe to leave open to
+# strangers, and what removes the arrangements a long-lived machine on a home
+# network needed: no emptying `runner.temp` because state survives between runs,
+# no per-fork `runs-on`, no runner version anybody has to keep above the floor
+# the actions require.
 #
-# **This is not the control, and must not be mistaken for one.** A
-# `pull_request` run uses the workflow file from the merge commit, which
-# includes whatever the fork changed — so a fork can point `runs-on` back at the
-# self-hosted pair by editing these lines. What actually holds is the repository
-# setting requiring approval for all outside collaborators, which stops any
-# workflow of theirs from starting until a maintainer says so. This is what
-# limits the damage of approving one that turns out to be hostile, and it makes
-# an honest fork's pull request run on GitHub's hardware rather than ours.
-#
-# The real fix is ephemeral runners. Until then, the approval gate is the thing
-# to keep switched on.
-#
-# Owning the runners also means owning what the actions below may require of
-# them. Every action this repository uses now runs on Node 24, and the majors
-# that made that switch state a floor of Actions Runner 2.327.1 — so a runner
-# rolled back past it stops being able to run this workflow at all, rather than
-# running it slightly older. Both are on 2.336.0. `gh api
-# /repos/datavisionzero/logaffe/actions/runners` is what answers the question.
+# This is not faster, and was not adopted for speed. The critical path is
+# `integration → image` and no number of runners shortens it; a cold Docker
+# layer cache and cold NuGet and npm caches make it slightly slower, which
+# `cache-from: type=gha` and the `actions/setup-*` caches only partly absorb.
 
-# One run at a time, across every branch. The contract job starts a real
-# installation and a real database on the runner's host, each on a port it
-# names, and the runners share that host — so two runs overlapping would have
-# them fight over those ports. Making every port dynamic would fix the two that
-# exist today and leave the next one to be discovered; serialising is the one
-# rule that covers all of them. Nothing is cancelled, so every run still
+# One run at a time, across every branch. The reason is no longer the runners —
+# a fresh machine per job has no ports to fight over — it is the registry. The
+# `image` job moves `ghcr.io/datavisionzero/logaffe:main`, and staging follows
+# that tag (ADR 0038): two runs overlapping would leave it wherever the slower
+# one finished, which can be the older commit. Serialising keeps the tag moving
+# in the order the commits were pushed. Nothing is cancelled, so every run still
 # happens, and with a single operator pushing there is nothing to gain from two
 # racing.
 concurrency:
@@ -55,7 +43,7 @@ jobs:
   # Seconds, and no Docker. Domain rules and use cases against substituted ports.
   unit:
     name: Unit tests
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "logaffe"]') }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -69,7 +57,7 @@ jobs:
   # actually does on the Postgres an installation runs.
   integration:
     name: Integration tests
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "logaffe"]') }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-dotnet@v6
@@ -79,18 +67,15 @@ jobs:
       - run: dotnet build Logaffe.slnx -c Release --no-restore
 
       - name: Integration tests
-        # Emptied first, because this runner is long-lived and a log from the
-        # run before would be read as this one's.
-        run: |
-          rm -rf "${{ runner.temp }}/installations"
-          dotnet test tests/Logaffe.IntegrationTests -c Release --no-build
+        run: dotnet test tests/Logaffe.IntegrationTests -c Release --no-build
         env:
           # Every test here that starts an installation gives it a host volume,
           # and logaffe writes its own account of itself there rather than into
           # itself (ADR 0002). Naming a directory keeps those volumes instead of
           # deleting them with the test, so that a failure on this runner can be
           # read from the installation's side as well as the caller's — which is
-          # what #46 has no way of answering today.
+          # what #46 has no way of answering today. The directory starts empty
+          # because the machine does: nothing survives from the run before.
           LOGAFFE_TEST_VOLUMES: ${{ runner.temp }}/installations
 
       - name: Keep what the installations wrote
@@ -107,7 +92,7 @@ jobs:
 
   web:
     name: Web
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "logaffe"]') }}
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: src/web
@@ -129,7 +114,7 @@ jobs:
   # checked in.
   contract:
     name: OpenAPI contract
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "logaffe"]') }}
+    runs-on: ubuntu-latest
     services:
       db:
         image: postgres:18
@@ -181,7 +166,7 @@ jobs:
     # it here costs nothing beyond building an image nobody will pull, which is
     # cheaper than a second workflow or a `workflow_run` trigger.
     needs: [unit, integration, web, contract]
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "logaffe"]') }}
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write

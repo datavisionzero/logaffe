@@ -32,7 +32,8 @@ permissions:
   packages: write
 
 # Never two releases at once, and never a release racing the CI run of the
-# commit it is built from: they share a host and the ports on it.
+# commit it is built from: both move tags in the registry, and which build
+# landed last is what an installation pulls.
 concurrency:
   group: ci
   cancel-in-progress: false
@@ -40,7 +41,7 @@ concurrency:
 jobs:
   version:
     name: Version
-    runs-on: [self-hosted, logaffe]
+    runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.read.outputs.version }}
       ref: ${{ steps.read.outputs.ref }}
@@ -82,7 +83,7 @@ jobs:
   image:
     name: Image
     needs: version
-    runs-on: [self-hosted, logaffe]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
@@ -140,7 +141,7 @@ jobs:
   packages:
     name: Packages
     needs: version
-    runs-on: [self-hosted, logaffe]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       # Trusted Publishing. This job asks the Actions service for an OIDC token
