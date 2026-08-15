@@ -359,14 +359,27 @@ ul.codes {
    One screen: the filters across the top, the entries below them, the detail
    of one beside them. */
 
-/* What is below the shell, and the only thing on the page that scrolls. */
+/* What is below the shell, and the only thing on the page that scrolls.
+
+   The margin is reset and not merely inherited past: `main` centres the column
+   of prose with `margin: 0 auto`, and an auto margin on the cross axis of a
+   column flex container stops the item stretching and makes it shrink to fit —
+   which put this surface's scrollbar a few hundred pixels short of the window
+   and took the log view's full width with it. Each screen inside still says how
+   wide it is.
+
+   The gutter is held whether or not there is anything to scroll, so that moving
+   between a short area of the settings and a long one does not shift the column
+   sideways. */
 main.surface {
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
   overflow: auto;
+  scrollbar-gutter: stable;
   max-width: none;
+  margin: 0;
   padding: 0;
 }
 
