@@ -1,4 +1,3 @@
-import { Link } from "react-router";
 import { AgentTokens } from "./AgentTokens";
 import { BackupCodes } from "./BackupCodes";
 import { ChangePassword } from "./ChangePassword";
@@ -22,10 +21,7 @@ import { Sessions } from "./Sessions";
 export function InstallationSettings() {
   return (
     <section className="narrow settings">
-      <h1>Settings</h1>
-      <p>
-        <Link to="/">Back to the projects</Link>
-      </p>
+      <h1>Installation settings</h1>
 
       <Sessions />
       <AgentTokens />

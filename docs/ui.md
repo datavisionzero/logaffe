@@ -40,8 +40,33 @@ closed. That last case is why the number is on the list rather than only in the
 project's settings: a project nothing can deliver to should be visible without
 opening each one in turn.
 
-A project switcher is present everywhere. Moving from one project to another is
-the frequent act, and it should never be a trip back to a start page.
+## The shell navigates on two levels
+
+Every screen above sits under one bar, and it is the only place this product
+navigates from. It carries two levels, because that is what there are.
+
+**The first is the installation**, and it is true wherever the operator is: the
+wordmark, the **project switcher**, the zone every timestamp is in, the
+installation's own settings, and the sign-out.
+
+**The second is the project being read** — its log and its settings — and the row
+holding it is present while a project is open and absent otherwise, so that the
+second level appearing is itself the statement that the operator is inside one.
+Which of the two surfaces is being read is marked in the bar rather than left to
+be inferred from the screen.
+
+Nothing navigates from inside a screen. A settings link in the status line of the
+log view and a *back to the log* sentence at the top of the settings are
+navigation hidden in the content: they are in a different place on every screen,
+they say where they go rather than where the operator is, and between them they
+leave no screen with a place. The bar says both at once.
+
+**The switcher is present everywhere**, because moving from one project to
+another is the frequent act and it should never be a trip back to a start page.
+It is a menu rather than a bare control, and it does two jobs: it names the
+project being read — which is the only place that name appears while the log is
+on the screen — and it opens on the other projects and on the way back to the
+list.
 
 ## The log view
 
@@ -242,6 +267,10 @@ integration is broken while the truth is that the time range is set to yesterday
 
 ## Settings
 
+They are two screens and the bar keeps them apart: a project's sit on the second
+level beside its log, and the installation's are on the first, where they are
+true of every project at once.
+
 Per project: the name, the retention window with its warning about what lowering
 it removes, the ingest tokens with when each was last used, and deletion
 confirmed by typing the project's name ([Projects and tokens](./projects.md)).
@@ -278,6 +307,9 @@ running on two cores has better things to do than answer questions nobody asked.
 - **No column configuration, no layout settings, no theme setting.** The row is
   what it is, and the interface follows the colour scheme the operating system
   asks for.
+- **No navigation sidebar.** There are three surfaces and one of them is a list
+  of lines that must not wrap; a permanent column beside it would spend the width
+  the log is read in on a menu of three entries.
 - **No export of a filtered result to a file.** A single entry copies as JSON,
   and an agent reads through [MCP](./mcp.md); a bulk export is a second read path
   with its own limits and its own answer to what happens at ten million rows.

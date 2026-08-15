@@ -22,10 +22,27 @@ body {
   background: var(--paper);
 }
 
+/* The shell stays where it is and the screen below it is what scrolls, so the
+   navigation is never something to scroll back up to. This is also what gives
+   the log view its height: it takes what is left rather than subtracting a
+   header height nobody can keep true. */
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+
 main {
+  flex: none;
   max-width: 60rem;
   margin: 0 auto;
   padding: 2rem 1rem;
+}
+
+/* The banner keeps its height whatever is below it. */
+#root > .notice {
+  flex: none;
+  margin: 0;
 }
 
 h1 {
@@ -60,15 +77,21 @@ a {
 }
 
 /* The shell, which is around every screen of a signed-in installation and
-   carries no user furniture at all. */
+   carries no user furniture at all. It navigates on two levels: the
+   installation across the top, and the project being read below it. */
 header.shell {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  align-items: center;
-  padding: 0.6rem 1rem;
+  flex: none;
   border-bottom: 1px solid var(--rule);
   background: var(--raised);
+}
+
+/* The first level: true wherever the operator is. */
+.shell-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  padding: 0.5rem 1rem;
 }
 
 .wordmark {
@@ -77,20 +100,132 @@ header.shell {
 }
 
 /* The zone every timestamp on the screen is in, stated once so that no screen
-   is ambiguous about it. It sits after the switcher and before the acts. */
+   is ambiguous about it. It ends the first level, before the acts. */
 .zone {
   margin-left: auto;
   color: var(--quiet);
   font-size: 0.85rem;
 }
 
-.switcher select {
-  padding: 0.2rem 0.3rem;
-  font: inherit;
-  color: inherit;
+/* What is done to the installation rather than to a project. It is held apart
+   by the zone's own margin and not by a rule, which on a window narrow enough
+   to wrap the bar would be a mark at the start of a line. */
+.shell-acts {
+  display: flex;
+  gap: 1.25rem;
+  align-items: baseline;
+}
+
+.shell-acts a {
+  text-decoration: none;
+}
+
+.shell-acts a:hover,
+.shell-acts a[aria-current="page"] {
+  text-decoration: underline;
+}
+
+/* The second level: the two surfaces a project has, present while one is open
+   and absent otherwise, so that the row appearing is itself the statement that
+   the operator is inside a project. */
+/* The padding is the bar's own, less what a tab carries itself, so that the
+   first tab starts under the wordmark rather than beside it. */
+.shell-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 0.4rem;
+}
+
+.shell-tabs a {
+  padding: 0.3rem 0.6rem;
+  color: var(--quiet);
+  font-size: 0.9rem;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+}
+
+.shell-tabs a:hover {
+  color: var(--ink);
+}
+
+/* Which of them is being read, said by the underline and by the ink both — the
+   colour is never the only thing carrying it. */
+.shell-tabs a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 500;
+  border-bottom-color: var(--ink);
+}
+
+/* The project switcher: which project is being read, and the way into every
+   other one. It is the only place the name appears on the log view. */
+.switcher {
+  position: relative;
+}
+
+.switcher-button {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  margin: 0;
+  padding: 0.25rem 0.6rem;
+  background: var(--paper);
+}
+
+.switcher-label {
+  color: var(--quiet);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.switcher-name {
+  font-weight: 500;
+}
+
+.switcher-menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  min-width: 14rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
   background: var(--paper);
   border: 1px solid var(--rule);
   border-radius: 4px;
+  box-shadow: 0 2px 8px light-dark(rgb(0 0 0 / 12%), rgb(0 0 0 / 40%));
+}
+
+.switcher-menu a {
+  display: block;
+  padding: 0.3rem 0.5rem;
+  text-decoration: none;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.switcher-menu a:hover,
+.switcher-menu a:focus-visible {
+  background: var(--raised);
+}
+
+.switcher-menu a[aria-current="true"] {
+  font-weight: 600;
+}
+
+/* The way back to the list, which is a different kind of destination from the
+   projects under it. */
+.switcher-all {
+  margin-bottom: 0.25rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+.switcher-all a {
+  color: var(--quiet);
 }
 
 /* The project list: a list of projects and not a dashboard. */
@@ -224,7 +359,13 @@ ul.codes {
    One screen: the filters across the top, the entries below them, the detail
    of one beside them. */
 
+/* What is below the shell, and the only thing on the page that scrolls. */
 main.surface {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
   max-width: none;
   padding: 0;
 }
@@ -237,10 +378,14 @@ main.surface {
   padding: 1.5rem 1rem;
 }
 
+/* It takes what the shell left rather than subtracting a header height, which
+   is a number that stops being true the moment the bar wraps or the second
+   level appears. */
 .logview {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  height: calc(100vh - 3.2rem);
+  min-height: 0;
   padding: 0.6rem 1rem;
   box-sizing: border-box;
 }
@@ -567,17 +712,6 @@ button.level.narrows {
 .count-number {
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   text-align: right;
-}
-
-/* The way into what is changed rarely about the project being read. It sits at
-   the end of the status line, away from the acts that narrow the view. */
-.to-settings {
-  margin-left: auto;
-}
-
-.logview > .to-settings {
-  align-self: flex-start;
-  margin: 0;
 }
 
 .expired,

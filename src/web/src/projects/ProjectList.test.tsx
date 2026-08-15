@@ -153,7 +153,10 @@ describe("the project switcher", () => {
 
     const operator = userEvent.setup();
 
-    await operator.selectOptions(await screen.findByLabelText("Project"), "9c1");
+    const shell = within(screen.getByRole("banner"));
+
+    await operator.click(await screen.findByRole("button", { name: /^project/i }));
+    await operator.click(shell.getByRole("link", { name: "billing" }));
 
     expect(await screen.findByRole("heading", { name: "billing" })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/project/9c1");

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { useSearchParams } from "react-router";
 import type { HeldProject } from "../projects/projects";
 import { CountPanel, ReadExpired } from "./CountPanel";
 import { EmptyProject } from "./EmptyProject";
@@ -116,7 +116,6 @@ export function LogView({ project }: { project: HeldProject }) {
     return (
       <section className="logview">
         <h1>{project.name}</h1>
-        <ToSettings projectId={project.id} />
         <EmptyProject projectId={project.id} />
       </section>
     );
@@ -166,8 +165,6 @@ export function LogView({ project }: { project: HeldProject }) {
             top
           </button>
         )}
-
-        <ToSettings projectId={project.id} />
       </div>
 
       <div className="logview-body">
@@ -227,22 +224,6 @@ export function LogView({ project }: { project: HeldProject }) {
         )}
       </div>
     </section>
-  );
-}
-
-/**
- * The way into what is changed rarely about this project: its name, its
- * retention window, its ingest tokens and its end.
- *
- * It sits on the screen the operator is already on rather than beside the
- * project on the list, because settings are reached from the thing they are
- * about — and because the switcher is what moves between projects.
- */
-function ToSettings({ projectId }: { projectId: string }) {
-  return (
-    <Link className="to-settings" to={`/project/${projectId}/settings`}>
-      Project settings
-    </Link>
   );
 }
 

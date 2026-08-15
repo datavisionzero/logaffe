@@ -321,29 +321,11 @@ describe("the keyboard", () => {
   });
 });
 
-describe("the way into the project's settings", () => {
-  it("is on the screen the operator is already on", async () => {
-    anInstallationAnswering({
-      "GET /projects/p1/entries": { body: { entries: [], next: null } },
-      "GET /projects/p1/entries/tail": QUIET_TAIL,
-    });
-
-    open();
-
-    expect(await screen.findByRole("link", { name: /project settings/i })).toHaveAttribute(
-      "href",
-      "/project/p1/settings",
-    );
-  });
-
-  it("is on a project nothing has ever arrived at as well", async () => {
-    anInstallationAnswering({ "GET /projects/p1/ingest-tokens": { body: [] } });
-
-    open(UNTOUCHED);
-
-    expect(await screen.findByRole("link", { name: /project settings/i })).toBeInTheDocument();
-  });
-});
+/**
+ * The way into a project's settings is the shell's second level and is asserted
+ * there (`shell/Shell.test.tsx`). This view carries no navigation of its own:
+ * everything on it narrows the list in front of it.
+ */
 
 describe("the two ways of being empty", () => {
   it("hands over the delivery when nothing has ever arrived", async () => {

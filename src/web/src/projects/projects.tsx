@@ -127,6 +127,23 @@ export function useProjectAtHand(
 }
 
 /**
+ * The project an address names, read off the address itself.
+ *
+ * The shell stands outside `<Routes>` — it is what surrounds them — so no route
+ * has matched where the switcher and the tabs are rendered, and `useParams`
+ * there answers with nothing at all. The addresses are the application's own and
+ * are stated in one place (`shell/Shell.tsx`), so reading the first two segments
+ * is the whole of it.
+ */
+export function projectIdIn(pathname: string): string | null {
+  const [, surface, id] = pathname.split("/");
+
+  return surface === "project" && id !== undefined && id !== ""
+    ? decodeURIComponent(id)
+    : null;
+}
+
+/**
  * An address naming a project this installation does not hold, which is
  * ordinarily one deleted from another browser.
  */

@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router";
+import { useParams } from "react-router";
 import { NoSuchProject, useProjectAtHand, useProjects } from "../projects/projects";
 import { DeleteProject } from "./DeleteProject";
 import { IngestTokens } from "./IngestTokens";
@@ -8,11 +8,11 @@ import { RetentionWindow } from "./RetentionWindow";
 /**
  * What is changed rarely about one project.
  *
- * It is a screen over acts that already exist, and it is deliberately reachable
- * from the log view rather than being somewhere a session starts: the name, the
- * window entries leave by, the tokens they arrive on, and the end of the project
- * — in the order an operator is likely to want them, with the irreversible one
- * last.
+ * It is a screen over acts that already exist, and it is the second of the two
+ * surfaces a project has — reached from the shell's project tabs beside the log,
+ * not from somewhere a session starts: the name, the window entries leave by,
+ * the tokens they arrive on, and the end of the project — in the order an
+ * operator is likely to want them, with the irreversible one last.
  *
  * The project is read off the list the shell already fetched, so opening these
  * settings asks the installation for the tokens and nothing else.
@@ -35,9 +35,6 @@ export function ProjectSettings() {
   return (
     <section className="narrow settings">
       <h1>{project.name}</h1>
-      <p>
-        <Link to={`/project/${project.id}`}>Back to the log</Link>
-      </p>
 
       <ProjectName project={project} onRenamed={reload} />
       <RetentionWindow project={project} onChanged={reload} />
