@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { GroupsProvider } from "../projects/groups";
 import { ProjectsProvider } from "../projects/projects";
 import { InstallationSettings } from "./InstallationSettings";
-import { aGroup, anInstallationAnswering, type Answer } from "../shared/testing";
+import { aGroup, aProject, anInstallationAnswering, type Answer } from "../shared/testing";
 
 function aSession(session: {
   id: string;
@@ -431,10 +431,17 @@ function openGroups(routes: Record<string, Answer | Answer[]> = {}) {
 }
 
 describe("the groups", () => {
-  it("lists them with how many projects each holds", async () => {
+  it("counts the projects each holds off the list it already reads", async () => {
     openGroups({
       "GET /groups": {
-        body: [aGroup({ id: "g1", name: "shop", projects: 2 }), aGroup({ id: "g2", name: "blog" })],
+        body: [aGroup({ id: "g1", name: "shop" }), aGroup({ id: "g2", name: "blog" })],
+      },
+      "GET /projects": {
+        body: [
+          aProject({ id: "p1", name: "api", groupId: "g1" }),
+          aProject({ id: "p2", name: "web", groupId: "g1" }),
+          aProject({ id: "p3", name: "loose" }),
+        ],
       },
     });
 
@@ -449,7 +456,13 @@ describe("the groups", () => {
 
   it("says what removing one leaves behind, and asks for no name to be typed", async () => {
     const installation = openGroups({
-      "GET /groups": { body: [aGroup({ id: "g1", name: "shop", projects: 2 })] },
+      "GET /groups": { body: [aGroup({ id: "g1", name: "shop" })] },
+      "GET /projects": {
+        body: [
+          aProject({ id: "p1", name: "api", groupId: "g1" }),
+          aProject({ id: "p2", name: "web", groupId: "g1" }),
+        ],
+      },
       "DELETE /groups/g1": {},
     });
 

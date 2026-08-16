@@ -45,17 +45,18 @@ public sealed class GroupActsTests
     }
 
     [Fact]
-    public async Task A_group_is_empty_until_a_project_is_moved_into_it()
+    public async Task A_group_holding_nothing_is_on_the_list_all_the_same()
     {
         // Empty is an ordinary state and not a step that has not finished: the
-        // operator made the heading before there was anything to put under it.
+        // operator made the heading before there was anything to put under it,
+        // and a list assembled from what the projects say would omit it.
         var group = await MakingAsync("shop");
 
         var listed = Assert.Single(await Listing().ExecuteAsync(
             TestContext.Current.CancellationToken));
 
         Assert.Equal(group!.Id, listed.Id);
-        Assert.Equal(0, listed.Projects);
+        Assert.Equal("shop", listed.Name);
     }
 
     [Fact]
@@ -138,7 +139,7 @@ public sealed class GroupActsTests
     }
 
     [Fact]
-    public async Task The_list_says_how_many_projects_each_group_holds()
+    public async Task The_list_is_oldest_first_and_says_nothing_about_what_is_in_it()
     {
         var shop = await MakingAsync("shop");
         _clock.Now = Now.AddMinutes(1);
@@ -153,11 +154,14 @@ public sealed class GroupActsTests
 
         var listed = await Listing().ExecuteAsync(TestContext.Current.CancellationToken);
 
+        // How many projects each holds is a fact about the projects, and it is
+        // answered by the project list rather than a second time here — the
+        // same fact in two answers is the one that goes stale (ADR 0039).
         Assert.Equal([shop.Id, blog!.Id], listed.Select(group => group.Id));
-        Assert.Equal([2, 0], listed.Select(group => group.Projects));
-
-        // A project in no group is counted under no heading rather than under
-        // one that does not exist.
+        // `api`, `loose`, `web` — two of the three under the same heading.
+        Assert.Equal(
+            [shop.Id, null, shop.Id],
+            _projects.Stored.OrderBy(p => p.Name, StringComparer.Ordinal).Select(p => p.GroupId));
         Assert.Null(_projects.Stored.Single(p => p.Id == loose!.Id).GroupId);
     }
 
@@ -268,12 +272,68 @@ public sealed class GroupActsTests
         Assert.Equal(group.Id, listed.GroupId);
     }
 
+    [Fact]
+    public async Task A_project_is_created_into_a_group_rather_than_moved_afterwards()
+    {
+        // Creating a project and putting it where it belongs is one errand, and
+        // finishing it in the new project's settings is a second trip.
+        var group = await MakingAsync("shop");
+
+        var created = await CreatingAsync("api", group!.Id);
+
+        Assert.Equal(CreateProjectOutcome.Created, created.Outcome);
+        Assert.Equal(group.Id, created.Project!.GroupId);
+        Assert.Equal(group.Id, Assert.Single(_projects.Stored).GroupId);
+    }
+
+    [Fact]
+    public async Task A_creation_into_a_group_holding_that_name_is_refused()
+    {
+        var group = await MakingAsync("shop");
+        await CreateAsync("api", group!.Id);
+        var writesBefore = _projects.Writes;
+
+        Assert.Equal(
+            CreateProjectOutcome.NameTaken, (await CreatingAsync("api", group.Id)).Outcome);
+        Assert.Single(_projects.Stored);
+        Assert.Equal(writesBefore, _projects.Writes);
+    }
+
+    [Fact]
+    public async Task A_name_taken_inside_a_group_is_free_outside_it()
+    {
+        var group = await MakingAsync("shop");
+        await CreateAsync("api", group!.Id);
+
+        // The name has to be free where the project will be listed, and the
+        // projects in no group are their own set.
+        Assert.Equal(CreateProjectOutcome.Created, (await CreatingAsync("api")).Outcome);
+    }
+
+    [Fact]
+    public async Task A_creation_into_a_group_that_is_not_there_says_so_and_writes_nothing()
+    {
+        var writesBefore = _projects.Writes;
+
+        // Ordinarily a group another browser removed while the screen was open.
+        // Reaching the foreign key instead would surface as a failure of the
+        // installation rather than as the answer it is.
+        Assert.Equal(
+            CreateProjectOutcome.NoSuchGroup,
+            (await CreatingAsync("api", Guid.CreateVersion7())).Outcome);
+        Assert.Empty(_projects.Stored);
+        Assert.Equal(writesBefore, _projects.Writes);
+    }
+
     private Task<Group?> MakingAsync(string name) =>
         new CreateGroup(_groups, _clock).ExecuteAsync(name, TestContext.Current.CancellationToken);
 
-    private Task<Project?> CreateAsync(string name) =>
-        new CreateProject(_projects, _clock).ExecuteAsync(
-            name, RetentionWindow.OfDays(7), TestContext.Current.CancellationToken);
+    private async Task<Project?> CreateAsync(string name, Guid? groupId = null) =>
+        (await CreatingAsync(name, groupId)).Project;
+
+    private Task<CreationAttempt> CreatingAsync(string name, Guid? groupId = null) =>
+        new CreateProject(_projects, _groups, _clock).ExecuteAsync(
+            name, RetentionWindow.OfDays(7), groupId, TestContext.Current.CancellationToken);
 
     private Task<RenameOutcome> RenameAsync(Guid project, string name) =>
         new RenameProject(_projects).ExecuteAsync(
@@ -283,7 +343,7 @@ public sealed class GroupActsTests
         new MoveProjectToGroup(_projects, _groups).ExecuteAsync(
             project, group, TestContext.Current.CancellationToken);
 
-    private ListGroups Listing() => new(_groups, _projects);
+    private ListGroups Listing() => new(_groups);
 
     private RenameGroup Renaming() => new(_groups);
 

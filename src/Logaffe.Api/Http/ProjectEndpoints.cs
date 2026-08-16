@@ -12,7 +12,12 @@ namespace Logaffe.Api.Http;
 /// How long the project keeps its entries, counted from receipt time, up to a
 /// ceiling no installation can raise (ADR 0020).
 /// </param>
-public sealed record CreateProjectRequest(string? Name, int RetentionDays);
+/// <param name="GroupId">
+/// The group to list the project under, or <c>null</c> for none — which is what
+/// a caller that says nothing about it gets. Creating a project and putting it
+/// where it belongs is one errand.
+/// </param>
+public sealed record CreateProjectRequest(string? Name, int RetentionDays, Guid? GroupId);
 
 /// <inheritdoc cref="CreateProjectRequest"/>
 public sealed record RenameProjectRequest(string? Name);
@@ -115,20 +120,27 @@ public static class ProjectEndpoints
                     return NotAWindow();
                 }
 
-                var project = await create.ExecuteAsync(
-                    request.Name!, retention, cancellationToken);
+                var created = await create.ExecuteAsync(
+                    request.Name!, retention, request.GroupId, cancellationToken);
 
                 // Two projects called `api` is a trap for the operator reaching
                 // for one of them at three in the morning. The name is theirs to
                 // change afterwards, so a taken one is a conflict with what the
-                // installation already holds rather than a malformed request.
-                return project is null
-                    ? Results.Conflict()
-                    : Results.Created($"/projects/{project.Id}", Shown(project));
+                // installation already holds rather than a malformed request —
+                // and a group that is gone is the same answer as any other
+                // identity this installation does not hold.
+                return created.Outcome switch
+                {
+                    CreateProjectOutcome.Created => Results.Created(
+                        $"/projects/{created.Project!.Id}", Shown(created.Project)),
+                    CreateProjectOutcome.NameTaken => Results.Conflict(),
+                    _ => Results.NotFound(),
+                };
             })
             .WithName("CreateProject")
             .WithSummary("Brings a project into existence, which is the only way one comes about.")
             .Produces<ProjectResponse>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
 

@@ -86,12 +86,13 @@ public sealed class GroupEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         // The name is stored as it would be, not as it was typed.
         Assert.Equal("shop", made.Name);
 
-        // A group made before its first project is empty, which is an ordinary
-        // state and is on the list rather than left off it (ADR 0039).
+        // A group made before its first project is on the list all the same: it
+        // is something the operator made and not a side effect of what the
+        // projects say (ADR 0039).
         var listed = Assert.Single(await ReadAsync<ListedGroupBody[]>(
             await client.GetAsync("/groups", TestContext.Current.CancellationToken)));
         Assert.Equal(made.Id, listed.Id);
-        Assert.Equal(0, listed.Projects);
+        Assert.Equal("shop", listed.Name);
 
         using var renamed = await client.PatchAsJsonAsync(
             $"/groups/{made.Id}",
@@ -233,7 +234,52 @@ public sealed class GroupEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         var listed = Assert.Single(await ReadAsync<ListedGroupBody[]>(
             await client.GetAsync("/groups", TestContext.Current.CancellationToken)));
         Assert.Equal(shop.Id, listed.Id);
-        Assert.Equal(0, listed.Projects);
+        Assert.Empty(await ReadAsync<ListedProjectBody[]>(
+            await client.GetAsync("/projects", TestContext.Current.CancellationToken)));
+    }
+
+    [Fact]
+    public async Task A_project_is_created_into_a_group_in_one_act()
+    {
+        using var client = await SignedInAsync();
+
+        var shop = await MakeAsync(client, "shop");
+
+        var created = await ReadAsync<ProjectBody>(await client.PostAsJsonAsync(
+            "/projects",
+            new { name = "api", retentionDays = 7, groupId = shop.Id },
+            TestContext.Current.CancellationToken));
+
+        Assert.Equal(shop.Id, created.GroupId);
+
+        // The name is taken inside that group now and free outside it, which is
+        // the index over the group and the name together.
+        using var again = await client.PostAsJsonAsync(
+            "/projects",
+            new { name = "api", retentionDays = 7, groupId = shop.Id },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+
+        var loose = await CreateProjectAsync(client, "api");
+        Assert.Null(loose.GroupId);
+    }
+
+    [Fact]
+    public async Task A_creation_into_a_group_that_is_not_there_is_an_answer()
+    {
+        using var client = await SignedInAsync();
+
+        // Reaching the foreign key instead would surface as a failure of the
+        // installation, when what happened is that the operator named a group
+        // another browser removed.
+        using var response = await client.PostAsJsonAsync(
+            "/projects",
+            new { name = "api", retentionDays = 7, groupId = Guid.Parse(NoSuchGroup) },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Empty(await ReadAsync<ListedProjectBody[]>(
+            await client.GetAsync("/projects", TestContext.Current.CancellationToken)));
     }
 
     [Fact]
@@ -342,8 +388,7 @@ public sealed class GroupEndpointTests(PostgresFixture postgres) : IAsyncLifetim
 
     private sealed record GroupBody(Guid Id, string Name, DateTimeOffset CreatedAt);
 
-    private sealed record ListedGroupBody(
-        Guid Id, string Name, DateTimeOffset CreatedAt, int Projects);
+    private sealed record ListedGroupBody(Guid Id, string Name, DateTimeOffset CreatedAt);
 
     private sealed record ProjectBody(
         Guid Id, string Name, Guid? GroupId, int RetentionDays, DateTimeOffset CreatedAt);

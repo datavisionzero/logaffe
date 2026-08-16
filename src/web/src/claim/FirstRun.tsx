@@ -102,7 +102,10 @@ function FirstProject({
 
     try {
       const { data, response, error } = await api.POST("/projects", {
-        body: { name, retentionDays: Number(retentionDays) },
+        // In no group, and the guide offers no choice about it: an installation
+        // being claimed holds none, and the first project is the one thing
+        // standing between the operator and their first delivery.
+        body: { name, retentionDays: Number(retentionDays), groupId: null },
       });
 
       if (data !== undefined) {

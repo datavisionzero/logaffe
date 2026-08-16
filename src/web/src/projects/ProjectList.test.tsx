@@ -175,6 +175,50 @@ describe("an empty installation", () => {
     expect(await screen.findByRole("heading", { name: "checkout" })).toBeInTheDocument();
   });
 
+  it("puts the project into a group without a second trip through its settings", async () => {
+    const installation = anInstallationAnswering({
+      "GET /groups": { body: [aGroup({ id: "g1", name: "shop" })] },
+      "GET /projects": [{ body: [] }, { body: [aProject({ id: "3f0", name: "checkout" })] }],
+      "POST /projects": {
+        status: 201,
+        body: {
+          id: "3f0",
+          name: "checkout",
+          groupId: "g1",
+          retentionDays: 30,
+          createdAt: "2026-08-08T09:00:00.000Z",
+        },
+      },
+    });
+
+    open();
+
+    const operator = userEvent.setup();
+
+    await operator.type(await screen.findByLabelText("Name"), "checkout");
+    await operator.selectOptions(screen.getByLabelText("Group"), "g1");
+    await operator.click(screen.getByRole("button", { name: /create the project/i }));
+
+    // Creating a project and putting it where it belongs is one errand.
+    expect(installation.sentTo("POST /projects")).toEqual([
+      { name: "checkout", retentionDays: 30, groupId: "g1" },
+    ]);
+  });
+
+  it("offers no group to choose while the installation holds none", async () => {
+    anInstallationAnswering({
+      "GET /groups": noGroups,
+      "GET /projects": { body: [] },
+    });
+
+    open();
+
+    // A select whose only option is "no group" asks the operator to decide
+    // something with one possible answer.
+    await screen.findByLabelText("Name");
+    expect(screen.queryByLabelText("Group")).toBeNull();
+  });
+
   it("says which name is already taken", async () => {
     anInstallationAnswering({
       "GET /groups": noGroups,

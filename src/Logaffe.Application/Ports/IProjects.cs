@@ -44,13 +44,6 @@ public interface IProjects
     /// </summary>
     Task<Project?> FindAsync(string name, Guid? groupId, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// How many projects each group holds, keyed by the group's identity. It is
-    /// one grouped read rather than one per group, and a group nothing points at
-    /// is absent rather than zero.
-    /// </summary>
-    Task<IReadOnlyDictionary<Guid, int>> CountByGroupAsync(CancellationToken cancellationToken);
-
     Task AddAsync(Project project, CancellationToken cancellationToken);
 
     /// <summary>

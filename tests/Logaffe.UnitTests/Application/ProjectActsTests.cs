@@ -12,6 +12,7 @@ public sealed class ProjectActsTests
     private static readonly DateTimeOffset Now = new(2026, 8, 7, 9, 0, 0, TimeSpan.Zero);
 
     private readonly InMemoryProjects _projects = new();
+    private readonly InMemoryGroups _groups = new();
     private readonly InMemoryTokens _tokens = new();
     private readonly RecordingReader _entries = new();
     private readonly StoppedClock _clock = new(Now);
@@ -223,9 +224,17 @@ public sealed class ProjectActsTests
             Guid.CreateVersion7(), TestContext.Current.CancellationToken));
     }
 
-    private Task<Project?> CreateAsync(string name, int retentionDays) =>
-        new CreateProject(_projects, _clock).ExecuteAsync(
-            name, RetentionWindow.OfDays(retentionDays), TestContext.Current.CancellationToken);
+    /// <summary>
+    /// The project a creation made, and <c>null</c> for one that was refused —
+    /// which is what almost every act here is asked about. The outcome itself is
+    /// <c>GroupActsTests</c>'s subject.
+    /// </summary>
+    private async Task<Project?> CreateAsync(string name, int retentionDays) =>
+        (await new CreateProject(_projects, _groups, _clock).ExecuteAsync(
+            name,
+            RetentionWindow.OfDays(retentionDays),
+            groupId: null,
+            TestContext.Current.CancellationToken)).Project;
 
     private Task<IssueAttempt> IssueAsync(Guid project) =>
         new IssueIngestToken(_projects, _tokens, new ReversingCipher(), _clock)

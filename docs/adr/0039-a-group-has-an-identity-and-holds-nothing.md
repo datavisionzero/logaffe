@@ -44,6 +44,14 @@ it the ambiguity the rule guards against is already resolved. Two ungrouped
 projects called `api` still collide, which is why the index treats the absent
 group as one value rather than as many.
 
+**A group does not say how many projects it holds, and neither does the answer
+that lists them.** That number is a fact about the projects, and both consumers
+of it already read the project list — so answering it twice is two things to keep
+current, which is exactly what the first attempt failed to do: the groups were
+read once when a session began, the projects were re-read after every act, and a
+group filled a minute ago still said nought. What is counted off the list that is
+already correct cannot disagree with it.
+
 **A group holds projects and never another group.** Nesting is what the identity
 makes cheap and what an installation holding ten to thirty projects has no use
 for, so the absence of a parent is a decision and is written down as one.

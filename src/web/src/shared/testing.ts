@@ -22,6 +22,7 @@ type Route = string;
  */
 export function anInstallationAnswering(routes: Record<Route, Answer | Answer[]>) {
   const asked: Route[] = [];
+  const sent = new Map<Route, unknown[]>();
 
   const queued = new Map<Route, Answer[]>(
     Object.entries(routes).map(([route, answer]) => [
@@ -39,6 +40,13 @@ export function anInstallationAnswering(routes: Record<Route, Answer | Answer[]>
 
       asked.push(route);
 
+      // Kept for the acts whose body is the point rather than the call: what a
+      // screen actually sent, parsed, in the order it sent it.
+      const text = await request.text();
+      if (text !== "") {
+        sent.set(route, [...(sent.get(route) ?? []), JSON.parse(text)]);
+      }
+
       const answers = queued.get(route);
 
       if (answers === undefined || answers.length === 0) {
@@ -55,7 +63,7 @@ export function anInstallationAnswering(routes: Record<Route, Answer | Answer[]>
     }),
   );
 
-  return { asked };
+  return { asked, sentTo: (route: Route): unknown[] => sent.get(route) ?? [] };
 }
 
 /** A claimed installation, which is what most screens are reached from. */
@@ -92,18 +100,18 @@ export function aProject(project: {
   };
 }
 
-/** A row of the group list, which every signed-in screen reads once. */
-export function aGroup(group: {
-  id: string;
-  name: string;
-  createdAt?: string;
-  projects?: number;
-}) {
+/**
+ * A row of the group list, which every signed-in screen reads once.
+ *
+ * It carries no count of its projects: how many a group holds is a fact about
+ * the projects, and the screens count it off the project list they already have
+ * (ADR 0039).
+ */
+export function aGroup(group: { id: string; name: string; createdAt?: string }) {
   return {
     id: group.id,
     name: group.name,
     createdAt: group.createdAt ?? "2026-08-01T09:00:00.000Z",
-    projects: group.projects ?? 0,
   };
 }
 

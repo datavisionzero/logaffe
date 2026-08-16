@@ -13,15 +13,14 @@ public sealed record GroupRequest(string? Name);
 public sealed record GroupResponse(Guid Id, string Name, DateTimeOffset CreatedAt);
 
 /// <summary>
-/// One group on the list the operator reads.
+/// One group on the list the operator reads, which is a name and an identity.
 /// </summary>
-/// <param name="Projects">
-/// How many projects it holds. Zero is an ordinary answer — a group made before
-/// its first project, or left behind by its last — and it is what the screen says
-/// before removing one.
-/// </param>
-public sealed record ListedGroupResponse(
-    Guid Id, string Name, DateTimeOffset CreatedAt, int Projects);
+/// <remarks>
+/// It does not carry how many projects it holds. That is a fact about the
+/// projects, and whoever reads this reads the project list too — the same fact
+/// answered twice is the one that goes stale (ADR 0039).
+/// </remarks>
+public sealed record ListedGroupResponse(Guid Id, string Name, DateTimeOffset CreatedAt);
 
 /// <summary>
 /// The operator's group acts, reached over HTTP.
@@ -81,10 +80,10 @@ public static class GroupEndpoints
                 var held = await list.ExecuteAsync(cancellationToken);
 
                 return Results.Ok(held.Select(group => new ListedGroupResponse(
-                    group.Id, group.Name, group.CreatedAt, group.Projects)));
+                    group.Id, group.Name, group.CreatedAt)));
             })
             .WithName("ListGroups")
-            .WithSummary("Every group the installation holds, with how many projects each holds.")
+            .WithSummary("Every group the installation holds.")
             .Produces<IEnumerable<ListedGroupResponse>>();
 
         operatorSurface.MapPatch("/{id:guid}", async (

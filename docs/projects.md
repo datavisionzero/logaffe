@@ -150,6 +150,13 @@ and they are managed where they are true of every project at once — the
 installation's settings ([The web UI](./ui.md)). A project's own settings name
 the group it is in and nothing more.
 
+**A project is created into a group or into none**, and moved between them
+afterwards. Creating a project and putting it where it belongs is one errand,
+and a project that could only be grouped after the fact would make the operator
+open the settings of something they had just made. Which of the two it is
+decides the name it has to be free of: the group's projects, or the ones in no
+group.
+
 **A group may be empty**, both before its first project and after its last one
 leaves. That follows from the identity: a group is something the operator made
 rather than a side effect of what the projects say, so it stays until it is

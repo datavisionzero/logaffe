@@ -51,14 +51,6 @@ internal sealed class InMemoryProjects : IProjects
         string name, Guid? groupId, CancellationToken cancellationToken) =>
         Task.FromResult(_projects.SingleOrDefault(p => p.Name == name && p.GroupId == groupId));
 
-    public Task<IReadOnlyDictionary<Guid, int>> CountByGroupAsync(
-        CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyDictionary<Guid, int>>(
-            _projects
-                .Where(p => p.GroupId is not null)
-                .GroupBy(p => p.GroupId!.Value)
-                .ToDictionary(held => held.Key, held => held.Count()));
-
     public Task AddAsync(Project project, CancellationToken cancellationToken) =>
         Write(() => _projects.Add(project));
 

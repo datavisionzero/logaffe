@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { api, problemWith } from "../api/client";
-import { useGroups, type HeldGroup } from "../projects/groups";
+import { projectsIn, useGroups, type HeldGroup } from "../projects/groups";
 import { useProjects } from "../projects/projects";
 
 /**
@@ -17,7 +17,7 @@ import { useProjects } from "../projects/projects";
  */
 export function Groups() {
   const { state, reload } = useGroups();
-  const { reload: reloadProjects } = useProjects();
+  const { state: projects, reload: reloadProjects } = useProjects();
   const [renaming, setRenaming] = useState<string>();
   const [removing, setRemoving] = useState<string>();
   const [name, setName] = useState("");
@@ -150,67 +150,73 @@ export function Groups() {
             </tr>
           </thead>
           <tbody>
-            {state.groups.map((group) => (
-              <tr key={group.id}>
-                <th scope="row">
-                  {renaming === group.id ? (
-                    <Rename
-                      group={group}
-                      busy={busy}
-                      onRename={(renamed) => void rename(group.id, renamed)}
-                      onLeave={() => setRenaming(undefined)}
-                    />
-                  ) : (
-                    group.name
-                  )}
-                </th>
-                <td>{group.projects}</td>
-                <td>
-                  <button
-                    type="button"
-                    className="plain"
-                    onClick={() => setRenaming(group.id)}
-                  >
-                    Rename
-                  </button>{" "}
-                  {removing === group.id ? (
-                    <>
-                      {/* Nothing is destroyed, so this states what happens
-                          rather than asking for the name to be typed — that
-                          guard belongs to deleting a project, where entries do
-                          not come back (ADR 0039). */}
-                      <button
-                        type="button"
-                        className="plain"
-                        disabled={busy}
-                        onClick={() => void remove(group.id)}
-                      >
-                        {group.projects === 0
-                          ? "Remove it"
-                          : `Remove it — ${group.projects} ${
-                              group.projects === 1 ? "project is" : "projects are"
-                            } left in no group`}
-                      </button>{" "}
-                      <button
-                        type="button"
-                        className="plain"
-                        onClick={() => setRemoving(undefined)}
-                      >
-                        Keep it
-                      </button>
-                    </>
-                  ) : (
+            {state.groups.map((group) => {
+              // Counted off the projects this application already holds, so
+              // that a project moved a moment ago is in the number.
+              const held = projects.status === "held" ? projectsIn(group, projects.projects) : 0;
+
+              return (
+                <tr key={group.id}>
+                  <th scope="row">
+                    {renaming === group.id ? (
+                      <Rename
+                        group={group}
+                        busy={busy}
+                        onRename={(renamed) => void rename(group.id, renamed)}
+                        onLeave={() => setRenaming(undefined)}
+                      />
+                    ) : (
+                      group.name
+                    )}
+                  </th>
+                  <td>{projects.status === "held" ? held : ""}</td>
+                  <td>
                     <button
                       type="button"
                       className="plain"
-                      onClick={() => setRemoving(group.id)}
+                      onClick={() => setRenaming(group.id)}
                     >
-                      Remove
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                      Rename
+                    </button>{" "}
+                    {removing === group.id ? (
+                      <>
+                        {/* Nothing is destroyed, so this states what happens
+                            rather than asking for the name to be typed — that
+                            guard belongs to deleting a project, where entries do
+                            not come back (ADR 0039). */}
+                        <button
+                          type="button"
+                          className="plain"
+                          disabled={busy}
+                          onClick={() => void remove(group.id)}
+                        >
+                          {held === 0
+                            ? "Remove it"
+                            : `Remove it — ${held} ${
+                                held === 1 ? "project is" : "projects are"
+                              } left in no group`}
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="plain"
+                          onClick={() => setRemoving(undefined)}
+                        >
+                          Keep it
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        className="plain"
+                        onClick={() => setRemoving(group.id)}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

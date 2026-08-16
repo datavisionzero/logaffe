@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { api, asInstant, asNumber } from "../api/client";
+import { api, asInstant } from "../api/client";
 import type { HeldProject } from "./projects";
 
 /**
@@ -17,12 +17,6 @@ export interface HeldGroup {
   id: string;
   name: string;
   createdAt: Date;
-  /**
-   * How many projects it holds. Zero is an ordinary answer — a group made
-   * before its first project, or left behind by its last — and it is what the
-   * settings area says before removing one.
-   */
-  projects: number;
 }
 
 export type GroupsState =
@@ -143,16 +137,24 @@ export function groupOf(project: HeldProject, groups: GroupsState): string | nul
   return groups.groups.find((group) => group.id === project.groupId)?.name ?? null;
 }
 
-function held(group: {
-  id: string;
-  name: string;
-  createdAt: string;
-  projects: number | string;
-}): HeldGroup {
+/**
+ * How many projects a group holds, counted off the projects the application
+ * already holds in full rather than asked of the installation.
+ *
+ * **This is the whole of why the group answer does not carry the number.** The
+ * groups are fetched once for a session; the projects are re-read after every
+ * act that changes one. A count that came from the group answer stayed at what
+ * it was when the session started, and the settings area said nought about
+ * groups the operator had just filled.
+ */
+export function projectsIn(group: HeldGroup, projects: HeldProject[]): number {
+  return projects.filter((project) => project.groupId === group.id).length;
+}
+
+function held(group: { id: string; name: string; createdAt: string }): HeldGroup {
   return {
     id: group.id,
     name: group.name,
     createdAt: asInstant(group.createdAt),
-    projects: asNumber(group.projects),
   };
 }

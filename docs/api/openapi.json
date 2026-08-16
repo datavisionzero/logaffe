@@ -445,6 +445,9 @@
               }
             }
           },
+          "404": {
+            "description": "Not Found"
+          },
           "409": {
             "description": "Conflict"
           },
@@ -787,7 +790,7 @@
         "tags": [
           "logaffe"
         ],
-        "summary": "Every group the installation holds, with how many projects each holds.",
+        "summary": "Every group the installation holds.",
         "operationId": "ListGroups",
         "responses": {
           "200": {
@@ -1740,7 +1743,8 @@
       "CreateProjectRequest": {
         "required": [
           "name",
-          "retentionDays"
+          "retentionDays",
+          "groupId"
         ],
         "type": "object",
         "properties": {
@@ -1757,6 +1761,13 @@
               "string"
             ],
             "format": "int32"
+          },
+          "groupId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
           }
         }
       },
@@ -2212,8 +2223,7 @@
         "required": [
           "id",
           "name",
-          "createdAt",
-          "projects"
+          "createdAt"
         ],
         "type": "object",
         "properties": {
@@ -2227,14 +2237,6 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
-          },
-          "projects": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "integer",
-              "string"
-            ],
-            "format": "int32"
           }
         }
       },

@@ -1,18 +1,30 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { api, problemWith } from "../api/client";
+import { useGroups } from "./groups";
 import { RETENTION_MAXIMUM, RETENTION_MINIMUM, RETENTION_OFFERED } from "./retention";
+
+/** The value the select carries for a project in no group. */
+const none = "";
 
 /**
  * Creating a project, which is the only way one comes about.
  *
- * A name and a retention window is the whole of it (`docs/projects.md`): the
- * ingest token is issued separately, and nothing else about a project is
+ * A name, a retention window and the group to list it under (`docs/projects.md`):
+ * the ingest token is issued separately, and nothing else about a project is
  * decided here.
+ *
+ * **The group is chosen here rather than only afterwards.** Creating a project
+ * and putting it where it belongs is one errand, and sending the operator into
+ * the new project's settings to finish it is a second trip for something they
+ * already knew. It offers no group by default, which is what most projects are
+ * and the only thing an installation holding no groups could mean.
  */
 export function CreateProject({ onCreated }: { onCreated: () => void }) {
   const navigate = useNavigate();
+  const { state: groups } = useGroups();
   const [name, setName] = useState("");
+  const [groupId, setGroupId] = useState(none);
   const [retentionDays, setRetentionDays] = useState(String(RETENTION_OFFERED));
   const [refusal, setRefusal] = useState<string>();
   const [problems, setProblems] = useState<{ name?: string; retentionDays?: string }>({});
@@ -26,7 +38,11 @@ export function CreateProject({ onCreated }: { onCreated: () => void }) {
 
     try {
       const { data, response, error } = await api.POST("/projects", {
-        body: { name, retentionDays: Number(retentionDays) },
+        body: {
+          name,
+          retentionDays: Number(retentionDays),
+          groupId: groupId === none ? null : groupId,
+        },
       });
 
       if (data !== undefined) {
@@ -39,12 +55,22 @@ export function CreateProject({ onCreated }: { onCreated: () => void }) {
 
       if (response.status === 409) {
         // Two projects called `api` is a trap for the operator reaching for one
-        // of them at three in the morning.
-        // A project is created in no group and put into one afterwards, so the
-        // name it has to be free of is the one the ungrouped projects hold.
+        // of them at three in the morning. The name has to be free where the
+        // project will be listed, which is inside the group it is being given
+        // or among the projects in no group.
         setProblems({
-          name: "This installation already holds a project by that name, in no group.",
+          name:
+            groupId === none
+              ? "This installation already holds a project by that name, in no group."
+              : "That group already holds a project by that name.",
         });
+        return;
+      }
+
+      if (response.status === 404) {
+        // The group was removed from another browser while this form was open.
+        setRefusal("That group is gone. It may have been removed from another browser.");
+        setGroupId(none);
         return;
       }
 
@@ -89,6 +115,25 @@ export function CreateProject({ onCreated }: { onCreated: () => void }) {
         days
       </label>
       {problems.retentionDays !== undefined && <p className="refusal">{problems.retentionDays}</p>}
+
+      {/* Absent while the installation holds none: a select whose only option
+          is "no group" asks the operator to decide something that has one
+          possible answer. */}
+      {groups.status === "held" && groups.groups.length > 0 && (
+        <label>
+          Group
+          <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+            <option value={none}>No group</option>
+            {[...groups.groups]
+              .sort((one, other) => one.name.localeCompare(other.name))
+              .map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+          </select>
+        </label>
+      )}
 
       {refusal !== undefined && <p className="refusal">{refusal}</p>}
 

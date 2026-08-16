@@ -321,10 +321,12 @@ acts on one account rather than three subjects.
 Per project: the name, the group it is in — one of the installation's, or none —
 the retention window with its warning about what lowering it removes, the ingest
 tokens with when each was last used, and deletion confirmed by typing the
-project's name ([Projects and tokens](./projects.md)). The group is chosen here
-and made elsewhere: a project's settings say where the project sits, and a screen
-about one project is the wrong place to bring into existence a thing that outlives
-it.
+project's name ([Projects and tokens](./projects.md)). The group is chosen here —
+and at the creation, which offers the same choice so that putting a project where
+it belongs is part of making it rather than a second trip — but it is **made**
+elsewhere: a screen about one project is the wrong place to bring into existence
+a thing that outlives it. The creation offers no group by default, and offers
+nothing at all while the installation holds none.
 
 Per installation: the sessions with where and when each was last used and the
 means to end them ([Signing in](./sign-in.md)), re-enrolment of the second
@@ -339,8 +341,9 @@ about what it can do.
 
 **The groups are here for the same reason**: a group is a fact about the
 installation's projects taken together, and no single project's screen can hold
-one. The area lists them with how many projects each holds, and creates, renames
-and removes one. **Removing is a plain act** — it says how many projects it will
+one. The area lists them with how many projects each holds — counted off the
+project list the interface already has, because a second answer carrying the
+same fact is the one that goes stale — and creates, renames and removes one. **Removing is a plain act** — it says how many projects it will
 leave in no group and asks for nothing to be typed, because nothing here is
 destroyed and the typed name on a project's deletion is proportionate to entries
 that do not come back
