@@ -96,7 +96,7 @@ describe("the project list", () => {
   it("lists the projects in no group first and the groups by name after them", async () => {
     anInstallationAnswering({
       "GET /groups": {
-        body: [aGroup({ id: "g2", name: "shop", projects: 2 }), aGroup({ id: "g1", name: "blog" })],
+        body: [aGroup({ id: "g2", name: "shop" }), aGroup({ id: "g1", name: "blog" })],
       },
       "GET /projects": {
         body: [
@@ -264,7 +264,7 @@ describe("the project switcher", () => {
 
   it("names the group beside the project being read", async () => {
     anInstallationAnswering({
-      "GET /groups": { body: [aGroup({ id: "g1", name: "shop", projects: 1 })] },
+      "GET /groups": { body: [aGroup({ id: "g1", name: "shop" })] },
       "GET /projects": { body: [aProject({ id: "3f0", name: "api", groupId: "g1" })] },
     });
 

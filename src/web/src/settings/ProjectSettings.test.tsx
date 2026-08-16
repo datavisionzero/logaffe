@@ -187,7 +187,7 @@ describe("the group", () => {
 
   it("refuses a move into a group that already holds the name", async () => {
     open({
-      "GET /groups": { body: [aGroup({ id: "g1", name: "shop", projects: 1 })] },
+      "GET /groups": { body: [aGroup({ id: "g1", name: "shop" })] },
       "PUT /projects/p1/group": { status: 409 },
     });
 
