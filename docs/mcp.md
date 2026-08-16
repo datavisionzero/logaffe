@@ -102,10 +102,20 @@ changes their password less often.
 
 Four, and no others.
 
-**`list_projects`** — the projects in the installation, each with its name, its
-retention window, and when it last received an entry. An agent has to know what
-exists before it can ask about it, and "has this project received anything
-lately" is the cheapest possible health question.
+**`list_projects`** — the projects in the installation, each with its name, the
+group it sits in when it sits in one, its retention window, and when it last
+received an entry. An agent has to know what exists before it can ask about it,
+and "has this project received anything lately" is the cheapest possible health
+question.
+
+**The group rides on the project rather than being a tool of its own.** It is
+what lets *the production one of shop* reach an identity, and it is also what
+keeps the operator's own word for two projects from being a thing the agent has
+to guess at. A fifth tool listing groups would be a second read path for a fact
+the first one already carries, and there is nothing further to ask: no filter, no
+scope and no query takes a group ([Projects and tokens](./projects.md)). A
+project's name is unique only within its group, which costs the agent nothing —
+every tool names a project by identity, as the next paragraph says.
 
 **`search_entries`** — a project, the filters from [Querying](./querying.md), a
 verbosity, and a cursor. The filters are exactly the operator's: a time range on

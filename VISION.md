@@ -203,6 +203,13 @@ Multi-project capability is built in from the start, not retrofitted:
 - Projects are kept separate in storage, in the web UI, and in agent access.
 - Retention is configured per project.
 
+**Projects can be grouped.** Twenty projects is a list, and one product's staging
+and production sitting under one heading is what makes it a readable one, so the
+operator may put projects into named groups. A group exists so that a project is
+found and for nothing else: it holds no retention window, no token and no query,
+and two projects listed under one word are as separate as they were before. See
+[`docs/projects.md`](./docs/projects.md).
+
 **Retention is time-based.** A project keeps its logs for a configured period,
 after which they are removed. Time is the only limit; there are no size or row
 quotas, no "drop oldest when full", and no interaction between different limits.

@@ -62,3 +62,4 @@ material value to understanding the decision.
 - [0036 – A re-enrolment carries its own sealed ticket](./0036-a-re-enrolment-carries-its-own-sealed-ticket.md)
 - [0037 – The installation dumps its own database](./0037-the-installation-dumps-its-own-database.md)
 - [0038 – Both installations pull on a timer, and the tag is the deliberate act](./0038-both-installations-pull-on-a-timer-and-the-tag-is-the-deliberate-act.md)
+- [0039 – A group has an identity and holds nothing](./0039-a-group-has-an-identity-and-holds-nothing.md)

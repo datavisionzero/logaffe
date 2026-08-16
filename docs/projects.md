@@ -7,14 +7,18 @@ rather than retrofitting it, and this is what a project actually is.
 
 ## What a project is
 
-A **name**, a **retention window**, and its **ingest token**. Nothing else.
+A **name**, a **retention window**, and its **ingest token**. Nothing else — the
+group it may sit in belongs to the group rather than to it.
 
-The name is unique within an installation and can be changed at any time. Two
+The name is unique **within its group** and can be changed at any time. Two
 projects called `api` is a trap for the operator who reaches for one of them at
 three in the morning, and the uniqueness is there for that rather than for any
-technical reason. A project is identified by an identity that survives every
-rename, and that identity is what entries, tokens and queries are attached to —
-never the name.
+technical reason — which is why the group relaxes it exactly as far as it
+resolves it. `shop / api` beside `blog / api` names two different things
+wherever either of them appears; two projects called `api` in no group at all are
+the trap itself, and stay refused. A project is identified by an identity that
+survives every rename, and that identity is what entries, tokens and queries are
+attached to — never the name.
 
 Projects are **created explicitly by the operator**. There is no implicit
 creation on first delivery, so a token that names nothing admits nothing, and an
@@ -119,6 +123,49 @@ told how many entries it will put outside the new window, because a settings
 field that silently destroys data is a bad settings field. Raising it again
 brings nothing back — what was swept is gone.
 
+## The group
+
+A project sits in **at most one group**, and a group is a name and the projects
+that name it — one product's staging and production, one customer's
+applications, one operator's idea of what belongs beside what. It exists so that
+an installation holding twenty projects is a list an operator can read, and it
+exists for nothing else.
+
+**A group is for finding, never for asking.** It has no retention window, no
+token, and no query of its own: a search still names one project exactly as it
+did before there were groups ([Querying](./querying.md)), and the separation
+`VISION.md` builds in is untouched by two projects being listed under the same
+word. A group that could be queried would be a second kind of scope in a product
+that has one.
+
+It is nevertheless **a row with its own identity**, surviving every rename, and
+not a word written on each project
+([ADR 0039](./adr/0039-a-group-has-an-identity-and-holds-nothing.md)). Nothing a
+group does today needs an identity. The identity is what makes adding something
+to a group later an addition rather than a migration that has to invent one for
+every string an installation in the field happens to hold.
+
+Groups are **created by the operator**, like projects and for the same reason,
+and they are managed where they are true of every project at once — the
+installation's settings ([The web UI](./ui.md)). A project's own settings name
+the group it is in and nothing more.
+
+**A group may be empty**, both before its first project and after its last one
+leaves. That follows from the identity: a group is something the operator made
+rather than a side effect of what the projects say, so it stays until it is
+removed.
+
+**Deleting a group deletes nothing else.** Its projects are left in no group, the
+act says how many that will be before it happens, and there is no name to type,
+because there is nothing here that cannot be done again in a minute — the guard
+on deleting a project is proportionate to entries that do not come back, and
+wearing it here would say the two acts weigh the same.
+
+**A group holds projects and never another group.** One level is what an
+installation of ten to thirty projects has a use for, and a second one is a tree
+in the interface, a path in every place a project is named, and a question about
+what a nested group would inherit from the one above it.
+
 ## Deleting a project
 
 Deleting is **immediate and irreversible**, and it is confirmed by typing the
@@ -138,11 +185,14 @@ locally, exactly as they would through a botched rotation.
 
 ## Projects belong to the operator alone
 
-Creating, renaming, deleting a project, and issuing, rotating or revoking a
-token, are **operator acts that are not reachable over MCP at all**
+Creating, renaming, deleting a project, issuing, rotating or revoking a token,
+and everything there is to do to a group, are **operator acts that are not
+reachable over MCP at all**
 ([ADR 0018](./adr/0018-projects-and-tokens-are-never-reachable-over-mcp.md)). The
 agent reads entries and counts them; it cannot bring a project into existence,
-end one, or mint a credential.
+end one, mint a credential, or move a project from one group to another. It is
+told which group a project is in, because that is a fact about the project it is
+reading ([MCP](./mcp.md)).
 
 ## What is deliberately not here
 
@@ -156,3 +206,9 @@ end one, or mint a credential.
 - **No size or row quota on a project.** Time is the only limit.
 - **No export or import of a project.** Backing an installation up is a database
   matter and `VISION.md` documents it as one.
+- **No group that carries anything.** A group is a name: no retention window its
+  projects inherit, no token, no colour, no icon, no description
+  ([ADR 0039](./adr/0039-a-group-has-an-identity-and-holds-nothing.md)).
+- **No group to query.** A search names one project, and putting two projects
+  under one word does not make them one ([Querying](./querying.md)).
+- **No nested groups, and no project in two of them.** Covered above.

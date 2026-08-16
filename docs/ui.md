@@ -40,6 +40,23 @@ closed. That last case is why the number is on the list rather than only in the
 project's settings: a project nothing can deliver to should be visible without
 opening each one in turn.
 
+### The list is grouped once there are groups
+
+Projects that sit in a group are listed **under its name**; projects in no group
+come first, with no heading over them. An installation that uses no groups
+therefore reads exactly as it did before there were any, and the first group an
+operator makes is the first heading the list has ever had.
+
+Groups are in the order of their names and there is nothing to drag. A
+hand-arranged order is a position stored per group, a way to change it, and an
+answer to where a new group lands — bought so that a list of five headings can be
+in a different order than alphabetical.
+
+**A group with no projects in it says so** rather than being left out. It is
+something the operator made and not a side effect of what the projects say
+([Projects and tokens](./projects.md)), and a list that quietly omits it is a
+list that answers *where did the group I just created go*.
+
 ## The shell navigates on two levels
 
 Every screen above sits under one bar, and it is the only place this product
@@ -66,7 +83,13 @@ another is the frequent act and it should never be a trip back to a start page.
 It is a menu rather than a bare control, and it does two jobs: it names the
 project being read — which is the only place that name appears while the log is
 on the screen — and it opens on the other projects and on the way back to the
-list.
+list. The menu carries the same headings the list does, for the same reason.
+
+**It names the group beside the project**, because a project's name is unique
+only within its group ([Projects and tokens](./projects.md)) and this is the one
+place a project is named while its list is nowhere on the screen. Reading `api`
+alone above a log that could be either of two would be the three-in-the-morning
+trap moved rather than removed.
 
 ## The log view
 
@@ -273,10 +296,11 @@ true of every project at once.
 
 ### Each screen is its areas
 
-Both screens are three **areas**, listed beside what is being read and marked
-while it is: *the project*, *ingest tokens* and *delete this project*; *signed-in
-browsers*, *agent tokens* and *your credentials*. One is on the screen at a time.
-Stacked, the answer to *where is the retention window* was to read the page.
+Both screens are their **areas**, listed beside what is being read and marked
+while it is: a project's are *the project*, *ingest tokens* and *delete this
+project*; the installation's are *signed-in browsers*, *agent tokens*, *your
+credentials* and *groups*. One is on the screen at a time. Stacked, the answer to
+*where is the retention window* was to read the page.
 
 **An area is an address**, so a reload comes back to it and the back button walks
 the ones just opened — the same thing the log view does with a filter set. The
@@ -294,9 +318,13 @@ destroys data and cannot be undone should be arrived at rather than scrolled
 past. The three credentials stay together on one area, because they are three
 acts on one account rather than three subjects.
 
-Per project: the name, the retention window with its warning about what lowering
-it removes, the ingest tokens with when each was last used, and deletion
-confirmed by typing the project's name ([Projects and tokens](./projects.md)).
+Per project: the name, the group it is in — one of the installation's, or none —
+the retention window with its warning about what lowering it removes, the ingest
+tokens with when each was last used, and deletion confirmed by typing the
+project's name ([Projects and tokens](./projects.md)). The group is chosen here
+and made elsewhere: a project's settings say where the project sits, and a screen
+about one project is the wrong place to bring into existence a thing that outlives
+it.
 
 Per installation: the sessions with where and when each was last used and the
 means to end them ([Signing in](./sign-in.md)), re-enrolment of the second
@@ -308,6 +336,15 @@ recorded ([ADR 0033](./adr/0033-the-last-use-of-a-token-is-written-coarsely.md))
 The agent tokens live here rather than inside a project because an agent token
 reads every project — putting it under one of them would say something untrue
 about what it can do.
+
+**The groups are here for the same reason**: a group is a fact about the
+installation's projects taken together, and no single project's screen can hold
+one. The area lists them with how many projects each holds, and creates, renames
+and removes one. **Removing is a plain act** — it says how many projects it will
+leave in no group and asks for nothing to be typed, because nothing here is
+destroyed and the typed name on a project's deletion is proportionate to entries
+that do not come back
+([ADR 0039](./adr/0039-a-group-has-an-identity-and-holds-nothing.md)).
 
 ## The interface asks for nothing unasked
 
@@ -323,7 +360,12 @@ running on two cores has better things to do than answer questions nobody asked.
 - **No dashboard, no home screen with numbers, no saved searches or pinned
   queries.** Settled in [Querying](./querying.md); the URL is where a filter set
   is kept.
-- **No cross-project view.** A view names one project, exactly as a query does.
+- **No cross-project view, and a group is not one.** A view names one project,
+  exactly as a query does; a group puts two of them under one heading and changes
+  nothing about what either can be asked.
+- **No nested groups, and no dragging them into an order.** Settled in
+  [Projects and tokens](./projects.md); the headings are in the order of their
+  names.
 - **No grouping of entries by message template.** The template is not shown at
   all (ADR 0005), and collapsing repeated events into patterns is the analysis
   product `VISION.md` says logaffe is not.

@@ -75,8 +75,18 @@ _Avoid_: Password reset, admin override, rescue mode, break-glass, escape hatch
 **Project**:
 The unit of separation: every log entry belongs to exactly one, the operator
 creates them explicitly, and separation holds in storage, in the UI and in agent
-access alike. It owns its retention window and its ingest tokens.
+access alike. It owns its retention window and its ingest tokens, and it sits in
+at most one **Group**, which changes nothing about what it is.
 _Avoid_: Application, service, tenant, stream, bucket, source, workspace
+
+**Group**:
+The set of projects an operator keeps together so they are found together — one
+product's environments, one customer's applications. It has an identity that
+survives its rename and carries nothing besides a name: no retention window, no
+token, and nothing that can be asked of it, because a query still names one
+project. A project sits in at most one, a group never holds another group, and a
+group with no projects in it is an ordinary state rather than an error.
+_Avoid_: Folder, tag, label, namespace, team, workspace, environment, category
 
 **Ingest Token**:
 The write-only secret that admits a delivery to one project. It permits writing
