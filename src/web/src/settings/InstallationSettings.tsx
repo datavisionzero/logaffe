@@ -2,6 +2,7 @@ import { useParams } from "react-router";
 import { AgentTokens } from "./AgentTokens";
 import { BackupCodes } from "./BackupCodes";
 import { ChangePassword } from "./ChangePassword";
+import { Groups } from "./Groups";
 import { SecondFactor } from "./SecondFactor";
 import { Sessions } from "./Sessions";
 import { SettingsScreen } from "./SettingsScreen";
@@ -16,12 +17,16 @@ import { SettingsScreen } from "./SettingsScreen";
  * recovery, no export and no backup button, because those are verbs on the
  * binary and are never reachable over the network (ADR 0013).
  *
- * What is left is the three things that are the installation's rather than a
- * project's, and they are three areas because that is what they are: the
- * browsers signed in, the tokens agents read with, and the operator's own
- * credentials. The first two are lists of what exists and the third is three
- * acts on one account, which is why the three credentials stay together on one
- * area rather than becoming three.
+ * What is left is the four things that are the installation's rather than a
+ * project's, and they are four areas because that is what they are: the browsers
+ * signed in, the tokens agents read with, the operator's own credentials, and
+ * the groups the projects are listed under. Three of them are lists of what
+ * exists and the credentials are three acts on one account, which is why those
+ * stay together on one area rather than becoming three.
+ *
+ * The groups are here for the same reason the agent tokens are: a group is a
+ * fact about the projects taken together, and no single project's screen can
+ * hold one (ADR 0039).
  */
 export function InstallationSettings() {
   const { section } = useParams();
@@ -54,6 +59,7 @@ export function InstallationSettings() {
             </>
           ),
         },
+        { at: "groups", name: "Groups", panel: <Groups /> },
       ]}
     />
   );

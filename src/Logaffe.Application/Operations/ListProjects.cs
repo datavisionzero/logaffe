@@ -17,9 +17,15 @@ namespace Logaffe.Application.Operations;
 /// received one — the one fact both consumers want at a glance, because it is
 /// what says whether an application is still delivering.
 /// </param>
+/// <param name="GroupId">
+/// The group the project is listed under, or <c>null</c> for one in no group.
+/// The name of that group is on the group list rather than repeated here, which
+/// is also what lets a group with no projects in it be shown at all.
+/// </param>
 public sealed record ListedProject(
     Guid Id,
     string Name,
+    Guid? GroupId,
     RetentionWindow Retention,
     DateTimeOffset CreatedAt,
     int IngestTokens,
@@ -63,6 +69,7 @@ public sealed class ListProjects(IProjects projects, ITokens tokens, IEntryReade
             listed.Add(new ListedProject(
                 project.Id,
                 project.Name,
+                project.GroupId,
                 project.Retention,
                 project.CreatedAt,
                 counts.TryGetValue(project.Id, out var count) ? count : 0,

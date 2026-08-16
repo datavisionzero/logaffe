@@ -61,7 +61,7 @@ public sealed class RestoreTests(PostgresFixture postgres) : IDisposable
 
         var restored = await RestoreIntoAsync(elsewhere, into, artifact);
 
-        Assert.Equal(8, restored.Tables);
+        Assert.Equal(9, restored.Tables);
         Assert.Equal(original.Migration, restored.Manifest.Migration);
 
         await using var context = ContextFor(elsewhere.ConnectionString);
@@ -138,15 +138,19 @@ public sealed class RestoreTests(PostgresFixture postgres) : IDisposable
         // The same artifact with a migration id from a logaffe that does not
         // exist yet, which is what an operator downgrading their image would be
         // holding.
-        var fromTheFuture = Rewritten(
-            artifact, original.Migration, "29991231235959_TooNew0000");
+        // Padded to the length of the id it replaces, so that the tar's own
+        // bookkeeping still adds up whatever this binary's latest migration
+        // happens to be called.
+        var tooNew = "29991231235959_TooNew".PadRight(original.Migration.Length, '0');
+
+        var fromTheFuture = Rewritten(artifact, original.Migration, tooNew);
 
         var elsewhere = await AnInstallationAsync(into, "something-else");
 
         var refusal = await Assert.ThrowsAsync<ArtifactRefusedException>(() =>
             RestoreIntoAsync(elsewhere, into, fromTheFuture));
 
-        Assert.Contains("29991231235959_TooNew0000", refusal.Message);
+        Assert.Contains(tooNew, refusal.Message);
 
         await using var context = ContextFor(elsewhere.ConnectionString);
 

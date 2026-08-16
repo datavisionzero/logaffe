@@ -127,6 +127,15 @@ builder.Services.AddScoped<ChangeRetentionWindow>();
 builder.Services.AddScoped<CountEntriesOutsideWindow>();
 builder.Services.AddScoped<DeleteProject>();
 
+// The heading a project is listed under, which carries a name and nothing else
+// (ADR 0039). Nothing here reads across the projects a group holds: a query
+// names one project, and a group is not one.
+builder.Services.AddScoped<CreateGroup>();
+builder.Services.AddScoped<ListGroups>();
+builder.Services.AddScoped<RenameGroup>();
+builder.Services.AddScoped<DeleteGroup>();
+builder.Services.AddScoped<MoveProjectToGroup>();
+
 // The read the ingestion path exists for, and the one surface both consumers
 // meet: the four MCP tools call exactly these and add no query behaviour of
 // their own (`docs/querying.md`).
@@ -207,6 +216,7 @@ app.MapClaim();
 app.MapSessions();
 app.MapOperator();
 app.MapProjects();
+app.MapGroups();
 app.MapEntries();
 app.MapTokens();
 app.MapIngest();

@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link, NavLink, Route, Routes, useLocation } from "react-router";
 import { api } from "../api/client";
 import { ProjectList } from "../projects/ProjectList";
 import { ProjectScreen } from "../projects/ProjectScreen";
 import { ProjectSwitcher } from "../projects/ProjectSwitcher";
+import { GroupsProvider } from "../projects/groups";
 import { projectIdIn, ProjectsProvider, useProjects } from "../projects/projects";
 import { InstallationSettings } from "../settings/InstallationSettings";
 import { ProjectSettings } from "../settings/ProjectSettings";
@@ -43,7 +44,7 @@ export function Shell({
   }
 
   return (
-    <ProjectsProvider>
+    <WhatTheInstallationHolds>
       <header className="shell">
         <div className="shell-bar">
           <Link to="/" className="wordmark">
@@ -108,6 +109,24 @@ export function Shell({
           <Route path="*" element={<ProjectList />} />
         </Routes>
       </main>
+    </WhatTheInstallationHolds>
+  );
+}
+
+/**
+ * The two answers every screen below is a reading of: the projects, and the
+ * headings they are listed under.
+ *
+ * They are two requests and one moment — the application asks for both once,
+ * when a session starts, and never again on a timer. The groups are not folded
+ * into the project rows because a group holding no projects is one the operator
+ * made and has to be shown all the same (`docs/ui.md`), and nothing the projects
+ * say would carry it.
+ */
+function WhatTheInstallationHolds({ children }: { children: ReactNode }) {
+  return (
+    <ProjectsProvider>
+      <GroupsProvider>{children}</GroupsProvider>
     </ProjectsProvider>
   );
 }

@@ -9,6 +9,7 @@ import {
   anInstallationAnswering,
   claimed,
   lapsed,
+  noGroups,
   unclaimed,
 } from "./shared/testing";
 
@@ -45,6 +46,7 @@ describe("the first screen", () => {
   it("is the project list on a claimed installation", async () => {
     anInstallationAnswering({
       "GET /claim": claimed,
+      "GET /groups": noGroups,
       "GET /projects": { body: [aProject({ id: "3f0", name: "checkout" })] },
     });
 
@@ -56,6 +58,7 @@ describe("the first screen", () => {
   it("is the sign-in when the session is refused", async () => {
     anInstallationAnswering({
       "GET /claim": claimed,
+      "GET /groups": noGroups,
       "GET /projects": { status: 401 },
     });
 
@@ -109,6 +112,7 @@ describe("signing in", () => {
   it("reaches the project list, and says what a spent backup code left", async () => {
     anInstallationAnswering({
       "GET /claim": claimed,
+      "GET /groups": noGroups,
       "GET /projects": [{ status: 401 }, { body: [aProject({ id: "3f0", name: "checkout" })] }],
       "POST /sign-in": { body: { backupCodesRemaining: 7 } },
     });
@@ -132,6 +136,7 @@ describe("signing in", () => {
   it("says one thing for every way of not getting in", async () => {
     anInstallationAnswering({
       "GET /claim": claimed,
+      "GET /groups": noGroups,
       "GET /projects": { status: 401 },
       "POST /sign-in": { status: 401 },
     });

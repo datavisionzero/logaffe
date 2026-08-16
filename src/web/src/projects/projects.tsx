@@ -17,6 +17,12 @@ import { api, asInstant, asNumber } from "../api/client";
 export interface HeldProject {
   id: string;
   name: string;
+  /**
+   * The group it is listed under, and `null` for one in no group. It is the
+   * identity rather than the name: the name is on the group list, which is also
+   * where a group holding nothing is found.
+   */
+  groupId: string | null;
   retentionDays: number;
   createdAt: Date;
   /**
@@ -163,6 +169,7 @@ export function NoSuchProject() {
 function held(project: {
   id: string;
   name: string;
+  groupId: string | null;
   retentionDays: number | string;
   createdAt: string;
   ingestTokens: number | string;
@@ -171,6 +178,7 @@ function held(project: {
   return {
     id: project.id,
     name: project.name,
+    groupId: project.groupId,
     retentionDays: asNumber(project.retentionDays),
     createdAt: asInstant(project.createdAt),
     ingestTokens: asNumber(project.ingestTokens),

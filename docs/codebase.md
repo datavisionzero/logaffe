@@ -46,8 +46,9 @@ cheapest possible check that nothing has leaked into it.
 
 **`Logaffe.Domain` holds the rules.** The entry and its level, the two clocks, the
 message template and the rendered form, the trace and span as the byte lengths
-they actually are, the caps and the truncation, the project and its retention
-window, the two tokens with the identifier and the alphabet they are written in,
+they actually are, the caps and the truncation, the project with its retention
+window and the group it is listed under, the two tokens with the identifier and
+the alphabet they are written in,
 the operator with the session, the backup code and the claim window, and the
 filters with the cursor. The test of whether something belongs here is stated
 in ADR 0030: **anything the documents already state as a rule.** A retention
@@ -56,8 +57,8 @@ constructed with two characters, is a rule that escaped.
 
 **`Logaffe.Application` holds the use cases and the ports.** Authenticating a
 presented token, ingesting a batch, searching, counting, fetching one entry, the
-project and token acts, the claim and the sign-in, the retention sweep, the
-backup and the recovery. Every one of them is reachable from more than one
+project, group and token acts, the claim and the sign-in, the retention sweep,
+the backup and the recovery. Every one of them is reachable from more than one
 adapter or is a candidate to become so, and none of them knows what it is being
 called by — the first is called by both public endpoints and is the plainest
 case. Beside them sit the ports — a writer and a reader for entries, stores for

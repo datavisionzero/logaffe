@@ -50,12 +50,13 @@ public sealed class BackupTests(PostgresFixture postgres)
         Assert.Equal(
             [
                 "agent_token", "backup_code", "claim_window", "ingest_token",
-                "log_entry", "operator", "project", "session",
+                "log_entry", "operator", "project", "project_group", "session",
             ],
             names.Order(StringComparer.Ordinal));
 
-        // The three foreign keys in the schema, each read as "after".
+        // The four foreign keys in the schema, each read as "after".
         Assert.True(Array.IndexOf(names, "project") < Array.IndexOf(names, "ingest_token"));
+        Assert.True(Array.IndexOf(names, "project_group") < Array.IndexOf(names, "project"));
         Assert.True(Array.IndexOf(names, "operator") < Array.IndexOf(names, "session"));
         Assert.True(Array.IndexOf(names, "operator") < Array.IndexOf(names, "backup_code"));
     }

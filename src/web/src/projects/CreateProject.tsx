@@ -40,7 +40,11 @@ export function CreateProject({ onCreated }: { onCreated: () => void }) {
       if (response.status === 409) {
         // Two projects called `api` is a trap for the operator reaching for one
         // of them at three in the morning.
-        setProblems({ name: "This installation already holds a project by that name." });
+        // A project is created in no group and put into one afterwards, so the
+        // name it has to be free of is the one the ungrouped projects hold.
+        setProblems({
+          name: "This installation already holds a project by that name, in no group.",
+        });
         return;
       }
 

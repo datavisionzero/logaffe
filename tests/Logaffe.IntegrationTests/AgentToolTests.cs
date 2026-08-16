@@ -307,6 +307,36 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
         // Nothing has been delivered to it, which is a fact and not a missing
         // one: an agent reads this before asking anything else.
         Assert.Null(project.LastReceivedAt);
+
+        // And it is in no group, which is the ordinary case.
+        Assert.Null(project.Group);
+    }
+
+    [Fact]
+    public async Task A_project_carries_the_group_it_is_listed_under()
+    {
+        using var client = await SignedInAsync();
+
+        var group = await ReadAsync<GroupBody>(await client.PostAsJsonAsync(
+            "/groups", new { name = "shop" }, TestContext.Current.CancellationToken));
+        var created = await CreateAsync(client, "orders");
+
+        using var moved = await client.PutAsJsonAsync(
+            $"/projects/{created.Id}/group",
+            new { groupId = group.Id },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, moved.StatusCode);
+
+        await using var agent = await ConnectAsync();
+
+        var listed = await CallAsync<ProjectsBody>(agent, "list_projects", []);
+        var project = Assert.Single(listed.Projects);
+
+        // The name and not the identity: it is what resolves a request naming
+        // "the production one of shop", and it rides on the project rather than
+        // being a fifth tool (`docs/mcp.md`). It narrows nothing — every tool
+        // still reads one project.
+        Assert.Equal("shop", project.Group);
     }
 
     [Fact]
@@ -848,6 +878,8 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
     private sealed record ProjectBody(
         Guid Id, string Name, int RetentionDays, DateTimeOffset CreatedAt);
 
+    private sealed record GroupBody(Guid Id, string Name, DateTimeOffset CreatedAt);
+
     private sealed record IssuedTokenBody(Guid Id, string Token);
 
     private sealed record ProjectsBody(IReadOnlyList<AgentProjectBody> Projects);
@@ -855,6 +887,7 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
     private sealed record AgentProjectBody(
         Guid Id,
         string Name,
+        string? Group,
         int RetentionDays,
         DateTimeOffset CreatedAt,
         DateTimeOffset? LastReceivedAt);

@@ -28,6 +28,7 @@ public static class InfrastructureServices
         services.AddScoped<IDatabaseProbe, DatabaseProbe>();
         services.AddScoped<ISealedSecrets, SealedSecrets>();
         services.AddScoped<IProjects, Projects>();
+        services.AddScoped<IGroups, Groups>();
         services.AddScoped<ITokens, Tokens>();
         services.AddScoped<IInstallation, Installation>();
         services.AddScoped<IOperators, Operators>();

@@ -41,7 +41,7 @@ export function ProjectName({
       }
 
       if (response.status === 409) {
-        setProblem("This installation already holds a project by that name.");
+        setProblem("This project's group already holds a project by that name.");
         return;
       }
 
@@ -66,7 +66,7 @@ export function ProjectName({
     <section>
       <h2>Name</h2>
       <p>
-        Unique within this installation, and the only thing about a project a person
+        Unique within this project's group, and the only thing about a project a person
         reads. Renaming moves nothing: entries, tokens and queries are attached to the
         project's identity, so no sender notices and nothing has to be redeployed.
       </p>

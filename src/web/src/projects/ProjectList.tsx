@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { formatTimestamp } from "../shared/time";
 import { CreateProject } from "./CreateProject";
+import { arrangedByGroup, useGroups } from "./groups";
 import { useProjects, type HeldProject } from "./projects";
 
 /**
@@ -13,9 +14,15 @@ import { useProjects, type HeldProject } from "./projects";
  * a glance — when that project last received an entry — and how many ingest
  * tokens it holds, so that a project whose door is closed is visible without
  * opening each one in turn.
+ *
+ * **It is grouped once there are groups.** Projects in no group come first and
+ * with no heading over them, so an installation that uses none reads exactly as
+ * it did before there were any; the groups follow in the order of their names,
+ * and there is nothing to drag.
  */
 export function ProjectList() {
   const { state, reload } = useProjects();
+  const { state: groups } = useGroups();
   const [creating, setCreating] = useState(false);
 
   if (state.status === "asking") {
@@ -39,25 +46,32 @@ export function ProjectList() {
     );
   }
 
+  const { ungrouped, grouped } = arrangedByGroup(
+    state.projects,
+    groups.status === "held" ? groups.groups : [],
+  );
+
   return (
     <section className="narrow">
       <h1>Projects</h1>
 
-      <table className="projects">
-        <thead>
-          <tr>
-            <th scope="col">Project</th>
-            <th scope="col">Last entry received</th>
-            <th scope="col">Ingest tokens</th>
-            <th scope="col">Kept for</th>
-          </tr>
-        </thead>
-        <tbody>
-          {state.projects.map((project) => (
-            <ProjectRow key={project.id} project={project} />
-          ))}
-        </tbody>
-      </table>
+      {ungrouped.length > 0 && <Projects projects={ungrouped} />}
+
+      {grouped.map(({ group, projects }) => (
+        <section key={group.id} className="project-group">
+          <h2>{group.name}</h2>
+
+          {/* A group with nothing in it says so rather than being left out: it
+              is something the operator made and not a side effect of what the
+              projects say, and a list that omitted it would answer *where did
+              the group I just created go* (ADR 0039). */}
+          {projects.length === 0 ? (
+            <p className="quiet">No projects are in this group.</p>
+          ) : (
+            <Projects projects={projects} />
+          )}
+        </section>
+      ))}
 
       {creating ? (
         <section>
@@ -75,6 +89,30 @@ export function ProjectList() {
         </button>
       )}
     </section>
+  );
+}
+
+/**
+ * The rows themselves, which are the same wherever they stand: the headings
+ * above them say where they are, and nothing on a row repeats it.
+ */
+function Projects({ projects }: { projects: HeldProject[] }) {
+  return (
+    <table className="projects">
+      <thead>
+        <tr>
+          <th scope="col">Project</th>
+          <th scope="col">Last entry received</th>
+          <th scope="col">Ingest tokens</th>
+          <th scope="col">Kept for</th>
+        </tr>
+      </thead>
+      <tbody>
+        {projects.map((project) => (
+          <ProjectRow key={project.id} project={project} />
+        ))}
+      </tbody>
+    </table>
   );
 }
 

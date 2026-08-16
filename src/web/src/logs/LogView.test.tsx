@@ -9,6 +9,7 @@ import { anInstallationAnswering, type Answer } from "../shared/testing";
 const PROJECT: HeldProject = {
   id: "p1",
   name: "checkout",
+  groupId: null,
   retentionDays: 30,
   createdAt: new Date("2026-08-01T09:00:00.000Z"),
   ingestTokens: 1,

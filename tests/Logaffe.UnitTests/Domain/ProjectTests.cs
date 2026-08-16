@@ -29,6 +29,21 @@ public sealed class ProjectTests
         Assert.Equal("orders-api", project.Name);
     }
 
+    [Fact]
+    public void A_project_is_in_no_group_until_it_is_moved_into_one()
+    {
+        var project = Project.Create("api", RetentionWindow.OfDays(14), Now);
+        Assert.Null(project.GroupId);
+
+        var group = Guid.CreateVersion7();
+        project.MoveTo(group);
+        Assert.Equal(group, project.GroupId);
+
+        // And back out again, which destroys nothing either way.
+        project.MoveTo(null);
+        Assert.Null(project.GroupId);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]

@@ -22,6 +22,13 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
 {
     public DbSet<Project> Projects => Set<Project>();
 
+    /// <summary>
+    /// The headings the projects are listed under. A group carries a name and
+    /// nothing else, and a set with no rows in it is an installation that has
+    /// never needed one (ADR 0039).
+    /// </summary>
+    public DbSet<Group> Groups => Set<Group>();
+
     public DbSet<IngestToken> IngestTokens => Set<IngestToken>();
 
     public DbSet<AgentToken> AgentTokens => Set<AgentToken>();

@@ -51,6 +51,13 @@ public sealed record AgentProject(
     [property: Description("Names this project in every other tool.")]
     Guid Id,
     string Name,
+    [property: Description(
+        "The group this project is listed under, or absent when it is in none. "
+        + "It is the operator's own word for a set of projects that belong "
+        + "together — one product's environments, one customer's applications — "
+        + "and it is what resolves a request naming one of those. It narrows "
+        + "nothing: every tool reads one project, and a group is not one.")]
+    string? Group,
     [property: Description("How long the project keeps its entries, counted from receipt.")]
     int RetentionDays,
     DateTimeOffset CreatedAt,
@@ -60,9 +67,14 @@ public sealed record AgentProject(
         + "question there is about one.")]
     DateTimeOffset? LastReceivedAt)
 {
-    public static AgentProject Of(ListedProject project) => new(
+    /// <param name="group">
+    /// The name of the group the project points at, which the caller resolves —
+    /// a project carries the identity, and the name is on the group list.
+    /// </param>
+    public static AgentProject Of(ListedProject project, string? group) => new(
         project.Id,
         project.Name,
+        group,
         project.Retention.Days,
         project.CreatedAt,
         project.LastReceivedAt);

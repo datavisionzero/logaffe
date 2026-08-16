@@ -36,10 +36,20 @@ public interface IProjects
     Task<Project?> FindAsync(Guid id, CancellationToken cancellationToken);
 
     /// <summary>
-    /// The project holding this name, or <c>null</c> when the name is free. The
-    /// name given is the one <see cref="Project.NormalizeName"/> produced.
+    /// The project holding this name in that group, or <c>null</c> when the name
+    /// is free there. The name given is the one
+    /// <see cref="Project.NormalizeName"/> produced, and
+    /// <paramref name="groupId"/> is <c>null</c> for the projects in no group,
+    /// among which a name is taken exactly as it is inside one.
     /// </summary>
-    Task<Project?> FindAsync(string name, CancellationToken cancellationToken);
+    Task<Project?> FindAsync(string name, Guid? groupId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// How many projects each group holds, keyed by the group's identity. It is
+    /// one grouped read rather than one per group, and a group nothing points at
+    /// is absent rather than zero.
+    /// </summary>
+    Task<IReadOnlyDictionary<Guid, int>> CountByGroupAsync(CancellationToken cancellationToken);
 
     Task AddAsync(Project project, CancellationToken cancellationToken);
 

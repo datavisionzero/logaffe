@@ -2,9 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
+import { GroupsProvider } from "../projects/groups";
 import { ProjectsProvider } from "../projects/projects";
 import { ProjectSettings } from "./ProjectSettings";
-import { aProject, anInstallationAnswering, type Answer } from "../shared/testing";
+import { aGroup, aProject, anInstallationAnswering, noGroups, type Answer } from "../shared/testing";
 
 /** One of a project's tokens, carrying no secret — a list decrypts nothing. */
 function anIngestToken(token: {
@@ -28,6 +29,7 @@ const ONE_TOKEN: Answer = {
 /** The screen at one of its areas, which is an address like any other. */
 function open(routes: Record<string, Answer | Answer[]>, at = "/project/p1/settings") {
   const installation = anInstallationAnswering({
+    "GET /groups": noGroups,
     "GET /projects": { body: [aProject({ id: "p1", name: "checkout", retentionDays: 30 })] },
     "GET /projects/p1/ingest-tokens": ONE_TOKEN,
     ...routes,
@@ -36,11 +38,13 @@ function open(routes: Record<string, Answer | Answer[]>, at = "/project/p1/setti
   render(
     <MemoryRouter initialEntries={[at]}>
       <ProjectsProvider>
-        <Routes>
-          <Route path="/project/:id/settings" element={<ProjectSettings />} />
-          <Route path="/project/:id/settings/:section" element={<ProjectSettings />} />
-          <Route path="/" element={<h1>Projects</h1>} />
-        </Routes>
+        <GroupsProvider>
+          <Routes>
+            <Route path="/project/:id/settings" element={<ProjectSettings />} />
+            <Route path="/project/:id/settings/:section" element={<ProjectSettings />} />
+            <Route path="/" element={<h1>Projects</h1>} />
+          </Routes>
+        </GroupsProvider>
       </ProjectsProvider>
     </MemoryRouter>,
   );
@@ -76,9 +80,9 @@ describe("the areas", () => {
 
     await screen.findByLabelText("Name");
 
-    // The project is read off the list the shell already fetched, and the
-    // tokens belong to an area nobody has opened.
-    expect(installation.asked).toEqual(["GET /projects"]);
+    // The project is read off the list the shell already fetched, the groups
+    // off the one beside it, and the tokens belong to an area nobody opened.
+    expect([...installation.asked].sort()).toEqual(["GET /groups", "GET /projects"]);
   });
 });
 
@@ -162,6 +166,48 @@ describe("the name", () => {
 
     expect(
       await screen.findByText(/already holds a project by that name/i),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("the group", () => {
+  it("moves the project under another heading and nothing else", async () => {
+    const installation = open({
+      "GET /groups": { body: [aGroup({ id: "g1", name: "shop" })] },
+      "PUT /projects/p1/group": {},
+    });
+
+    const operator = userEvent.setup();
+
+    await operator.selectOptions(await screen.findByLabelText("Group"), "g1");
+
+    await waitFor(() => expect(installation.asked).toContain("PUT /projects/p1/group"));
+    expect(await screen.findByText("Moved.")).toBeInTheDocument();
+  });
+
+  it("refuses a move into a group that already holds the name", async () => {
+    open({
+      "GET /groups": { body: [aGroup({ id: "g1", name: "shop", projects: 1 })] },
+      "PUT /projects/p1/group": { status: 409 },
+    });
+
+    const operator = userEvent.setup();
+
+    await operator.selectOptions(await screen.findByLabelText("Group"), "g1");
+
+    // Renaming a project nobody asked to rename is not this screen's to do.
+    expect(
+      await screen.findByText(/already holds a project by this name/i),
+    ).toBeInTheDocument();
+  });
+
+  it("points at where a group is made when there are none", async () => {
+    open({});
+
+    // A screen about one project is the wrong place to bring into existence a
+    // thing that outlives it (`docs/ui.md`).
+    expect(
+      await screen.findByRole("link", { name: /make one in the installation's settings/i }),
     ).toBeInTheDocument();
   });
 });

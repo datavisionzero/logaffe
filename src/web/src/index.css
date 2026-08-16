@@ -228,6 +228,31 @@ header.shell {
   color: var(--quiet);
 }
 
+/* A heading inside the menu and not something to choose: a group is for finding
+   a project, never for opening. */
+.switcher-group {
+  margin: 0.5rem 0 0.15rem;
+  padding: 0 0.5rem;
+  color: var(--quiet);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.switcher-menu ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The groups on the project list. The projects in no group come first and carry
+   no heading at all, so an installation using none reads as it always did. */
+.project-group h2 {
+  margin: 1.5rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
 /* The project list: a list of projects and not a dashboard. */
 table.projects {
   width: 100%;

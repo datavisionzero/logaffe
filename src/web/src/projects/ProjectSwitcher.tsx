@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 import { addressOf, carriedToAnotherProject, filtersIn } from "../logs/filters";
+import { arrangedByGroup, groupOf, useGroups } from "./groups";
 import { projectIdIn, useProjects } from "./projects";
 
 /**
@@ -19,9 +20,16 @@ import { projectIdIn, useProjects } from "./projects";
  * minutes in the other service" one click. An instance, a logger name, a trace
  * or a search text belongs to the project it was found in, and carrying it into
  * another one would produce an empty list that looks like an outage.
+ *
+ * **It names the group beside the project.** A project's name is unique only
+ * within its group (`docs/projects.md`), and this is the one place a project is
+ * named while the list it stands in is nowhere on the screen — reading `api`
+ * alone above a log that could be either of two would be the three-in-the-
+ * morning trap moved rather than removed.
  */
 export function ProjectSwitcher() {
   const { state } = useProjects();
+  const { state: groups } = useGroups();
   const { pathname, search } = useLocation();
   const [open, setOpen] = useState(false);
 
@@ -65,6 +73,12 @@ export function ProjectSwitcher() {
   const at = projectIdIn(pathname);
   const held = state.projects.find((project) => project.id === at) ?? null;
   const carried = addressOf(carriedToAnotherProject(filtersIn(new URLSearchParams(search))));
+  const under = held === null ? null : groupOf(held, groups);
+
+  const { ungrouped, grouped } = arrangedByGroup(
+    state.projects,
+    groups.status === "held" ? groups.groups : [],
+  );
 
   return (
     <div className="switcher" ref={box}>
@@ -76,10 +90,12 @@ export function ProjectSwitcher() {
         onClick={() => setOpen(!open)}
       >
         {/* Two spans and the space between them, which is what the button is
-            called: "Project billing" and not the two run together. */}
+            called: "Project billing" and not the two run together. The group
+            stands in front of the name where there is one, because the name
+            alone is unique only inside it. */}
         <span className="switcher-label">Project</span>{" "}
         <span className={held === null ? "switcher-name quiet" : "switcher-name"}>
-          {held === null ? "Choose a project" : held.name}
+          {held === null ? "Choose a project" : under === null ? held.name : `${under} / ${held.name}`}
         </span>
         <span aria-hidden="true">▾</span>
       </button>
@@ -91,7 +107,9 @@ export function ProjectSwitcher() {
             <Link to="/">All projects</Link>
           </li>
 
-          {state.projects.map((project) => (
+          {/* The same arrangement the list has, for the same reason: the
+              projects in no group first, then the groups by name. */}
+          {ungrouped.map((project) => (
             <li key={project.id}>
               <Link
                 to={`/project/${project.id}${carried}`}
@@ -101,6 +119,28 @@ export function ProjectSwitcher() {
               </Link>
             </li>
           ))}
+
+          {grouped
+            .filter(({ projects }) => projects.length > 0)
+            .map(({ group, projects }) => (
+              <li key={group.id}>
+                {/* A heading in a menu and not a thing to choose: a group is
+                    for finding a project, never for opening. */}
+                <p className="switcher-group">{group.name}</p>
+                <ul>
+                  {projects.map((project) => (
+                    <li key={project.id}>
+                      <Link
+                        to={`/project/${project.id}${carried}`}
+                        aria-current={project.id === at ? "true" : undefined}
+                      >
+                        {project.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
         </ul>
       )}
     </div>

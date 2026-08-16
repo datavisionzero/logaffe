@@ -21,8 +21,23 @@ public sealed class Projects(LogaffeDbContext context) : IProjects
     public Task<Project?> FindAsync(Guid id, CancellationToken cancellationToken) =>
         context.Projects.SingleOrDefaultAsync(p => p.Id == id, cancellationToken);
 
-    public Task<Project?> FindAsync(string name, CancellationToken cancellationToken) =>
-        context.Projects.SingleOrDefaultAsync(p => p.Name == name, cancellationToken);
+    public Task<Project?> FindAsync(
+        string name, Guid? groupId, CancellationToken cancellationToken) =>
+        context.Projects.SingleOrDefaultAsync(
+            p => p.Name == name && p.GroupId == groupId, cancellationToken);
+
+    /// <remarks>
+    /// One grouped read over a table holding tens of rows. The projects in no
+    /// group are left out rather than counted under a key that does not exist —
+    /// the list they appear on has no heading over them.
+    /// </remarks>
+    public async Task<IReadOnlyDictionary<Guid, int>> CountByGroupAsync(
+        CancellationToken cancellationToken) =>
+        await context.Projects
+            .Where(p => p.GroupId != null)
+            .GroupBy(p => p.GroupId!.Value)
+            .Select(held => new { Group = held.Key, Projects = held.Count() })
+            .ToDictionaryAsync(held => held.Group, held => held.Projects, cancellationToken);
 
     public async Task AddAsync(Project project, CancellationToken cancellationToken)
     {

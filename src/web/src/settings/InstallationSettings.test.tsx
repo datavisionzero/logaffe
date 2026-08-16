@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router";
+import { GroupsProvider } from "../projects/groups";
+import { ProjectsProvider } from "../projects/projects";
 import { InstallationSettings } from "./InstallationSettings";
-import { anInstallationAnswering, type Answer } from "../shared/testing";
+import { aGroup, anInstallationAnswering, type Answer } from "../shared/testing";
 
 function aSession(session: {
   id: string;
@@ -397,5 +399,85 @@ describe("the operator's own credentials", () => {
     await operator.click(factor.getByRole("button", { name: /the old phone is gone/i }));
 
     expect(factor.getByLabelText(/backup code off the sheet/i)).toBeInTheDocument();
+  });
+});
+
+/**
+ * The area holding the groups, which is the one area of this screen that reads
+ * what the signed-in application already holds rather than asking on its own.
+ */
+function openGroups(routes: Record<string, Answer | Answer[]> = {}) {
+  const installation = anInstallationAnswering({
+    "GET /sessions": { body: [aSession({ id: "s1", isCurrent: true })] },
+    "GET /agent-tokens": { body: [] },
+    "GET /projects": { body: [] },
+    "GET /groups": { body: [] },
+    ...routes,
+  });
+
+  render(
+    <MemoryRouter initialEntries={["/settings/groups"]}>
+      <ProjectsProvider>
+        <GroupsProvider>
+          <Routes>
+            <Route path="/settings/:section" element={<InstallationSettings />} />
+          </Routes>
+        </GroupsProvider>
+      </ProjectsProvider>
+    </MemoryRouter>,
+  );
+
+  return installation;
+}
+
+describe("the groups", () => {
+  it("lists them with how many projects each holds", async () => {
+    openGroups({
+      "GET /groups": {
+        body: [aGroup({ id: "g1", name: "shop", projects: 2 }), aGroup({ id: "g2", name: "blog" })],
+      },
+    });
+
+    const shop = (await screen.findByRole("rowheader", { name: "shop" })).closest("tr")!;
+    const blog = screen.getByRole("rowheader", { name: "blog" }).closest("tr")!;
+
+    // A group holding nothing is an ordinary state — one made before its first
+    // project, or left behind by its last.
+    expect(within(shop).getByRole("cell", { name: "2" })).toBeInTheDocument();
+    expect(within(blog).getByRole("cell", { name: "0" })).toBeInTheDocument();
+  });
+
+  it("says what removing one leaves behind, and asks for no name to be typed", async () => {
+    const installation = openGroups({
+      "GET /groups": { body: [aGroup({ id: "g1", name: "shop", projects: 2 })] },
+      "DELETE /groups/g1": {},
+    });
+
+    const operator = userEvent.setup();
+
+    await operator.click(await screen.findByRole("button", { name: "Remove" }));
+
+    // Nothing is destroyed, so the guard that fits deleting a project — typing
+    // its name — would say the two acts weigh the same (ADR 0039).
+    const removing = await screen.findByRole("button", {
+      name: /remove it — 2 projects are left in no group/i,
+    });
+
+    await operator.click(removing);
+
+    await waitFor(() => expect(installation.asked).toContain("DELETE /groups/g1"));
+  });
+
+  it("says which name is already taken", async () => {
+    openGroups({ "POST /groups": { status: 409 } });
+
+    const operator = userEvent.setup();
+
+    await operator.type(await screen.findByLabelText(/name for a new group/i), "shop");
+    await operator.click(screen.getByRole("button", { name: /make a group/i }));
+
+    expect(
+      await screen.findByText(/already holds a group by that name/i),
+    ).toBeInTheDocument();
   });
 });

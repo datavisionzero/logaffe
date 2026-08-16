@@ -18,8 +18,9 @@ public enum RenameOutcome
     NoSuchProject,
 
     /// <summary>
-    /// Another project holds that name. It is the one refusal the operator
-    /// acts on, so it is not the same answer as a project that is not there.
+    /// Another project in the same group holds that name. It is the one refusal
+    /// the operator acts on, so it is not the same answer as a project that is
+    /// not there.
     /// </summary>
     NameTaken,
 }
@@ -50,8 +51,10 @@ public sealed class RenameProject(IProjects projects)
 
         // Renaming a project to the name it already has is a no-op rather than
         // a collision with itself: the operator opened the field and left it.
+        // The name has to be free where the project is listed, which is inside
+        // its group or among the projects in none.
         var normalized = Project.NormalizeName(name);
-        var taken = await projects.FindAsync(normalized, cancellationToken);
+        var taken = await projects.FindAsync(normalized, project.GroupId, cancellationToken);
         if (taken is not null && taken.Id != project.Id)
         {
             return RenameOutcome.NameTaken;

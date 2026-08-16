@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace Logaffe.Api.Http;
 
 /// <param name="Name">
-/// Unique within the installation, and the only thing about a project that a
+/// Unique within the project's group, and the only thing about a project that a
 /// person reads.
 /// </param>
 /// <param name="RetentionDays">
@@ -35,9 +35,15 @@ public sealed record RetentionWindowRequest(int RetentionDays);
 /// </param>
 public sealed record EntriesOutsideWindowResponse(int RetentionDays, long Entries);
 
+/// <summary>
+/// Where a project is listed: the identity of one of the installation's groups,
+/// or <c>null</c> for no group at all.
+/// </summary>
+public sealed record ProjectGroupRequest(Guid? GroupId);
+
 /// <summary>One project, by itself.</summary>
 public sealed record ProjectResponse(
-    Guid Id, string Name, int RetentionDays, DateTimeOffset CreatedAt);
+    Guid Id, string Name, Guid? GroupId, int RetentionDays, DateTimeOffset CreatedAt);
 
 /// <summary>
 /// One project on the list a session starts at.
@@ -52,9 +58,15 @@ public sealed record ProjectResponse(
 /// This is the fact the row is read for: whether the application behind it is
 /// still delivering.
 /// </param>
+/// <param name="GroupId">
+/// The group the project is listed under, or <c>null</c> for one in no group.
+/// The group's name is on the group list rather than repeated on every row,
+/// which is also what lets a group holding no projects be shown at all.
+/// </param>
 public sealed record ListedProjectResponse(
     Guid Id,
     string Name,
+    Guid? GroupId,
     int RetentionDays,
     DateTimeOffset CreatedAt,
     int IngestTokens,
@@ -135,6 +147,7 @@ public static class ProjectEndpoints
                 return Results.Ok(held.Select(project => new ListedProjectResponse(
                     project.Id,
                     project.Name,
+                    project.GroupId,
                     project.Retention.Days,
                     project.CreatedAt,
                     project.IngestTokens,
@@ -185,6 +198,28 @@ public static class ProjectEndpoints
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
+
+        operatorSurface.MapPut("/{id:guid}/group", async (
+                Guid id,
+                ProjectGroupRequest request,
+                MoveProjectToGroup move,
+                CancellationToken cancellationToken) =>
+                // A move changes the heading the project is listed under and
+                // nothing else: entries, tokens and queries are attached to the
+                // identity, so no sender notices. A name already taken where it
+                // is going is refused rather than resolved — renaming a project
+                // the operator did not ask to rename is not this route's to do.
+                await move.ExecuteAsync(id, request.GroupId, cancellationToken) switch
+                {
+                    MoveProjectOutcome.Moved => Results.NoContent(),
+                    MoveProjectOutcome.NameTaken => Results.Conflict(),
+                    _ => Results.NotFound(),
+                })
+            .WithName("MoveProjectToGroup")
+            .WithSummary("Lists a project under another group, or under none.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
 
         operatorSurface.MapGet("/{id:guid}/retention/outside", async (
                 Guid id,
@@ -258,7 +293,7 @@ public static class ProjectEndpoints
     }
 
     private static ProjectResponse Shown(Project project) =>
-        new(project.Id, project.Name, project.Retention.Days, project.CreatedAt);
+        new(project.Id, project.Name, project.GroupId, project.Retention.Days, project.CreatedAt);
 
     /// <summary>
     /// The domain refuses a name that is not one as a backstop; a caller taking

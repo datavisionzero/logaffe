@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { Shell } from "../shell/Shell";
-import { aProject, anInstallationAnswering } from "../shared/testing";
+import { aGroup, aProject, anInstallationAnswering, noGroups } from "../shared/testing";
 
 function open() {
   window.history.pushState({}, "", "/");
@@ -20,6 +20,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("the project list", () => {
   it("says when a project last received an entry, absolute and to the millisecond", async () => {
     anInstallationAnswering({
+      "GET /groups": noGroups,
       "GET /projects": {
         body: [
           aProject({
@@ -45,6 +46,7 @@ describe("the project list", () => {
 
   it("distinguishes a project nothing has ever delivered to from one that fell quiet", async () => {
     anInstallationAnswering({
+      "GET /groups": noGroups,
       "GET /projects": {
         body: [aProject({ id: "3f0", name: "checkout", lastReceivedAt: null })],
       },
@@ -57,6 +59,7 @@ describe("the project list", () => {
 
   it("names the project whose door is closed", async () => {
     anInstallationAnswering({
+      "GET /groups": noGroups,
       "GET /projects": {
         body: [
           aProject({ id: "3f0", name: "checkout", ingestTokens: 0 }),
@@ -76,6 +79,7 @@ describe("the project list", () => {
 
   it("carries no count of entries beside a project", async () => {
     const installation = anInstallationAnswering({
+      "GET /groups": noGroups,
       "GET /projects": { body: [aProject({ id: "3f0", name: "checkout" })] },
     });
 
@@ -84,14 +88,64 @@ describe("the project list", () => {
     await screen.findByRole("link", { name: "checkout" });
 
     // A dashboard is a set of counts nobody asked for over the largest table in
-    // the database. The list asks for the projects and for nothing else.
-    expect(installation.asked).toEqual(["GET /projects"]);
+    // the database. The list asks for the projects and the headings they are
+    // listed under, and for nothing else.
+    expect([...installation.asked].sort()).toEqual(["GET /groups", "GET /projects"]);
+  });
+
+  it("lists the projects in no group first and the groups by name after them", async () => {
+    anInstallationAnswering({
+      "GET /groups": {
+        body: [aGroup({ id: "g2", name: "shop", projects: 2 }), aGroup({ id: "g1", name: "blog" })],
+      },
+      "GET /projects": {
+        body: [
+          aProject({ id: "3f0", name: "checkout", groupId: "g2" }),
+          aProject({ id: "9c1", name: "loose" }),
+          aProject({ id: "b47", name: "api", groupId: "g2" }),
+        ],
+      },
+    });
+
+    open();
+
+    await screen.findByRole("link", { name: "loose" });
+
+    // An installation using no groups reads as it always did, so the ungrouped
+    // ones carry no heading of their own and come first.
+    const headings = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((heading) => heading.textContent);
+
+    expect(headings).toEqual(["blog", "shop"]);
+
+    const shop = screen.getByRole("heading", { name: "shop" }).closest("section")!;
+
+    expect(within(shop).getByRole("link", { name: "checkout" })).toBeInTheDocument();
+    expect(within(shop).queryByRole("link", { name: "loose" })).toBeNull();
+  });
+
+  it("says so about a group holding nothing rather than leaving it out", async () => {
+    anInstallationAnswering({
+      "GET /groups": { body: [aGroup({ id: "g1", name: "shop" })] },
+      "GET /projects": { body: [aProject({ id: "9c1", name: "loose" })] },
+    });
+
+    open();
+
+    // It is something the operator made and not a side effect of what the
+    // projects say, so a list that omitted it would answer where the group they
+    // just created went.
+    const group = (await screen.findByRole("heading", { name: "shop" })).closest("section")!;
+
+    expect(within(group).getByText(/no projects are in this group/i)).toBeInTheDocument();
   });
 });
 
 describe("an empty installation", () => {
   it("offers the act that creates a project", async () => {
     anInstallationAnswering({
+      "GET /groups": noGroups,
       "GET /projects": [
         { body: [] },
         { body: [aProject({ id: "3f0", name: "checkout" })] },
@@ -123,6 +177,7 @@ describe("an empty installation", () => {
 
   it("says which name is already taken", async () => {
     anInstallationAnswering({
+      "GET /groups": noGroups,
       "GET /projects": { body: [] },
       "POST /projects": { status: 409 },
     });
@@ -141,6 +196,7 @@ describe("an empty installation", () => {
 describe("the project switcher", () => {
   it("reaches another project without a trip back to the list", async () => {
     anInstallationAnswering({
+      "GET /groups": noGroups,
       "GET /projects": {
         body: [
           aProject({ id: "3f0", name: "checkout" }),
@@ -160,5 +216,24 @@ describe("the project switcher", () => {
 
     expect(await screen.findByRole("heading", { name: "billing" })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/project/9c1");
+  });
+
+  it("names the group beside the project being read", async () => {
+    anInstallationAnswering({
+      "GET /groups": { body: [aGroup({ id: "g1", name: "shop", projects: 1 })] },
+      "GET /projects": { body: [aProject({ id: "3f0", name: "api", groupId: "g1" })] },
+    });
+
+    window.history.pushState({}, "", "/project/3f0");
+
+    render(
+      <BrowserRouter>
+        <Shell backupCodesRemaining={null} onSignedOut={() => undefined} />
+      </BrowserRouter>,
+    );
+
+    // A name is unique only within its group, and this is the one place a
+    // project is named while the list it stands in is nowhere on the screen.
+    expect(await screen.findByRole("button", { name: /shop \/ api/ })).toBeInTheDocument();
   });
 });

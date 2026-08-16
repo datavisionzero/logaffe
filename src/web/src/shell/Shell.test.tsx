@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { Shell } from "./Shell";
-import { aProject, anInstallationAnswering, type Answer } from "../shared/testing";
+import { aProject, anInstallationAnswering, noGroups, type Answer } from "../shared/testing";
 
 /**
  * The shell around a signed-in installation holding two projects, opened at an
@@ -12,6 +12,7 @@ import { aProject, anInstallationAnswering, type Answer } from "../shared/testin
  */
 function open(at = "/", routes: Record<string, Answer | Answer[]> = {}) {
   anInstallationAnswering({
+    "GET /groups": noGroups,
     "GET /projects": {
       body: [
         aProject({ id: "3f0", name: "checkout" }),

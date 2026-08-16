@@ -29,13 +29,15 @@ public sealed class CreateProject(IProjects projects, TimeProvider clock)
 {
     /// <summary>
     /// The project, or <c>null</c> when the installation already holds one by
-    /// that name.
+    /// that name in no group.
     /// </summary>
     /// <remarks>
     /// <para>
     /// Two projects called <c>api</c> is a trap for the operator reaching for
     /// one of them at three in the morning, and that is the whole reason the
-    /// name is unique — there is no technical one.
+    /// name is unique — there is no technical one. A project is created in no
+    /// group and moved into one afterwards, so the name it has to be free of is
+    /// the one held by the other projects in no group.
     /// </para>
     /// <para>
     /// Two creations racing each other both pass this check and the second is
@@ -52,7 +54,7 @@ public sealed class CreateProject(IProjects projects, TimeProvider clock)
         string name, RetentionWindow retention, CancellationToken cancellationToken)
     {
         var taken = await projects.FindAsync(
-            Project.NormalizeName(name), cancellationToken);
+            Project.NormalizeName(name), groupId: null, cancellationToken);
         if (taken is not null)
         {
             return null;

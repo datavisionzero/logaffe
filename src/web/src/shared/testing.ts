@@ -75,6 +75,7 @@ export const lapsed = {
 export function aProject(project: {
   id: string;
   name: string;
+  groupId?: string | null;
   retentionDays?: number;
   createdAt?: string;
   ingestTokens?: number;
@@ -83,9 +84,31 @@ export function aProject(project: {
   return {
     id: project.id,
     name: project.name,
+    groupId: project.groupId ?? null,
     retentionDays: project.retentionDays ?? 30,
     createdAt: project.createdAt ?? "2026-08-01T09:00:00.000Z",
     ingestTokens: project.ingestTokens ?? 1,
     lastReceivedAt: project.lastReceivedAt ?? null,
   };
 }
+
+/** A row of the group list, which every signed-in screen reads once. */
+export function aGroup(group: {
+  id: string;
+  name: string;
+  createdAt?: string;
+  projects?: number;
+}) {
+  return {
+    id: group.id,
+    name: group.name,
+    createdAt: group.createdAt ?? "2026-08-01T09:00:00.000Z",
+    projects: group.projects ?? 0,
+  };
+}
+
+/**
+ * An installation holding no groups, which is what most screens are read
+ * against: the feature is invisible until an operator makes one.
+ */
+export const noGroups: Answer = { body: [] };

@@ -9,6 +9,8 @@ namespace Logaffe.Domain.Projects;
 /// A project is a name, a retention window and its ingest token, and nothing
 /// else. It is identified by an <see cref="Id"/> that survives every rename, and
 /// that identity is what entries, tokens and queries attach to — never the name.
+/// The <see cref="GroupId"/> it may carry belongs to the group rather than to
+/// it: it changes where the project is listed and nothing about what it is.
 /// </remarks>
 public sealed class Project
 {
@@ -30,11 +32,20 @@ public sealed class Project
     public Guid Id { get; private init; }
 
     /// <summary>
-    /// Unique within an installation and changeable at any time. The uniqueness
-    /// is there for the operator who reaches for one of two projects called
-    /// <c>api</c> at three in the morning, not for any technical reason.
+    /// Unique within its group and changeable at any time. The uniqueness is
+    /// there for the operator who reaches for one of two projects called
+    /// <c>api</c> at three in the morning, not for any technical reason — which
+    /// is why the group relaxes it exactly as far as it resolves it, and why two
+    /// projects called <c>api</c> in no group at all still collide.
     /// </summary>
     public string Name { get; private set; } = null!;
+
+    /// <summary>
+    /// The group this project is listed under, or <c>null</c> for one in no
+    /// group. It is an identity rather than a name, so renaming a group moves no
+    /// project (ADR 0039).
+    /// </summary>
+    public Guid? GroupId { get; private set; }
 
     public RetentionWindow Retention { get; private set; } = null!;
 
@@ -44,6 +55,13 @@ public sealed class Project
         new(Guid.CreateVersion7(), NormalizeName(name), retention, createdAt);
 
     public void Rename(string name) => Name = NormalizeName(name);
+
+    /// <summary>
+    /// Lists the project under another group, or under none when
+    /// <paramref name="groupId"/> is <c>null</c>. It moves nothing else: entries,
+    /// tokens and queries are attached to the identity, so no sender notices.
+    /// </summary>
+    public void MoveTo(Guid? groupId) => GroupId = groupId;
 
     public void KeepFor(RetentionWindow retention) => Retention = retention;
 
