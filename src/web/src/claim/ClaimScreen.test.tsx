@@ -1,117 +1,89 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { ClaimScreen } from "./ClaimScreen";
+import { CannotBeClaimed, ClaimScreen } from "./ClaimScreen";
 import { anInstallationAnswering } from "../shared/testing";
-
-const ENROLMENT = {
-  secondFactorSecret: "JBSWY3DPEHPK3PXP",
-  enrolmentUri: "otpauth://totp/logaffe:operator?secret=JBSWY3DPEHPK3PXP&issuer=logaffe",
-  backupCodes: ["4RTY-8HQ2", "K2WM-9PLD", "7XCN-4BVR"],
-  ticket: "sealed",
-};
 
 const PASSWORD = "a passphrase nobody guesses";
 
+const SECRET = "7xcn4bvrk2wm9pld4rty8hq2mnpq";
+
 afterEach(() => vi.unstubAllGlobals());
 
-async function walkToTheSheet() {
+async function fillIn({ secret }: { secret?: string } = {}) {
   const operator = userEvent.setup();
+
+  if (secret !== undefined) {
+    await operator.type(screen.getByLabelText("Claim secret"), secret);
+  }
 
   await operator.type(screen.getByLabelText("Password"), PASSWORD);
   await operator.type(screen.getByLabelText("Password again"), PASSWORD);
-  await operator.click(screen.getByRole("button", { name: "Continue" }));
 
   return operator;
 }
 
 describe("the claim", () => {
-  it("shows the second factor and the sheet before anything is stored", async () => {
-    const installation = anInstallationAnswering({
-      "POST /claim/enrolment": { body: ENROLMENT },
-    });
-
-    render(<ClaimScreen closesAt={null} onClaimed={() => undefined} />);
-
-    await walkToTheSheet();
-
-    expect(await screen.findByText(ENROLMENT.secondFactorSecret)).toBeInTheDocument();
-
-    for (const code of ENROLMENT.backupCodes) {
-      expect(screen.getByText(code)).toBeInTheDocument();
-    }
-
-    // Only the last step stores anything (ADR 0014). Up to here the
-    // installation has drawn an enrolment and kept none of it.
-    expect(installation.asked).toEqual(["POST /claim/enrolment"]);
-  });
-
-  it("is finished by a code from the app and one off the sheet", async () => {
+  it("is one request carrying the secret and the password", async () => {
     const claimed = vi.fn();
 
-    anInstallationAnswering({
-      "POST /claim/enrolment": { body: ENROLMENT },
-      "POST /claim": { status: 204 },
-    });
+    const installation = anInstallationAnswering({ "POST /claim": { status: 204 } });
 
-    render(<ClaimScreen closesAt={null} onClaimed={claimed} />);
+    render(<ClaimScreen needsSecret closesAt={null} onClaimed={claimed} />);
 
-    const operator = await walkToTheSheet();
+    const operator = await fillIn({ secret: SECRET });
+    await operator.click(screen.getByRole("button", { name: /claim this installation/i }));
 
-    await operator.click(await screen.findByRole("checkbox"));
-    await operator.click(screen.getByRole("button", { name: "Continue" }));
+    expect(claimed).toHaveBeenCalled();
 
-    await operator.type(screen.getByLabelText(/six digits/i), "123456");
-    await operator.type(screen.getByLabelText(/backup code/i), ENROLMENT.backupCodes[0]!);
+    // One request and no step before it: with the second factor out of the claim
+    // there is nothing to draw and nothing to carry (ADR 0041).
+    expect(installation.asked).toEqual(["POST /claim"]);
+  });
+
+  it("asks for no secret on an installation guarded by a window", async () => {
+    const claimed = vi.fn();
+
+    anInstallationAnswering({ "POST /claim": { status: 204 } });
+
+    render(
+      <ClaimScreen needsSecret={false} closesAt={null} onClaimed={claimed} />,
+    );
+
+    expect(screen.queryByLabelText("Claim secret")).not.toBeInTheDocument();
+
+    const operator = await fillIn();
     await operator.click(screen.getByRole("button", { name: /claim this installation/i }));
 
     expect(claimed).toHaveBeenCalled();
   });
 
-  it("says which step failed, because the door is open on purpose", async () => {
+  it("says the secret was wrong, and says only that", async () => {
     anInstallationAnswering({
-      "POST /claim/enrolment": { body: ENROLMENT },
       "POST /claim": {
         status: 400,
         body: {
-          errors: {
-            secondFactorCode: ["That is not a code the authenticator you just enrolled produces now."],
-          },
+          errors: { secret: ["That is not this installation's claim secret."] },
         },
       },
     });
 
-    render(<ClaimScreen closesAt={null} onClaimed={() => undefined} />);
+    render(<ClaimScreen needsSecret closesAt={null} onClaimed={() => undefined} />);
 
-    const operator = await walkToTheSheet();
-
-    await operator.click(await screen.findByRole("checkbox"));
-    await operator.click(screen.getByRole("button", { name: "Continue" }));
-
-    await operator.type(screen.getByLabelText(/six digits/i), "000000");
-    await operator.type(screen.getByLabelText(/backup code/i), ENROLMENT.backupCodes[0]!);
+    const operator = await fillIn({ secret: "not the one" });
     await operator.click(screen.getByRole("button", { name: /claim this installation/i }));
 
     expect(
-      await screen.findByText(/not a code the authenticator you just enrolled produces/i),
+      await screen.findByText(/not this installation's claim secret/i),
     ).toBeInTheDocument();
   });
 
   it("names the conflict when somebody else finished first", async () => {
-    anInstallationAnswering({
-      "POST /claim/enrolment": { body: ENROLMENT },
-      "POST /claim": { status: 409 },
-    });
+    anInstallationAnswering({ "POST /claim": { status: 409 } });
 
-    render(<ClaimScreen closesAt={null} onClaimed={() => undefined} />);
+    render(<ClaimScreen needsSecret={false} closesAt={null} onClaimed={() => undefined} />);
 
-    const operator = await walkToTheSheet();
-
-    await operator.click(await screen.findByRole("checkbox"));
-    await operator.click(screen.getByRole("button", { name: "Continue" }));
-
-    await operator.type(screen.getByLabelText(/six digits/i), "123456");
-    await operator.type(screen.getByLabelText(/backup code/i), ENROLMENT.backupCodes[0]!);
+    const operator = await fillIn();
     await operator.click(screen.getByRole("button", { name: /claim this installation/i }));
 
     expect(await screen.findByText(/somebody else finished first/i)).toBeInTheDocument();
@@ -120,15 +92,34 @@ describe("the claim", () => {
   it("refuses a password the installation would refuse, without asking it", async () => {
     const installation = anInstallationAnswering({});
 
-    render(<ClaimScreen closesAt={null} onClaimed={() => undefined} />);
+    render(<ClaimScreen needsSecret={false} closesAt={null} onClaimed={() => undefined} />);
 
     const operator = userEvent.setup();
 
     await operator.type(screen.getByLabelText("Password"), "short");
     await operator.type(screen.getByLabelText("Password again"), "short");
-    await operator.click(screen.getByRole("button", { name: "Continue" }));
+    await operator.click(screen.getByRole("button", { name: /claim this installation/i }));
 
-    expect(screen.getByText(/at least twelve characters/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/^A password is at least 16 characters\.$/),
+    ).toBeInTheDocument();
     expect(installation.asked).toEqual([]);
+  });
+});
+
+describe("an installation that cannot be claimed", () => {
+  it("names the host command for a window that lapsed", () => {
+    render(<CannotBeClaimed needsSecret={false} />);
+
+    expect(screen.getByText(/claim window opened when this installation first ran/i))
+      .toBeInTheDocument();
+    expect(screen.getByText(/logaffe recover/)).toBeInTheDocument();
+  });
+
+  it("names it for a secret the installation never drew", () => {
+    render(<CannotBeClaimed needsSecret />);
+
+    expect(screen.getByText(/guarded by a claim secret and holds none/i)).toBeInTheDocument();
+    expect(screen.getByText(/logaffe recover/)).toBeInTheDocument();
   });
 });

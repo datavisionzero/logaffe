@@ -329,8 +329,13 @@ a thing that outlives it. The creation offers no group by default, and offers
 nothing at all while the installation holds none.
 
 Per installation: the sessions with where and when each was last used and the
-means to end them ([Signing in](./sign-in.md)), re-enrolment of the second
-factor, a fresh set of backup codes, and the **agent tokens** ([MCP](./mcp.md)).
+means to end them ([Signing in](./sign-in.md)), the second factor — enrolled,
+re-enrolled or turned off from here, since this is the only place it is ever done
+([ADR 0041](./adr/0041-the-second-factor-is-offered-not-required.md)) — a fresh
+set of backup codes, and the **agent tokens** ([MCP](./mcp.md)). **An
+installation with no second factor says so wherever the operator is**, not only
+on this screen: a banner that stays until one is enrolled, because the interface
+is the only thing that can keep an omission from passing for a setting.
 The session list marks the browser being read from, which the server says and
 nothing else could — without it "end all others" is a guess. It shows the last
 use to the minute rather than to the second, because that is how accurately it is

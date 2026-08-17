@@ -4,6 +4,34 @@ using Logaffe.Domain.Operators;
 namespace Logaffe.Application.Operations;
 
 /// <summary>
+/// How asking for a fresh sheet ended.
+/// </summary>
+public enum SheetOutcome
+{
+    /// <summary>Ten codes, and the previous set is gone.</summary>
+    Issued,
+
+    /// <summary>
+    /// The password was not it — or there is no account, in the moment after a
+    /// Host Recovery.
+    /// </summary>
+    PasswordRefused,
+
+    /// <summary>
+    /// There is no second factor for these to stand in for (ADR 0041), so there
+    /// is nothing to issue. The screen does not offer the act in this state; this
+    /// is the answer to a request that raced a different browser, or to one made
+    /// by hand.
+    /// </summary>
+    NoSecondFactor,
+}
+
+/// <summary>
+/// The sheet, when there was one to issue.
+/// </summary>
+public sealed record IssuedSheet(SheetOutcome Outcome, IReadOnlyList<BackupCodeText> Codes);
+
+/// <summary>
 /// A fresh sheet of backup codes, shown once.
 /// </summary>
 /// <remarks>
@@ -30,29 +58,35 @@ public sealed class IssueBackupCodes(
     IPasswordHasher hasher,
     TimeProvider clock)
 {
-    /// <summary>
-    /// The ten codes to show, or <c>null</c> when the password was not it —
-    /// which is also what an installation with no account answers, in the moment
-    /// after a Host Recovery.
-    /// </summary>
-    public async Task<IReadOnlyList<BackupCodeText>?> ExecuteAsync(
+    /// <summary>The ten codes to show, or why there are none.</summary>
+    public async Task<IssuedSheet> ExecuteAsync(
         string? password, CancellationToken cancellationToken)
     {
         if (!Password.TryCreate(password, out var presented))
         {
-            return null;
+            return Refused(SheetOutcome.PasswordRefused);
         }
 
         var theOperator = await operators.FindAsync(cancellationToken);
         if (theOperator is null
             || hasher.Verify(theOperator.PasswordHash, presented) is PasswordCheck.Wrong)
         {
-            return null;
+            return Refused(SheetOutcome.PasswordRefused);
+        }
+
+        // Asked after the password rather than before it, so that whether this
+        // installation has a second factor is not something an unauthenticated
+        // guess can ask about.
+        if (!theOperator.HasSecondFactor)
+        {
+            return Refused(SheetOutcome.NoSecondFactor);
         }
 
         var minted = BackupCode.MintSet(theOperator.Id, clock.GetUtcNow());
         await operators.ReplaceBackupCodesAsync(minted.Stored, cancellationToken);
 
-        return minted.Shown;
+        return new IssuedSheet(SheetOutcome.Issued, minted.Shown);
     }
+
+    private static IssuedSheet Refused(SheetOutcome outcome) => new(outcome, []);
 }

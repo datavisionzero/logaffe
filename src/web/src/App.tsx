@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, whenSignedOut } from "./api/client";
-import { ClaimScreen, WindowClosed } from "./claim/ClaimScreen";
+import { CannotBeClaimed, ClaimScreen } from "./claim/ClaimScreen";
 import { FirstRun } from "./claim/FirstRun";
 import { SignInScreen } from "./session/SignInScreen";
 import { Shell } from "./shell/Shell";
@@ -23,7 +23,12 @@ import { Shell } from "./shell/Shell";
 type Reached =
   | { at: "asking" }
   | { at: "unreachable" }
-  | { at: "unclaimed"; windowIsOpen: boolean; closesAt: string | null }
+  | {
+      at: "unclaimed";
+      canBeClaimed: boolean;
+      needsSecret: boolean;
+      closesAt: string | null;
+    }
   | { at: "guiding" }
   | { at: "claimed" };
 
@@ -48,7 +53,8 @@ export function App() {
               ? { at: "claimed" }
               : {
                   at: "unclaimed",
-                  windowIsOpen: data.windowIsOpen,
+                  canBeClaimed: data.canBeClaimed,
+                  needsSecret: data.needsSecret,
                   closesAt: data.closesAt,
                 },
         );
@@ -77,13 +83,14 @@ export function App() {
       );
 
     case "unclaimed":
-      return reached.windowIsOpen ? (
+      return reached.canBeClaimed ? (
         <ClaimScreen
+          needsSecret={reached.needsSecret}
           closesAt={reached.closesAt}
           onClaimed={() => setReached({ at: "guiding" })}
         />
       ) : (
-        <WindowClosed />
+        <CannotBeClaimed needsSecret={reached.needsSecret} />
       );
 
     case "guiding":

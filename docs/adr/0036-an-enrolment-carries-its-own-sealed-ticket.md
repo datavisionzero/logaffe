@@ -1,22 +1,22 @@
-# A Re-Enrolment Carries Its Own Sealed Ticket
+# An Enrolment Carries Its Own Sealed Ticket
 
-Replacing the second factor has the shape the claim already solved: a new secret
-has to be shown, scanned and confirmed before it replaces the one in the row, and
-nothing may be stored in between — a half-replaced second factor is an operator
-locked out of their own installation. So it is solved the same way
-([ADR 0035](./0035-the-claim-hands-its-enrolment-back-sealed.md)): the
-installation draws the secret and a fresh sheet of backup codes, hands both to
-the browser, and hands back a **ticket** sealed under the key on the host volume.
-The confirming request returns the ticket, and opening it is how the installation
-knows those were the values it drew.
+Enrolling a second factor, and replacing one, has a shape that fits in no single
+request: a new secret has to be shown, scanned and confirmed before it goes into
+the row, and nothing may be stored in between — a half-written second factor is
+an operator locked out of their own installation. So the installation draws the
+secret and a fresh sheet of backup codes, hands both to the browser, and hands
+back a **ticket** sealed under the key on the host volume. The confirming request
+returns the ticket, and opening it is how the installation knows those were the
+values it drew.
 
-**It is a second ticket type rather than a generalization of the claim's.** The
-two are bound to different things: a claim ticket names the window it was drawn
-in, because that is the moment the installation's notion of who may claim it
-changes, and a re-enrolment ticket names the **operator** and the instant it was
-drawn. One type carrying both bindings would carry a field that is empty in half
-its uses, and it would put the finished claim path into the blast radius of every
-change made here.
+**This is the only enrolment there is.** The claim used to carry one and had a
+ticket of its own bound to the claim window
+([ADR 0035](./0035-the-claim-hands-its-enrolment-back-sealed.md)); with the
+second factor out of the claim
+([ADR 0041](./0041-the-second-factor-is-offered-not-required.md)) there is one
+path and one ticket type, bound to the **operator** and the instant it was drawn.
+Every enrolment therefore happens behind a full credential, which is a stronger
+starting position than the claim's ticket ever had.
 
 The alternative was to let the browser hand the plain new secret back with a code
 computed from it, and verify by proof instead of by provenance. It is rejected

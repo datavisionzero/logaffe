@@ -164,13 +164,15 @@ public sealed class SignInActsTests(PostgresFixture postgres) : IDisposable
             .ApplyAsync(TestContext.Current.CancellationToken);
 
         var theOperator = Operator.Claim(
-            new FrameworkPasswordHasher().Hash(Password.Create(TheirPassword)),
-            CipherOn(_volume).Encrypt(SecondFactorSecret),
-            Claimed);
+            new FrameworkPasswordHasher().Hash(Password.Create(TheirPassword)), Claimed);
+        theOperator.EnrolSecondFactor(CipherOn(_volume).Encrypt(SecondFactorSecret), Claimed);
 
         var minted = BackupCode.MintSet(theOperator.Id, Claimed);
-        Assert.True(await new Operators(context).TryClaimAsync(
-            theOperator, minted.Stored, TestContext.Current.CancellationToken));
+        var operators = new Operators(context);
+        Assert.True(await operators.TryClaimAsync(
+            theOperator, TestContext.Current.CancellationToken));
+        await operators.ReplaceBackupCodesAsync(
+            minted.Stored, TestContext.Current.CancellationToken);
 
         return new Installation(connectionString, minted.Shown);
     }

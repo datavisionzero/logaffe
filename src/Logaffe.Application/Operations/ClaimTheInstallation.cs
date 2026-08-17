@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Logaffe.Application.Ports;
 using Logaffe.Domain.Operators;
 
@@ -9,10 +8,11 @@ namespace Logaffe.Application.Operations;
 /// </summary>
 /// <remarks>
 /// Unlike a sign-in, which answers every refusal with one refusal, this says
-/// which step failed. There is nothing to protect: the installation is open to
-/// whoever reaches it by design (<c>docs/setup.md</c>), the person on the other
-/// end is setting up their own installation, and telling them the code did not
-/// verify rather than "no" is the difference between finishing and giving up.
+/// which step failed. There is little to protect and much to lose by being
+/// unhelpful: the person on the other end is setting up their own installation,
+/// and telling them the secret did not match rather than "no" is the difference
+/// between finishing and giving up. What it never says is anything about the
+/// secret beyond whether the one presented was right.
 /// </remarks>
 public enum ClaimOutcome
 {
@@ -27,34 +27,28 @@ public enum ClaimOutcome
     AlreadyClaimed,
 
     /// <summary>
-    /// The thirty minutes are up. Claiming over the network is over and the way
-    /// back is the host (ADR 0013).
+    /// Window mode, and the thirty minutes are up. Claiming over the network is
+    /// over and the way back is the host (ADR 0013).
     /// </summary>
     WindowClosed,
 
+    /// <summary>
+    /// Secret mode, and there is no secret to compare against: configuration
+    /// named none and the installation holds none. It is a start that never drew
+    /// one — a database made by hand, or a first start that stopped between
+    /// writing the hash and being asked — and the host command is the way out of
+    /// it, as it is for a lapsed window.
+    /// </summary>
+    NoSecretToPresentTo,
+
+    /// <summary>
+    /// The secret presented is not the one that guards this installation
+    /// (ADR 0040). It is the only thing this refusal says.
+    /// </summary>
+    SecretRefused,
+
     /// <summary>Shorter than a password may be, or longer than one is hashed.</summary>
     PasswordNotOne,
-
-    /// <summary>
-    /// The ticket is not one this installation sealed, or it belongs to a
-    /// window that is no longer the current one (ADR 0035). The claimant starts
-    /// the enrolment again.
-    /// </summary>
-    EnrolmentNotOurs,
-
-    /// <summary>
-    /// The six digits are not what the drawn secret produces now. It is the
-    /// step that proves the authenticator app really holds the enrolment, and a
-    /// phone whose clock is out fails here rather than at the first sign-in.
-    /// </summary>
-    SecondFactorRefused,
-
-    /// <summary>
-    /// The code typed back is not one of the ten. It is the step that proves the
-    /// sheet was actually kept, which is the only thing standing between the
-    /// operator and Host Recovery on the day they lose their phone.
-    /// </summary>
-    BackupCodeRefused,
 }
 
 /// <summary>
@@ -74,35 +68,36 @@ public sealed record ClaimAttempt(
 /// </summary>
 /// <remarks>
 /// <para>
-/// It is one act and it stores nothing until it succeeds (ADR 0014). Everything
-/// the operator established on the way here — the password they chose, the
-/// authenticator they enrolled, the sheet they printed — arrives in this one
-/// request, the enrolment in the sealed ticket the previous step handed them
-/// (ADR 0035), and either all of it is written or none of it is.
+/// It is one request and it establishes one thing: a password (ADR 0041). The
+/// second factor is not here — it is the operator's to enrol afterwards from the
+/// settings — and with nothing to carry between two steps there is nothing to
+/// seal and nothing to hold. The claim stores nothing until it succeeds, and a
+/// claim that is abandoned leaves the installation exactly as unclaimed as it was
+/// (ADR 0014).
 /// </para>
 /// <para>
-/// <b>The database decides the race.</b> Two claimants both walk the whole flow
-/// and both reach here; what settles it is the account table holding one row,
-/// not the check this could have run first and been wrong about a moment later.
+/// <b>The database decides the race.</b> Two claimants both reach here; what
+/// settles it is the account table holding one row, not the check this could have
+/// run first and been wrong about a moment later.
 /// </para>
 /// <para>
-/// The steps are ordered by what they cost. The window and the account are one
-/// small read each, the ticket is one decryption, the two codes are arithmetic —
-/// and hashing the password is deliberately slow, so it happens once everything
-/// else has already said yes.
+/// The steps are ordered by what they cost. The account and the guard are one
+/// small read each, the secret is one SHA-256 — and hashing the password is
+/// deliberately slow, so it happens once everything else has already said yes.
 /// </para>
 /// </remarks>
 public sealed class ClaimTheInstallation(
     IInstallation installation,
     IOperators operators,
     ISessions sessions,
+    IClaimSecretHandover handover,
     IPasswordHasher hasher,
-    ISecondFactor secondFactor,
-    ISecretCipher cipher,
+    ClaimSettings settings,
     TimeProvider clock)
 {
-    /// <param name="backupCode">
-    /// One of the ten, typed back off the sheet, read however it was typed.
+    /// <param name="secret">
+    /// The claim secret, as it was read off the file or out of the compose file.
+    /// Ignored in window mode, where there is none to present.
     /// </param>
     /// <param name="seenFrom">
     /// Where the request came from, which the session this hands out is listed
@@ -110,9 +105,7 @@ public sealed class ClaimTheInstallation(
     /// </param>
     public async Task<ClaimAttempt> ExecuteAsync(
         string? password,
-        string? ticket,
-        string? secondFactorCode,
-        string? backupCode,
+        string? secret,
         string? seenFrom,
         CancellationToken cancellationToken)
     {
@@ -126,10 +119,19 @@ public sealed class ClaimTheInstallation(
 
         var now = clock.GetUtcNow();
 
-        var window = await installation.ReadClaimWindowAsync(cancellationToken);
-        if (window is null || !window.IsOpenAt(now))
+        var guard = await installation.ReadClaimGuardAsync(cancellationToken);
+        if (guard is null)
         {
-            return Refused(ClaimOutcome.WindowClosed);
+            return Refused(
+                settings.Mode is ClaimMode.Secret
+                    ? ClaimOutcome.NoSecretToPresentTo
+                    : ClaimOutcome.WindowClosed);
+        }
+
+        var admitted = Admits(guard, secret, now);
+        if (admitted is not ClaimOutcome.Claimed)
+        {
+            return Refused(admitted);
         }
 
         // The shape before the hasher, as on the sign-in: hashing is slow and
@@ -140,53 +142,63 @@ public sealed class ClaimTheInstallation(
             return Refused(ClaimOutcome.PasswordNotOne);
         }
 
-        // A ticket names the window it was drawn in, so one drawn before a Host
-        // Recovery is refused after it: the installation's notion of who may
-        // claim it changed, and the enrolment that was in flight belongs to the
-        // installation that no longer exists.
-        if (!ClaimTicket.TryOpen(ticket, cipher, out var enrolment)
-            || enrolment.WindowOpenedAt != window.OpenedAt)
-        {
-            return Refused(ClaimOutcome.EnrolmentNotOurs);
-        }
+        var theOperator = Operator.Claim(hasher.Hash(chosen), now);
 
-        if (!secondFactor.Verifies(enrolment.SecondFactorSecret, secondFactorCode, now))
-        {
-            return Refused(ClaimOutcome.SecondFactorRefused);
-        }
+        var claimed = await operators.TryClaimAsync(theOperator, cancellationToken);
 
-        // Compared against the hashes in the ticket rather than against rows,
-        // because the rows cannot exist yet: a backup code hangs off an operator
-        // this act has not created. It is the comparison `BackupCode.Matches`
-        // makes and it is made the same way, in constant time.
-        if (!BackupCodeText.TryParse(backupCode, out var confirmed)
-            || !enrolment.BackupCodeHashes.Any(
-                hash => CryptographicOperations.FixedTimeEquals(hash, confirmed.Hash)))
-        {
-            return Refused(ClaimOutcome.BackupCodeRefused);
-        }
-
-        var theOperator = Operator.Claim(
-            hasher.Hash(chosen), cipher.Encrypt(enrolment.SecondFactorSecret), now);
-
-        var claimed = await operators.TryClaimAsync(
-            theOperator,
-            BackupCode.SetOf(theOperator.Id, enrolment.BackupCodeHashes, now),
-            cancellationToken);
-
-        // The other claimant confirmed their sheet first. Nothing here was
-        // written — it was one transaction — and this is the screen ADR 0014
-        // describes.
+        // The other claimant sent theirs first. Nothing here was written — it was
+        // one statement — and this is the screen ADR 0014 describes.
         if (!claimed)
         {
             return Refused(ClaimOutcome.AlreadyClaimed);
         }
 
-        var secret = SessionSecret.Mint();
-        var session = Session.Start(theOperator.Id, secret, seenFrom, now);
+        // The file the secret was handed over in is a delivery copy, and what it
+        // delivered has arrived. Leaving it would leave a credential for a door
+        // that no longer opens.
+        handover.Remove();
+
+        var sessionSecret = SessionSecret.Mint();
+        var session = Session.Start(theOperator.Id, sessionSecret, seenFrom, now);
         await sessions.AddAsync(session, cancellationToken);
 
-        return new ClaimAttempt(ClaimOutcome.Claimed, secret, session);
+        return new ClaimAttempt(ClaimOutcome.Claimed, sessionSecret, session);
+    }
+
+    /// <summary>
+    /// Whether this request gets as far as choosing a password, which is the one
+    /// place the two modes differ.
+    /// </summary>
+    /// <remarks>
+    /// A supplied secret is compared against configuration and a drawn one
+    /// against the hash in the row; both comparisons are made through the hashes
+    /// and take the same time whatever was typed. In window mode nothing is
+    /// presented and the deadline is the whole of the guard.
+    /// </remarks>
+    private ClaimOutcome Admits(ClaimGuard guard, string? presented, DateTimeOffset now)
+    {
+        if (settings.Mode is ClaimMode.Window)
+        {
+            return guard.WindowIsOpenAt(now)
+                ? ClaimOutcome.Claimed
+                : ClaimOutcome.WindowClosed;
+        }
+
+        if (settings.SuppliedSecret is null && !guard.HasDrawnSecret)
+        {
+            return ClaimOutcome.NoSecretToPresentTo;
+        }
+
+        if (!ClaimSecret.TryRead(presented, out var offered))
+        {
+            return ClaimOutcome.SecretRefused;
+        }
+
+        var right = settings.SuppliedSecret is { } supplied
+            ? offered.Matches(supplied)
+            : guard.AdmitsDrawn(offered);
+
+        return right ? ClaimOutcome.Claimed : ClaimOutcome.SecretRefused;
     }
 
     private static ClaimAttempt Refused(ClaimOutcome outcome) => new(outcome, null, null);

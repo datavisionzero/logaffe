@@ -36,7 +36,7 @@ public sealed class OperatorSchemaTests(PostgresFixture postgres)
         var operators = new Operators(context);
 
         var claimed = await operators.TryClaimAsync(
-            Operator.Claim(Hash, Ciphertext, Now), [], TestContext.Current.CancellationToken);
+            Enrolled(), TestContext.Current.CancellationToken);
 
         Assert.True(claimed);
 
@@ -65,31 +65,25 @@ public sealed class OperatorSchemaTests(PostgresFixture postgres)
     {
         var connectionString = await postgres.CreateDatabaseAsync();
         await using var winner = await MigratedAsync(connectionString);
-        var theOperator = Operator.Claim(Hash, Ciphertext, Now);
+        var theOperator = Enrolled();
         Assert.True(await new Operators(winner).TryClaimAsync(
-            theOperator,
-            BackupCode.MintSet(theOperator.Id, Now).Stored,
-            TestContext.Current.CancellationToken));
+            theOperator, TestContext.Current.CancellationToken));
 
         // The loser walked the whole flow and fails at the last step, which is
         // the price of the claim holding nothing until then (ADR 0014).
         await using var loser = ContextFor(connectionString);
-        var second = Operator.Claim("AQAAAAIAAYagAAAAE-someone-else", [9, 9, 9], Now.AddMinutes(1));
+        var second = Operator.Claim("AQAAAAIAAYagAAAAE-someone-else", Now.AddMinutes(1));
         var claimed = await new Operators(loser).TryClaimAsync(
-            second,
-            BackupCode.MintSet(second.Id, Now.AddMinutes(1)).Stored,
-            TestContext.Current.CancellationToken);
+            second, TestContext.Current.CancellationToken);
 
         Assert.False(claimed);
 
         await using var reader = ContextFor(connectionString);
         var stored = await reader.Operators.SingleAsync(TestContext.Current.CancellationToken);
-        // Not a row of the loser's survives — not the account, and not the
-        // codes that were written in the same statement.
+
+        // Not a row of the loser's survives, and the account that is there is
+        // the winner's.
         Assert.Equal(Hash, stored.PasswordHash);
-        Assert.Equal(
-            BackupCode.SetSize,
-            await reader.BackupCodes.CountAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -98,10 +92,11 @@ public sealed class OperatorSchemaTests(PostgresFixture postgres)
         var connectionString = await postgres.CreateDatabaseAsync();
         await using var context = await MigratedAsync(connectionString);
         var operators = new Operators(context);
-        var theOperator = Operator.Claim(Hash, Ciphertext, Now);
+        var theOperator = Enrolled();
         var first = BackupCode.MintSet(theOperator.Id, Now);
-        await operators.TryClaimAsync(
-            theOperator, first.Stored, TestContext.Current.CancellationToken);
+        await operators.TryClaimAsync(theOperator, TestContext.Current.CancellationToken);
+        await operators.ReplaceBackupCodesAsync(
+            first.Stored, TestContext.Current.CancellationToken);
 
         var second = BackupCode.MintSet(theOperator.Id, Now.AddDays(1));
         await operators.ReplaceBackupCodesAsync(
@@ -123,10 +118,11 @@ public sealed class OperatorSchemaTests(PostgresFixture postgres)
         var connectionString = await postgres.CreateDatabaseAsync();
         await using var context = await MigratedAsync(connectionString);
         var operators = new Operators(context);
-        var theOperator = Operator.Claim(Hash, Ciphertext, Now);
+        var theOperator = Enrolled();
         var minted = BackupCode.MintSet(theOperator.Id, Now);
-        await operators.TryClaimAsync(
-            theOperator, minted.Stored, TestContext.Current.CancellationToken);
+        await operators.TryClaimAsync(theOperator, TestContext.Current.CancellationToken);
+        await operators.ReplaceBackupCodesAsync(
+            minted.Stored, TestContext.Current.CancellationToken);
 
         var codes = await operators.ListBackupCodesAsync(TestContext.Current.CancellationToken);
         var spent = codes.Single(code => code.Matches(minted.Shown[0]));
@@ -219,9 +215,9 @@ public sealed class OperatorSchemaTests(PostgresFixture postgres)
         var connectionString = await postgres.CreateDatabaseAsync();
         await using var context = await MigratedAsync(connectionString);
         var operators = new Operators(context);
-        var theOperator = Operator.Claim(Hash, Ciphertext, Now);
-        await operators.TryClaimAsync(
-            theOperator,
+        var theOperator = Enrolled();
+        await operators.TryClaimAsync(theOperator, TestContext.Current.CancellationToken);
+        await operators.ReplaceBackupCodesAsync(
             BackupCode.MintSet(theOperator.Id, Now).Stored,
             TestContext.Current.CancellationToken);
         await new Sessions(context).AddAsync(
@@ -241,9 +237,22 @@ public sealed class OperatorSchemaTests(PostgresFixture postgres)
 
     private static async Task<Operator> ClaimedInto(LogaffeDbContext context)
     {
-        var theOperator = Operator.Claim(Hash, Ciphertext, Now);
+        var theOperator = Enrolled();
         await new Operators(context).TryClaimAsync(
-            theOperator, [], TestContext.Current.CancellationToken);
+            theOperator, TestContext.Current.CancellationToken);
+
+        return theOperator;
+    }
+
+    /// <summary>
+    /// An account with a second factor. The claim writes the password alone
+    /// (ADR 0041); what these tests are about is the row once an enrolment has
+    /// filled the other two columns in.
+    /// </summary>
+    private static Operator Enrolled()
+    {
+        var theOperator = Operator.Claim(Hash, Now);
+        theOperator.EnrolSecondFactor(Ciphertext, Now);
 
         return theOperator;
     }

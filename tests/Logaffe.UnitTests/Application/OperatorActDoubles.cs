@@ -19,8 +19,10 @@ internal sealed class InMemoryOperators : IOperators
     public IReadOnlyList<BackupCode> BackupCodes => _backupCodes;
 
     /// <summary>
-    /// Puts an installation in the state a completed claim leaves it in, which
-    /// is the starting point of every sign-in.
+    /// Puts an installation in the state a claim leaves it in — an account and
+    /// no second factor (ADR 0041) — with a sheet of backup codes beside it,
+    /// which is the state an enrolment leaves behind and the starting point of
+    /// most of what is asserted here.
     /// </summary>
     public MintedBackupCodes Claim(Operator theOperator, DateTimeOffset issuedAt)
     {
@@ -32,6 +34,12 @@ internal sealed class InMemoryOperators : IOperators
         return minted;
     }
 
+    /// <summary>
+    /// Puts an account in place that has enrolled nothing, which is what a claim
+    /// on its own leaves behind.
+    /// </summary>
+    public void ClaimWithoutASecondFactor(Operator theOperator) => _operator = theOperator;
+
     public Task<bool> IsClaimedAsync(CancellationToken cancellationToken) =>
         Task.FromResult(_operator is not null);
 
@@ -39,9 +47,7 @@ internal sealed class InMemoryOperators : IOperators
         Task.FromResult(_operator);
 
     public Task<bool> TryClaimAsync(
-        Operator theOperator,
-        IReadOnlyList<BackupCode> backupCodes,
-        CancellationToken cancellationToken)
+        Operator theOperator, CancellationToken cancellationToken)
     {
         if (_operator is not null)
         {
@@ -49,7 +55,6 @@ internal sealed class InMemoryOperators : IOperators
         }
 
         _operator = theOperator;
-        _backupCodes.AddRange(backupCodes);
         Writes++;
 
         return Task.FromResult(true);
@@ -96,43 +101,79 @@ internal sealed class InMemoryOperators : IOperators
 /// </summary>
 internal sealed class InMemoryInstallation : IInstallation
 {
-    private ClaimWindow? _window;
+    private ClaimGuard? _guard;
 
     /// <summary>How many statements the store was asked to write.</summary>
     public int Writes { get; private set; }
 
-    public Task<ClaimWindow?> ReadClaimWindowAsync(CancellationToken cancellationToken) =>
-        Task.FromResult(_window);
+    public Task<ClaimGuard?> ReadClaimGuardAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(_guard);
 
-    public Task<ClaimWindow> OpenClaimWindowAsync(
+    public Task<ClaimGuard> OpenClaimAsync(
         DateTimeOffset firstRunAt, CancellationToken cancellationToken)
     {
-        if (_window is not null)
+        if (_guard is not null)
         {
-            return Task.FromResult(_window);
+            return Task.FromResult(_guard);
         }
 
-        _window = ClaimWindow.OpenedOnFirstRun(firstRunAt);
+        _guard = ClaimGuard.OpenedOnFirstRun(firstRunAt);
         Writes++;
 
-        return Task.FromResult(_window);
+        return Task.FromResult(_guard);
     }
 
-    public Task<ClaimWindow> ArmClaimWindowAsync(
+    public Task<ClaimGuard> ArmClaimAsync(
         DateTimeOffset at, CancellationToken cancellationToken)
     {
-        if (_window is null)
+        if (_guard is null)
         {
-            _window = ClaimWindow.OpenedOnFirstRun(at);
+            _guard = ClaimGuard.OpenedOnFirstRun(at);
         }
         else
         {
-            _window.ArmAt(at);
+            _guard.ArmAt(at);
         }
 
         Writes++;
 
-        return Task.FromResult(_window);
+        return Task.FromResult(_guard);
+    }
+
+    public Task RecordClaimAsync(ClaimGuard guard, CancellationToken cancellationToken)
+    {
+        _guard = guard;
+        Writes++;
+
+        return Task.CompletedTask;
+    }
+}
+
+/// <summary>
+/// The file a drawn claim secret is handed over in, in memory. What the acts
+/// turn on is that it is written when one is drawn and removed by the claim
+/// (ADR 0040), and this holds exactly that.
+/// </summary>
+internal sealed class InMemoryClaimSecretHandover : IClaimSecretHandover
+{
+    public string Path => "/var/lib/logaffe/claim-secret.txt";
+
+    /// <summary>The secret as it was handed over, or <c>null</c> once removed.</summary>
+    public string? HandedOver { get; private set; }
+
+    public int Removals { get; private set; }
+
+    public Task WriteAsync(ClaimSecret secret, CancellationToken cancellationToken)
+    {
+        HandedOver = secret.Text;
+
+        return Task.CompletedTask;
+    }
+
+    public void Remove()
+    {
+        HandedOver = null;
+        Removals++;
     }
 }
 

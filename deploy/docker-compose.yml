@@ -16,6 +16,16 @@ services:
     environment:
       ConnectionStrings__Postgres: >-
         Host=db;Port=5432;Database=logaffe;Username=logaffe;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      # How the claim is guarded until somebody makes it (docs/setup.md).
+      # `secret` is the default: nobody can claim the installation without the
+      # claim secret, and there is no deadline. Leave LOGAFFE_CLAIM_SECRET unset
+      # and the installation draws one on its first start, writes it to
+      # /var/lib/logaffe/claim-secret.txt on the volume and logs it once.
+      # `window` is the other way: no secret, and anyone who reaches the
+      # installation may claim it for 30 minutes after its first run. It is for
+      # the host where reading that file or that log is not on offer.
+      Logaffe__Claim__Mode: "${LOGAFFE_CLAIM_MODE:-secret}"
+      Logaffe__Claim__Secret: "${LOGAFFE_CLAIM_SECRET:-}"
       # An installation reached through a reverse proxy names it here, as
       # addresses or CIDR ranges, so that the address a request is throttled by
       # and listed under is the caller's rather than the proxy's. Unset means

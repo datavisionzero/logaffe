@@ -5,9 +5,9 @@ that gives it an operator. This is the only surface in the product a stranger ca
 act on, and everything below is written from that angle.
 
 Two things are settled in `VISION.md` and are the premises here rather than
-decisions of this document. **Anyone who can reach an unclaimed installation may
-claim it** — there is no setup secret to fetch first. And **there is always a way
-back in from the host**, which is what makes the rest affordable.
+decisions of this document. **Whoever installs decides how the claim is
+guarded** — by a secret, which is the default, or by an open window. And **there
+is always a way back in from the host**, which is what makes the rest affordable.
 
 ## An unclaimed installation
 
@@ -16,19 +16,69 @@ ingestion, because ingestion needs a token and a token needs a project and a
 project needs an operator; there is no MCP; there is nothing to read and nothing
 to configure. The whole reachable surface is one flow.
 
-Claiming is open, and the cost of that is a race the operator can lose: an
-installation that is reachable before its operator gets to it can be claimed by
-whoever finds it first. The damage is bounded — an empty installation, no data to
-take, and the host command below takes it back — but it is a real window and the
-next section is what keeps it narrow.
+## The claim secret
+
+```yaml
+Logaffe__Claim__Mode: secret     # the default
+Logaffe__Claim__Secret: ""       # empty: the installation draws one
+```
+
+In this mode the installation is **not claimable by anyone who cannot present the
+secret**, and there is no deadline of any kind. A door that is locked does not
+need a clock: an installation that is brought up and forgotten is not an open
+door, and the operator can claim it a week later from wherever they are
+([ADR 0040](./adr/0040-the-claim-is-guarded-by-a-secret-or-by-a-window.md)).
+
+**Either the installation draws the secret or the operator sets it.** A drawn one
+is thirty-two symbols of the same transcription-safe alphabet a token is written
+in — no `l`, no `o`, no `0`, no `1` — because this is a value that gets read off
+a terminal and typed into a browser on another machine more often than a token
+ever is. It lands in two places on the start that draws it:
+
+```
+/var/lib/logaffe/claim-secret.txt      on the host volume, readable by its owner alone
+```
+
+and once in the container log, which is where somebody watching a first start is
+already looking. Every later start while the installation is still unclaimed
+names the file without repeating the secret, because an operator who restarted a
+container has not lost anything.
+
+A secret set as configuration is **not stored at all** — it is compared against
+what configuration says, so changing it is editing the compose file and there is
+no second copy to disagree with. It has to be at least sixteen characters or the
+installation refuses to start, which is the one rule this value has: it is
+pasted, not recited, and anything shorter is somebody typing a word.
+
+**The secret guards the act of claiming and nothing else.** It is not a factor
+alongside the password, it grants nothing on its own, and it stops working the
+moment the installation is claimed — at which point the file is removed, because
+what is left otherwise is a credential for a door that no longer opens. Losing it
+before that is what Host Recovery is for.
+
+**This is the mode an unattended installation uses.** Whoever performs it — a
+person, a script, an agent — writes the compose file, brings the installation up,
+reads the secret and hands it over. The person who claims never has to be the
+person who installed, and never has to be at a browser within minutes of the
+container coming up.
 
 ## The claim window
 
-The window opens when the installation **first runs**, lasts **30 minutes**, and
-**a restart does not extend it**. The deadline belongs to the installation rather
-than to the process, so nobody gains anything by forcing a restart, and an
-installation that is brought up and forgotten stops being an open door half an
-hour later rather than indefinitely.
+```yaml
+Logaffe__Claim__Mode: window
+```
+
+In this mode there is no secret and **anyone who can reach the installation may
+claim it**, for a window that opens when the installation **first runs**, lasts
+**30 minutes**, and that **a restart does not extend**. The deadline belongs to
+the installation rather than to the process, so nobody gains anything by forcing
+a restart.
+
+Claiming is open here, and the cost of that is a race the operator can lose: an
+installation that is reachable before its operator gets to it can be claimed by
+whoever finds it first. The damage is bounded — an empty installation, no data to
+take, and the host command below takes it back — but it is a real window, and
+thirty minutes is what keeps it narrow.
 
 Thirty minutes is deliberately short, and it is short because the way back is
 cheap. The alternative reading — make the window generous so nobody is locked
@@ -44,81 +94,82 @@ against a scanner's patience.
 When the window lapses, claiming over the network is over. The installation says
 so plainly and names the host command that re-opens it, because an operator
 meeting this screen is already having a bad minute and does not need to search
-for the answer. The container log says the same thing on every start, since an
-operator bringing an installation up for the first time is watching it.
+for the answer. The container log says the same thing on every start.
+
+**This mode exists for the installation that cannot read a file or a container
+log** — a one-click host, a hosting panel, somebody else's Docker. It is the
+older of the two rather than the better one, and it is chosen deliberately.
 
 The instant the window hangs off lives **in the database**, which makes the first
 run the run that created the schema
-([ADR 0034](./adr/0034-the-claim-window-is-a-row-in-the-database.md)). One
-consequence is worth knowing in advance: an installation restored from a backup
-taken *before* it was claimed comes back with that old window, which has long
-since lapsed, and is opened again with the host command below.
+([ADR 0034](./adr/0034-the-claim-window-is-a-row-in-the-database.md)), and so does
+the hash of a drawn secret. One consequence is worth knowing in advance: an
+installation restored from a backup taken *before* it was claimed comes back with
+that old window, which has long since lapsed, and is opened again with the host
+command below. In secret mode the same restore behaves better — the hash travels
+in the database and the secret on the volume, so a backup holding both halves
+comes back claimable with the secret it always had.
 
 ## The claim is one act
 
-The flow establishes, in order:
+The claim establishes a **password** and nothing else. It is a single request:
+the installation is unclaimed until it succeeds, a claim that is abandoned holds
+nothing, and there is no reservation, no lock and no half-claimed state to clean
+up ([ADR 0014](./adr/0014-the-claim-is-atomic-and-holds-nothing.md)). In window
+mode, two people racing both get to fill the screen in, and whoever sends it
+first has the installation while the other is refused against an installation
+that is no longer unclaimed.
 
-1. a **password**,
-2. a **second factor** — a TOTP authenticator, enrolled during setup rather than
-   offered afterwards,
-3. **backup codes**, shown once and confirmed by typing one back.
+**The second factor is not part of it**
+([ADR 0041](./adr/0041-the-second-factor-is-offered-not-required.md)). It used to
+be — a TOTP enrolment and a sheet of backup codes, shown and confirmed before the
+claim completed — and requiring it there meant the first act of a new
+installation depended on the claimant having an authenticator to hand at that
+minute. An operator enrols one afterwards, from the settings, whenever they
+decide to, and the installation says the second factor is off for as long as it
+is. How that works is [Signing in and sessions](./sign-in.md).
 
-**It is atomic.** The installation stays unclaimed until the last step completes,
-and a claim that is started and abandoned holds nothing. There is no reservation,
-no lock, and no half-claimed state to clean up: two people racing both get to
-walk the flow, and whoever confirms their backup codes first has the
-installation, while the other's final step fails against an installation that is
-no longer unclaimed
-([ADR 0014](./adr/0014-the-claim-is-atomic-and-holds-nothing.md)).
-
-Because nothing is stored before the last step, the secret and the codes have to
-survive between the screen that shows them and the request that completes the
-claim — and they survive **in the browser**, alongside a sealed copy the
-installation drew and only the installation can read
-([ADR 0035](./adr/0035-the-claim-hands-its-enrolment-back-sealed.md)). That is
-what keeps "the installation drew these at full entropy" a fact rather than a
-hope, without a half-claimed row anywhere.
-
-The second factor cannot be turned off later. `VISION.md` puts it in the guided
-setup precisely so it is not an optional extra, and a single god-mode account on
-the public internet is not a place where that is negotiable afterwards. It can be
-re-enrolled by a signed-in operator, which is how a replaced phone stays an
-ordinary event. Backup codes are single-use, and a fresh set can be generated at
-any time, which replaces the old set entirely.
-
-How the operator gets back in on an ordinary day, from whatever machine they are
-at, is [Signing in and sessions](./sign-in.md).
+The password is at least sixteen characters
+([ADR 0042](./adr/0042-the-password-carries-more-so-it-gets-longer.md)), which is
+what it is worth on an installation where it may be the only credential.
 
 ## The operator has no name and no address
 
-Sign-in is a password and the second factor. There is **no username**, because an
-installation has exactly one account and a name that identifies which of one is
-decoration. There is **no email address**, because the product sends no mail at
-all — no verification, no notification, no password reset — and storing an
-address that is never written to would be inviting the feature that reads it
+Sign-in is a password, and a second factor if one is enrolled. There is **no
+username**, because an installation has exactly one account and a name that
+identifies which of one is decoration. There is **no email address**, because the
+product sends no mail at all — no verification, no notification, no password
+reset — and storing an address that is never written to would be inviting the
+feature that reads it
 ([ADR 0015](./adr/0015-the-operator-has-no-username-and-no-email.md)).
 
 Consequently there is **no password reset over the network**. Forgetting the
-password is the same event as losing the second factor and the backup codes, and
-it has the same answer: the host.
+password has the same answer as losing the second factor and the backup codes
+with it: the host.
 
 ## After the claim
 
-What follows the claim is a **guide, not a stage**: it offers the first project
-and hands over a copy-paste delivery pointed at this installation, with the
-ingest token already in it. It can be skipped, it holds no state, and nothing is
-half-configured if it is abandoned — the installation is fully claimed the moment
-the claim completed.
+What follows the claim is a **guide, not a stage**: it offers the second factor,
+then the first project with a copy-paste delivery pointed at this installation
+and the ingest token already in it. It can be skipped, it holds no state, and
+nothing is half-configured if it is abandoned — the installation is fully claimed
+the moment the claim completed.
 
-It exists because `VISION.md` makes ingestion friction the adoption barrier, and
-the shortest path from a running installation to a log arriving is a snippet the
-operator does not have to assemble from documentation.
+The second factor comes first in it because that is the one thing on the list the
+operator cannot be reminded of by anything else later except the banner, and
+because it costs a phone that is already in their hand. Skipping it is a
+decision, not an oversight, and the interface keeps saying so.
+
+The rest exists because `VISION.md` makes ingestion friction the adoption
+barrier, and the shortest path from a running installation to a log arriving is a
+snippet the operator does not have to assemble from documentation.
 
 **The guide is the interface's, and the backend knows nothing about it.** It is
-the act that creates a project and the act that issues an ingest token, walked in
-order by the single-page application. There is no endpoint that reports how far
-along it is: a guide that holds no state has no progress to report, and one that
-reported it would be the stage this is not.
+the act that enrols a second factor, the act that creates a project and the act
+that issues an ingest token, walked in order by the single-page application.
+There is no endpoint that reports how far along it is: a guide that holds no
+state has no progress to report, and one that reported it would be the stage this
+is not.
 
 **What it hands over is the plain path** — an address, a header and one CLEF
 line, which needs nothing installed and works from any language
@@ -155,11 +206,15 @@ command name will expect the smaller thing — a password reset — so it prints
 what it removes and asks for the word `recover` before touching anything. A
 caller with no terminal passes `--yes`.
 
-It **returns the installation to unclaimed** and arms a fresh claim window
-([ADR 0013](./adr/0013-host-recovery-returns-the-installation-to-unclaimed.md)).
-That single operation covers both cases `VISION.md` asks it to: an operator who
-lost their second factor and their backup codes, and an installation whose window
-lapsed before anyone claimed it.
+It **returns the installation to unclaimed** and opens the way in again
+([ADR 0013](./adr/0013-host-recovery-returns-the-installation-to-unclaimed.md)),
+in whichever form that installation is configured for: it draws and prints a
+fresh claim secret, or it arms a fresh window. The secret is drawn rather than
+reused, because this is exactly the moment at which the installation's notion of
+who may claim it changes. That single operation covers every case `VISION.md`
+asks it to — an operator who forgot their password, one who lost their second
+factor and their backup codes with it, and an installation whose door closed
+before anyone came through it.
 
 **Projects, ingest tokens and log entries are untouched.** Recovery replaces who
 the installation belongs to, not what it holds, and an application shipping logs
@@ -185,24 +240,27 @@ one place a record of it can survive the reset it performs.
 ## Abuse protection on this surface
 
 The claim and the sign-in are public, pre-authentication and reachable by anyone,
-so they carry the rate limits `VISION.md` requires of every exposed endpoint.
-Failed sign-ins are throttled by their source and **never lock the account**,
-because with one account a lockout is a weapon pointed at its owner
-([ADR 0017](./adr/0017-a-wrong-password-never-locks-the-account.md)). A rate
-limit on the claim does not stop somebody who wins the race honestly — it stops
-the automated attempt at the password afterwards.
+so they carry the rate limits `VISION.md` requires of every exposed endpoint. A
+presented claim secret is compared in constant time and behind those limits, like
+any other credential on a public surface. Failed sign-ins are throttled by their
+source and **never lock the account**, because with one account a lockout is a
+weapon pointed at its owner
+([ADR 0017](./adr/0017-a-wrong-password-never-locks-the-account.md)) — and that
+holds all the more on an installation whose operator enrolled no second factor,
+where the throttle is the whole of what stands in front of a guess.
 
 ## What is deliberately not here
 
-- **No setup token or install secret.** Settled in `VISION.md`: the claim is open
-  to whoever reaches it, and the short window plus Host Recovery is the answer to
-  what that costs.
+- **No setup secret that has to be fetched from somewhere.** The claim secret is
+  produced by the installation being installed, or set by the person installing
+  it; window mode needs none at all. Neither involves an account anywhere, a
+  licence, or a service to ask.
 - **No email, anywhere.** No verification, no reset link, no notification that a
   claim happened. There is nothing to notify: the account that would be told is
   the one being created.
 - **No second account, no invitation, no delegation.** Settled in `VISION.md`:
   one operator, no user model.
-- **No disabling the second factor** once the installation is claimed.
 - **No account recovery over the network**, by any mechanism, for any reason.
 - **No re-claim while claimed.** An installation with an operator is not
-  claimable, and the only route back to unclaimed is the host.
+  claimable, and the only route back to unclaimed is the host. Neither claim
+  setting does anything on an installation that already has an operator.

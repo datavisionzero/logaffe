@@ -174,14 +174,15 @@ public sealed class RestoreTests(PostgresFixture postgres) : IDisposable
         var cipher = CipherOn(volume);
 
         var theOperator = Operator.Claim(
-            new FrameworkPasswordHasher().Hash(Password.Create(TheirPassword)),
-            cipher.Encrypt(SecondFactorSecret),
-            Claimed);
+            new FrameworkPasswordHasher().Hash(Password.Create(TheirPassword)), Claimed);
+        theOperator.EnrolSecondFactor(cipher.Encrypt(SecondFactorSecret), Claimed);
 
-        Assert.True(await new Operators(context).TryClaimAsync(
-            theOperator,
+        var operators = new Operators(context);
+        Assert.True(await operators.TryClaimAsync(
+            theOperator, TestContext.Current.CancellationToken));
+        await operators.ReplaceBackupCodesAsync(
             BackupCode.MintSet(theOperator.Id, Claimed).Stored,
-            TestContext.Current.CancellationToken));
+            TestContext.Current.CancellationToken);
 
         var project = Project.Create(projectName, RetentionWindow.OfDays(14), Claimed);
         var minted = TokenText.Mint(TokenKind.Ingest);

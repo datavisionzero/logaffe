@@ -86,10 +86,10 @@ public sealed class KeyFitsTests(PostgresFixture postgres) : IDisposable
         var volume = NewVolume();
         var context = await MigratedAsync();
         var cipher = CipherOn(volume);
-        context.Operators.Add(Operator.Claim(
-            "AQAAAAIAAYagAAAAE-not-a-real-hash",
-            cipher.Encrypt("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"),
-            Now));
+        var theOperator = Operator.Claim("AQAAAAIAAYagAAAAE-not-a-real-hash", Now);
+        theOperator.EnrolSecondFactor(
+            cipher.Encrypt("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"), Now);
+        context.Operators.Add(theOperator);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         // An installation claimed a minute ago holds no project, no token and

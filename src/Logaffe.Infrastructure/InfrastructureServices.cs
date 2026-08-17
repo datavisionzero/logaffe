@@ -68,6 +68,12 @@ public static class InfrastructureServices
         services.AddSingleton<IHostVolume>(_ => new HostVolume(VolumePath(configuration)));
         services.AddSingleton<ISecretCipher, AesGcmSecretCipher>();
 
+        // Where a drawn claim secret is put for the operator to read. It is on
+        // the same volume and is not part of it in any other sense: it is written
+        // once, read once and removed by the claim (ADR 0040).
+        services.AddSingleton<IClaimSecretHandover>(
+            _ => new ClaimSecretFile(VolumePath(configuration)));
+
         // Neither of these holds anything: one is PBKDF2 with its parameters
         // written into every hash it produces, the other is arithmetic over a
         // secret the caller brings.

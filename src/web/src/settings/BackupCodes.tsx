@@ -9,6 +9,9 @@ import { BackupCodeSheet } from "../session/Enrolment";
  * factor. It **ends no session**: replacing the way back in says nothing about
  * the browsers already signed in (`docs/sign-in.md`), which is the one thing
  * that distinguishes it from the two acts around it.
+ *
+ * There is nothing to issue on an account with no second factor, since a code
+ * that stands in for one that is not there stands in for nothing (ADR 0041).
  */
 export function BackupCodes() {
   const [password, setPassword] = useState("");
@@ -35,7 +38,10 @@ export function BackupCodes() {
       setProblem(
         response.status === 400
           ? problemWith(error, "password")
-          : "This installation refused to issue a sheet.",
+          : response.status === 409
+            ? "There is no second factor on this account for these to stand in for. "
+              + "Enrol one above, and a sheet comes with it."
+            : "This installation refused to issue a sheet.",
       );
     } catch {
       setProblem("This installation did not answer.");

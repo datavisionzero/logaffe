@@ -34,11 +34,12 @@ public sealed class OperatorCredentialActsTests
     public OperatorCredentialActsTests()
     {
         _enrolledSecret = _secondFactor.MintSecret();
-        _theOperator = Operator.Claim(
-            StubPasswordHasher.HashOf(TheirPassword),
-            _cipher.Encrypt(_enrolledSecret),
-            Claimed);
+        _theOperator = Operator.Claim(StubPasswordHasher.HashOf(TheirPassword), Claimed);
 
+        // The state an enrolment leaves behind, which is where most of what is
+        // asserted here starts. A claim on its own leaves no second factor
+        // (ADR 0041), and the acts that start from that state say so.
+        _theOperator.EnrolSecondFactor(_cipher.Encrypt(_enrolledSecret), Claimed);
         _backupCodes = _operators.Claim(_theOperator, Claimed).Shown;
 
         _asking = Seed();
@@ -85,10 +86,10 @@ public sealed class OperatorCredentialActsTests
         var spent = _operators.BackupCodes[0];
         spent.ConsumeAt(_clock.Now);
 
-        var shown = await IssueBackupCodes(TheirPassword);
+        var sheet = await IssueBackupCodes(TheirPassword);
 
-        Assert.NotNull(shown);
-        Assert.Equal(BackupCode.SetSize, shown.Count);
+        Assert.Equal(SheetOutcome.Issued, sheet.Outcome);
+        Assert.Equal(BackupCode.SetSize, sheet.Codes.Count);
 
         // Wholesale (ADR 0032): the spent ones go with the rest, and nothing of
         // the old sheet survives.
@@ -104,7 +105,9 @@ public sealed class OperatorCredentialActsTests
     [Fact]
     public async Task A_fresh_sheet_is_refused_without_the_password()
     {
-        Assert.Null(await IssueBackupCodes("some other passphrase"));
+        Assert.Equal(
+            SheetOutcome.PasswordRefused,
+            (await IssueBackupCodes("some other passphrase")).Outcome);
 
         // Ten of these are ten ways past the second factor, so an unlocked
         // browser on its own does not get them.
@@ -114,22 +117,22 @@ public sealed class OperatorCredentialActsTests
     [Fact]
     public async Task A_re_enrolment_replaces_the_secret_the_sheet_and_every_other_session()
     {
-        var drawn = await BeginReEnrolment();
+        var drawn = await BeginEnrolment();
 
-        var outcome = await ReEnrol(
+        var outcome = await Enrol(
             TheirPassword,
             _secondFactor.CodeFor(_enrolledSecret),
             null,
             _secondFactor.CodeFor(drawn.SecondFactorSecret),
             drawn.Ticket);
 
-        Assert.Equal(ReEnrolmentOutcome.ReEnrolled, outcome);
+        Assert.Equal(EnrolmentOutcome.Enrolled, outcome);
 
         // The row holds the new secret sealed, and the previous one is gone
         // rather than kept beside it.
         Assert.Equal(
             drawn.SecondFactorSecret,
-            _cipher.Decrypt(_theOperator.EncryptedSecondFactorSecret));
+            _cipher.Decrypt(_theOperator.EncryptedSecondFactorSecret!));
         Assert.Equal(_clock.Now, _theOperator.SecondFactorEnrolledAt);
 
         // The sheet shown with it is the operator's now, and it is the one that
@@ -144,16 +147,16 @@ public sealed class OperatorCredentialActsTests
     [Fact]
     public async Task A_backup_code_stands_in_for_a_phone_that_is_already_gone()
     {
-        var drawn = await BeginReEnrolment();
+        var drawn = await BeginEnrolment();
 
-        var outcome = await ReEnrol(
+        var outcome = await Enrol(
             TheirPassword,
             null,
             _backupCodes[0].Display,
             _secondFactor.CodeFor(drawn.SecondFactorSecret),
             drawn.Ticket);
 
-        Assert.Equal(ReEnrolmentOutcome.ReEnrolled, outcome);
+        Assert.Equal(EnrolmentOutcome.Enrolled, outcome);
 
         // It is not spent: the set it belongs to is replaced by this same act a
         // moment later, so consuming it would be a fact written about a row that
@@ -164,26 +167,26 @@ public sealed class OperatorCredentialActsTests
     [Fact]
     public async Task A_ticket_this_installation_did_not_seal_is_refused()
     {
-        var drawn = await BeginReEnrolment();
+        var drawn = await BeginEnrolment();
 
-        var outcome = await ReEnrol(
+        var outcome = await Enrol(
             TheirPassword,
             _secondFactor.CodeFor(_enrolledSecret),
             null,
             _secondFactor.CodeFor(drawn.SecondFactorSecret),
             "not-a-ticket-this-installation-sealed");
 
-        Assert.Equal(ReEnrolmentOutcome.EnrolmentNotOurs, outcome);
+        Assert.Equal(EnrolmentOutcome.EnrolmentNotOurs, outcome);
         Assert.Equal(0, _operators.Writes);
     }
 
     [Fact]
     public async Task A_ticket_drawn_too_long_ago_is_refused()
     {
-        var drawn = await BeginReEnrolment();
-        _clock.Now += ReEnrolmentTicket.Lifetime + TimeSpan.FromMinutes(1);
+        var drawn = await BeginEnrolment();
+        _clock.Now += EnrolmentTicket.Lifetime + TimeSpan.FromMinutes(1);
 
-        var outcome = await ReEnrol(
+        var outcome = await Enrol(
             TheirPassword,
             _secondFactor.CodeFor(_enrolledSecret),
             null,
@@ -192,16 +195,16 @@ public sealed class OperatorCredentialActsTests
 
         // The operator starts the enrolment again, which costs them a QR code
         // and nothing else.
-        Assert.Equal(ReEnrolmentOutcome.EnrolmentNotOurs, outcome);
+        Assert.Equal(EnrolmentOutcome.EnrolmentNotOurs, outcome);
         Assert.Equal(0, _operators.Writes);
     }
 
     [Fact]
     public async Task A_code_the_new_app_does_not_produce_leaves_the_second_factor_alone()
     {
-        var drawn = await BeginReEnrolment();
+        var drawn = await BeginEnrolment();
 
-        var outcome = await ReEnrol(
+        var outcome = await Enrol(
             TheirPassword,
             _secondFactor.CodeFor(_enrolledSecret),
             null,
@@ -211,8 +214,8 @@ public sealed class OperatorCredentialActsTests
         // The step that proves the app really holds the enrolment. Failing it
         // here is an afternoon; failing it at the next sign-in is a phone that
         // cannot produce the code the installation now wants.
-        Assert.Equal(ReEnrolmentOutcome.NewSecondFactorRefused, outcome);
-        Assert.Equal(_enrolledSecret, _cipher.Decrypt(_theOperator.EncryptedSecondFactorSecret));
+        Assert.Equal(EnrolmentOutcome.NewSecondFactorRefused, outcome);
+        Assert.Equal(_enrolledSecret, _cipher.Decrypt(_theOperator.EncryptedSecondFactorSecret!));
         Assert.Equal(0, _operators.Writes);
         Assert.Equal(2, _sessions.Stored.Count);
     }
@@ -220,9 +223,9 @@ public sealed class OperatorCredentialActsTests
     [Fact]
     public async Task The_second_factor_in_use_has_to_be_proved()
     {
-        var drawn = await BeginReEnrolment();
+        var drawn = await BeginEnrolment();
 
-        var outcome = await ReEnrol(
+        var outcome = await Enrol(
             TheirPassword,
             "000000",
             null,
@@ -231,23 +234,23 @@ public sealed class OperatorCredentialActsTests
 
         // Otherwise an unlocked browser is enough to replace the factor that
         // makes public exposure defensible (ADR 0016).
-        Assert.Equal(ReEnrolmentOutcome.SecondFactorRefused, outcome);
+        Assert.Equal(EnrolmentOutcome.SecondFactorRefused, outcome);
         Assert.Equal(0, _operators.Writes);
     }
 
     [Fact]
     public async Task A_re_enrolment_without_the_password_writes_nothing()
     {
-        var drawn = await BeginReEnrolment();
+        var drawn = await BeginEnrolment();
 
-        var outcome = await ReEnrol(
+        var outcome = await Enrol(
             "some other passphrase",
             _secondFactor.CodeFor(_enrolledSecret),
             null,
             _secondFactor.CodeFor(drawn.SecondFactorSecret),
             drawn.Ticket);
 
-        Assert.Equal(ReEnrolmentOutcome.PasswordRefused, outcome);
+        Assert.Equal(EnrolmentOutcome.PasswordRefused, outcome);
         Assert.Equal(0, _operators.Writes);
         Assert.Equal(0, _sessions.Writes);
     }
@@ -255,7 +258,7 @@ public sealed class OperatorCredentialActsTests
     [Fact]
     public async Task The_step_that_draws_the_enrolment_stores_nothing()
     {
-        var drawn = await BeginReEnrolment();
+        var drawn = await BeginEnrolment();
 
         Assert.NotNull(drawn);
         Assert.Equal(BackupCode.SetSize, drawn.BackupCodes.Count);
@@ -263,10 +266,124 @@ public sealed class OperatorCredentialActsTests
 
         // The second factor that worked this morning still works this evening,
         // and the sheet in the operator's drawer is still the one that admits.
-        Assert.Equal(_enrolledSecret, _cipher.Decrypt(_theOperator.EncryptedSecondFactorSecret));
+        Assert.Equal(_enrolledSecret, _cipher.Decrypt(_theOperator.EncryptedSecondFactorSecret!));
         Assert.Equal(0, _operators.Writes);
         Assert.Equal(0, _sessions.Writes);
     }
+
+    [Fact]
+    public async Task A_first_enrolment_asks_for_the_password_and_the_new_code_alone()
+    {
+        // The state a claim leaves behind: an account, and nothing in use to
+        // prove (ADR 0041).
+        var fresh = new InMemoryOperators();
+        var theOperator = Operator.Claim(StubPasswordHasher.HashOf(TheirPassword), Claimed);
+        fresh.ClaimWithoutASecondFactor(theOperator);
+
+        var drawn = await new BeginEnrolment(fresh, _secondFactor, _cipher, _clock)
+            .ExecuteAsync("logs.example.com", TestContext.Current.CancellationToken);
+        Assert.NotNull(drawn);
+
+        var outcome = await new EnrolTheSecondFactor(
+                fresh, _sessions, _hasher, _secondFactor, _cipher, _clock)
+            .ExecuteAsync(
+                TheirPassword,
+                null,
+                null,
+                _secondFactor.CodeFor(drawn.SecondFactorSecret),
+                drawn.Ticket,
+                _asking,
+                TestContext.Current.CancellationToken);
+
+        Assert.Equal(EnrolmentOutcome.Enrolled, outcome);
+        Assert.True(theOperator.HasSecondFactor);
+        Assert.Equal(
+            drawn.SecondFactorSecret,
+            _cipher.Decrypt(theOperator.EncryptedSecondFactorSecret!));
+
+        // The sheet arrives with it, on the account that had none.
+        Assert.Equal(BackupCode.SetSize, fresh.BackupCodes.Count);
+    }
+
+    [Fact]
+    public async Task Turning_it_off_takes_the_codes_and_ends_every_other_session()
+    {
+        var outcome = await TurnOff(TheirPassword, _secondFactor.CodeFor(_enrolledSecret), null);
+
+        Assert.Equal(TurningOffOutcome.TurnedOff, outcome);
+        Assert.False(_theOperator.HasSecondFactor);
+        Assert.Null(_theOperator.SecondFactorEnrolledAt);
+
+        // A code that stands in for a second factor that is not there stands in
+        // for nothing.
+        Assert.Empty(_operators.BackupCodes);
+
+        Assert.Equal([_asking], _sessions.Stored);
+    }
+
+    [Fact]
+    public async Task Turning_it_off_costs_what_enrolling_costs()
+    {
+        // A session somebody took is not a session that can strip the account
+        // down to one credential (ADR 0041).
+        Assert.Equal(
+            TurningOffOutcome.PasswordRefused,
+            await TurnOff("some other passphrase", _secondFactor.CodeFor(_enrolledSecret), null));
+
+        Assert.Equal(
+            TurningOffOutcome.SecondFactorRefused,
+            await TurnOff(TheirPassword, "000000", null));
+
+        Assert.True(_theOperator.HasSecondFactor);
+        Assert.Equal(BackupCode.SetSize, _operators.BackupCodes.Count);
+        Assert.Equal([_asking, _elsewhere], _sessions.Stored);
+    }
+
+    [Fact]
+    public async Task A_backup_code_turns_it_off_and_is_not_spent_doing_it()
+    {
+        // The set is replaced by this same act a moment later, so consuming one
+        // would be writing down a fact about a row that is about to be gone.
+        var outcome = await TurnOff(TheirPassword, null, _backupCodes[2].Symbols);
+
+        Assert.Equal(TurningOffOutcome.TurnedOff, outcome);
+        Assert.Empty(_operators.BackupCodes);
+    }
+
+    [Fact]
+    public async Task There_is_nothing_to_turn_off_twice()
+    {
+        Assert.Equal(
+            TurningOffOutcome.TurnedOff,
+            await TurnOff(TheirPassword, _secondFactor.CodeFor(_enrolledSecret), null));
+
+        Assert.Equal(
+            TurningOffOutcome.NoSecondFactor,
+            await TurnOff(TheirPassword, "000000", null));
+    }
+
+    [Fact]
+    public async Task A_fresh_sheet_is_refused_where_there_is_no_second_factor_for_it()
+    {
+        await TurnOff(TheirPassword, _secondFactor.CodeFor(_enrolledSecret), null);
+
+        var sheet = await IssueBackupCodes(TheirPassword);
+
+        Assert.Equal(SheetOutcome.NoSecondFactor, sheet.Outcome);
+        Assert.Empty(sheet.Codes);
+        Assert.Empty(_operators.BackupCodes);
+    }
+
+    private Task<TurningOffOutcome> TurnOff(
+        string? password, string? secondFactorCode, string? backupCode) =>
+        new TurnOffTheSecondFactor(
+                _operators, _sessions, _hasher, _secondFactor, _cipher, _clock)
+            .ExecuteAsync(
+                password,
+                secondFactorCode,
+                backupCode,
+                _asking,
+                TestContext.Current.CancellationToken);
 
     private Session Seed() => _sessions.Seed(
         Session.Start(_theOperator.Id, SessionSecret.Mint(), "203.0.113.7", Claimed));
@@ -275,13 +392,13 @@ public sealed class OperatorCredentialActsTests
         new ChangePassword(_operators, _sessions, _hasher).ExecuteAsync(
             current, chosen, _asking, TestContext.Current.CancellationToken);
 
-    private Task<IReadOnlyList<BackupCodeText>?> IssueBackupCodes(string? password) =>
+    private Task<IssuedSheet> IssueBackupCodes(string? password) =>
         new IssueBackupCodes(_operators, _hasher, _clock).ExecuteAsync(
             password, TestContext.Current.CancellationToken);
 
-    private async Task<ReEnrolment> BeginReEnrolment()
+    private async Task<Enrolment> BeginEnrolment()
     {
-        var drawn = await new BeginReEnrolment(_operators, _secondFactor, _cipher, _clock)
+        var drawn = await new BeginEnrolment(_operators, _secondFactor, _cipher, _clock)
             .ExecuteAsync("logs.example.com", TestContext.Current.CancellationToken);
 
         Assert.NotNull(drawn);
@@ -289,13 +406,13 @@ public sealed class OperatorCredentialActsTests
         return drawn;
     }
 
-    private Task<ReEnrolmentOutcome> ReEnrol(
+    private Task<EnrolmentOutcome> Enrol(
         string? password,
         string? secondFactorCode,
         string? backupCode,
         string? newSecondFactorCode,
         string? ticket) =>
-        new ReEnrolTheSecondFactor(
+        new EnrolTheSecondFactor(
                 _operators, _sessions, _hasher, _secondFactor, _cipher, _clock)
             .ExecuteAsync(
                 password,

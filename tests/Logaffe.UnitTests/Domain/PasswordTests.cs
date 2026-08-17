@@ -17,7 +17,7 @@ public sealed class PasswordTests
     [Theory]
     [InlineData("")]
     [InlineData("short")]
-    [InlineData("elevenchar")]
+    [InlineData("fifteencharacte")]
     public void A_password_that_is_too_short_is_refused(string value) =>
         Assert.False(Password.TryCreate(value, out _));
 

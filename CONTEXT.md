@@ -37,20 +37,28 @@ _Avoid_: Bot, assistant, integration, client, sender
 
 **Claim**:
 The act by which an operator takes an unclaimed installation and establishes
-their account, credentials and second factor. An installation is unclaimed until
-it happens, and claimable by anyone who can reach it while it is.
+their account, which is one password and nothing else. An installation is
+unclaimed until it happens, and it happens once.
 _Avoid_: Signup, registration, onboarding, first login, setup
+
+**Claim Secret**:
+The value that must be presented to claim an installation, either set before its
+first start or drawn by the installation and written where the host can read it.
+It guards the act of claiming, not the account, and it stops working the moment
+the installation is claimed.
+_Avoid_: Setup token, install key, invitation, licence, bootstrap password
 
 **Claim Window**:
 The limited period after an installation first runs during which a claim may be
-made over the network. Once it lapses, claiming is only re-enabled from the host
-the installation runs on.
+made over the network without a **Claim Secret**. It is the other way of guarding
+a claim, and once it lapses, claiming is only re-enabled from the host the
+installation runs on.
 _Avoid_: Grace period, trial, timeout, expiry
 
 **Second Factor**:
-The time-based one-time code from an authenticator app that an operator gives
-alongside their password. It is enrolled during the claim, can be re-enrolled by
-a signed-in operator, and cannot be turned off.
+The time-based one-time code from an authenticator app that an operator may give
+alongside their password. It is optional and no part of the claim: a signed-in
+operator enrols it, re-enrols it and can turn it off again.
 _Avoid_: 2FA, MFA, OTP, passkey, authenticator
 
 **Session**:
@@ -60,16 +68,18 @@ after a period of disuse.
 _Avoid_: Login, token, cookie, device, connection
 
 **Backup Code**:
-One of a set of single-use codes shown once during the claim and confirmed there,
-which stands in for the second factor when it is unavailable. A fresh set can be
-generated at any time and replaces the previous one entirely.
+One of a set of single-use codes shown once when a **Second Factor** is enrolled,
+which stands in for it when it is unavailable. A fresh set can be generated at
+any time and replaces the previous one entirely, and an operator who has enrolled
+no second factor has none.
 _Avoid_: Recovery code, one-time password, fallback, emergency key
 
 **Host Recovery**:
 The command run inside the running container that returns an installation to
-unclaimed and arms a fresh claim window, keeping its projects, tokens and
-entries. It is reachable from the host and never over the network, and it is the
-only route back into a claimed installation.
+unclaimed and opens the way in again — a fresh **Claim Secret** or a fresh
+**Claim Window** — keeping its projects, tokens and entries. It is reachable from
+the host and never over the network, and it is the only route back into a claimed
+installation.
 _Avoid_: Password reset, admin override, rescue mode, break-glass, escape hatch
 
 **Project**:

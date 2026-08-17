@@ -1,5 +1,7 @@
 using Logaffe.Api.Hosting;
 using Logaffe.Application.Operations;
+using Logaffe.Application.Ports;
+using Logaffe.Domain.Operators;
 using Logaffe.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -50,8 +52,26 @@ public static class RecoverCommand
 
         var volumePath = HostConfiguration.VolumePath(builder.Configuration);
 
+        // Read here as the server reads it, because this command opens whichever
+        // door the installation is configured for and a verb that read it
+        // differently would open the other one (ADR 0040). A refusal is said
+        // plainly: the operator is at a keyboard and the fix is in a file they
+        // have open.
+        ClaimSettings claim;
+        try
+        {
+            claim = HostConfiguration.Claim(builder.Configuration);
+        }
+        catch (InvalidOperationException cause)
+        {
+            Console.Error.WriteLine($"\n{cause.Message}");
+
+            return Failed;
+        }
+
         builder.Services.AddLogaffeInfrastructure(builder.Configuration);
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(claim);
         builder.Services.AddScoped<Recover>();
 
         // The operator ran a command and wants two lines back, not the SQL it
@@ -63,7 +83,7 @@ public static class RecoverCommand
             .WriteTo.WriteToLogaffeFile(volumePath)
             .CreateLogger();
 
-        if (!Agreed(args))
+        if (!Agreed(args, claim.Mode))
         {
             return Declined;
         }
@@ -77,17 +97,29 @@ public static class RecoverCommand
                 .GetRequiredService<Recover>()
                 .ExecuteAsync(CancellationToken.None);
 
+            var handoverPath = scope.ServiceProvider
+                .GetRequiredService<IClaimSecretHandover>()
+                .Path;
+
             // Written before anything is said on the terminal, because the
-            // terminal is not where this has to survive.
+            // terminal is not where this has to survive. The secret itself is
+            // not written here: the file log is the one place a record of this
+            // command survives, and a record is not a place for a live
+            // credential.
             log.Warning(
                 "Host Recovery returned this installation to unclaimed. There "
                 + "{ThereWasAnOperator} an operator account, and it is gone along with its "
                 + "sessions and backup codes. {AgentTokens} agent tokens were removed with "
-                + "it. Projects, ingest tokens and entries are untouched. The installation "
-                + "can be claimed by anyone who can reach it until {ClosesAt:u}.",
+                + "it. Projects, ingest tokens and entries are untouched. {HowItIsGuarded}",
                 recovered.ThereWasAnOperator ? "was" : "was no",
                 recovered.AgentTokensRemoved,
-                recovered.Window.ClosesAt);
+                recovered.DrawnSecret is not null
+                    ? "A fresh claim secret was drawn and printed on the terminal."
+                    : claim.Mode is ClaimMode.Secret
+                        ? "It is claimable by whoever presents the claim secret the "
+                        + "configuration names."
+                        : "It can be claimed by anyone who can reach it until "
+                        + $"{recovered.Guard.WindowClosesAt:u}.");
 
             Console.WriteLine(
                 recovered.ThereWasAnOperator
@@ -107,9 +139,30 @@ public static class RecoverCommand
                         + "those agents read nothing until they are given new ones.");
             }
 
-            Console.WriteLine(
-                $"Anyone who can reach this installation can claim it until "
-                + $"{recovered.Window.ClosesAt:u}. Claim it now.");
+            if (recovered.DrawnSecret is not null)
+            {
+                // The one moment this value is ever handed over. The operator
+                // running this command is at the keyboard, which is the whole
+                // reason it can be said out loud here and nowhere else.
+                Console.WriteLine(
+                    $"\nThis installation is claimed by presenting its claim secret, and a "
+                    + $"fresh one has been drawn:\n\n    {recovered.DrawnSecret.Text}\n\n"
+                    + $"It is also in {handoverPath}, and the previous one no longer opens "
+                    + "anything. There is no deadline.");
+            }
+            else if (claim.Mode is ClaimMode.Secret)
+            {
+                Console.WriteLine(
+                    "\nThis installation is claimed by presenting the claim secret its "
+                    + "configuration names, which this command does not change. There is no "
+                    + "deadline.");
+            }
+            else
+            {
+                Console.WriteLine(
+                    $"\nAnyone who can reach this installation can claim it until "
+                    + $"{recovered.Guard.WindowClosesAt:u}. Claim it now.");
+            }
 
             return 0;
         }
@@ -137,7 +190,7 @@ public static class RecoverCommand
     /// <c>--yes</c>, because a prompt nobody can answer would hang the container
     /// rather than protect anything.
     /// </remarks>
-    private static bool Agreed(string[] args)
+    private static bool Agreed(string[] args, ClaimMode mode)
     {
         Console.Error.WriteLine(
             """
@@ -149,10 +202,17 @@ public static class RecoverCommand
             entries are untouched — the installation changes hands, it does not lose
             what it holds, and an application shipping logs through it does not
             notice.
-
-            The installation then belongs to nobody for the next 30 minutes, and anyone
-            who can reach it in that time can claim it.
             """);
+
+        // Which door this is about to open, said before it is opened, because the
+        // two are a different thing to agree to: one of them is a deadline the
+        // operator is about to start racing.
+        Console.Error.WriteLine(
+            mode is ClaimMode.Secret
+                ? "\nThe installation then belongs to nobody, and whoever holds its claim\n"
+                + "secret can claim it. There is no deadline."
+                : "\nThe installation then belongs to nobody for the next 30 minutes, and "
+                + "anyone\nwho can reach it in that time can claim it.");
 
         if (args.Contains("--yes") || args.Contains("-y"))
         {

@@ -10,14 +10,21 @@ be reasoned about on every path that asks whether the installation has an owner.
 
 ## Consequences
 
-Two claimants racing both walk the whole flow, and the one who confirms their
-backup codes first has the installation while the other's final step fails. The
-loser learns this at the end rather than at the beginning, which is the price of
-not holding anything, and it is a screen shown to a person who at that moment
-either owns the host — and can take it back — or was never going to.
+**The claim became one request and this decision got cheaper to hold rather than
+weaker.** With the second factor out of the flow
+([ADR 0041](./0041-the-second-factor-is-offered-not-required.md)) there is one
+step, and one step is atomic for nothing: the row is written or it is not. What
+the decision now says is what it always meant — that reaching the claim screen,
+filling it in, and abandoning it takes nothing and reserves nothing.
 
-Every step before the last is therefore a form with no effect: the password is
-not stored, the second factor is not enrolled, and nothing exists to abandon.
-Whether the installation is claimed is a single fact with no in-between value,
-which is what lets the claim window, the read paths and the recovery command all
+Two claimants racing are therefore decided by the request itself, and the loser
+is refused against an installation that already has an operator. In secret mode
+there are no strangers in that race
+([ADR 0040](./0040-the-claim-is-guarded-by-a-secret-or-by-a-window.md)); in
+window mode there can be, and the answer is unchanged — it is a screen shown to
+a person who at that moment either owns the host, and can take it back, or was
+never going to.
+
+Whether the installation is claimed stays a single fact with no in-between value,
+which is what lets the claim guard, the read paths and the recovery command all
 ask the same question and get an unambiguous answer.

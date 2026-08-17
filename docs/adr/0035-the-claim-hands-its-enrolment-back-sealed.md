@@ -1,5 +1,13 @@
 # The Claim Hands Its Enrolment Back Sealed
 
+**Superseded by
+[ADR 0041](./0041-the-second-factor-is-offered-not-required.md).** The claim no
+longer enrols anything, so it has nothing to hand back and no ticket to seal. The
+mechanism below was not wrong and did not go away — it is the one described in
+[ADR 0036](./0036-an-enrolment-carries-its-own-sealed-ticket.md), which is now
+the only place an enrolment happens. This document is kept because the reasoning
+about provenance is what that one inherits.
+
 [ADR 0014](./0014-the-claim-is-atomic-and-holds-nothing.md) says nothing is
 stored until the last step, and [Setup](../setup.md) says the operator sees their
 authenticator secret and their ten backup codes before that step and confirms one

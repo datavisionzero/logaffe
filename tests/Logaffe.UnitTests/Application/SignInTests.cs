@@ -209,10 +209,9 @@ public sealed class SignInTests
     private static Installation Claimed_installation()
     {
         var installation = Unclaimed_installation();
-        var theOperator = Operator.Claim(
-            StubPasswordHasher.HashOf(TheirPassword),
-            installation.Cipher.Encrypt(StubSecondFactor.Secret),
-            Claimed);
+        var theOperator = Operator.Claim(StubPasswordHasher.HashOf(TheirPassword), Claimed);
+        theOperator.EnrolSecondFactor(
+            installation.Cipher.Encrypt(StubSecondFactor.Secret), Claimed);
 
         installation.BackupCodes = installation.Operators.Claim(theOperator, Claimed).Shown;
 

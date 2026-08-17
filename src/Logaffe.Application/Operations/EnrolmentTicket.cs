@@ -7,39 +7,37 @@ using Logaffe.Domain.Operators;
 namespace Logaffe.Application.Operations;
 
 /// <summary>
-/// What the installation drew for a re-enrolment in progress, carried by the
+/// What the installation drew for an enrolment in progress, carried by the
 /// browser between the two requests and sealed so that only the installation can
 /// read it.
 /// </summary>
 /// <remarks>
 /// <para>
-/// A re-enrolment has the shape the claim already solved: a new secret has to be
-/// shown, scanned and confirmed before it replaces the one in the row, and
-/// nothing may be stored in between — a half-replaced second factor is an
-/// operator locked out of their own installation. So it is solved the same way
-/// (ADR 0035): the values live in the browser, and this sealed copy is what says
-/// the installation drew them at full entropy rather than the caller.
+/// Enrolling a second factor fits in no single request: a secret has to be shown,
+/// scanned and confirmed before it goes into the row, and nothing may be stored in
+/// between — a half-written second factor is an operator locked out of their own
+/// installation. So the values live in the browser, and this sealed copy is what
+/// says the installation drew them at full entropy rather than the caller
+/// (ADR 0036).
 /// </para>
 /// <para>
-/// <b>It is a second type rather than a generalization of
-/// <see cref="ClaimTicket"/>.</b> The two are bound to different things — a
-/// claim ticket to the window it was drawn in, because the installation's notion
-/// of who may claim it changes there, and this one to the operator and a
-/// deadline, because there is no window here and the account it belongs to can
-/// be replaced underneath it. One type carrying both bindings would carry a
-/// field that is empty in half its uses, and it would put the finished claim
-/// path into the blast radius of every change made here.
+/// <b>It is the only ticket type there is.</b> The claim used to carry one of its
+/// own, bound to the claim window it was drawn in (ADR 0035); with the second
+/// factor out of the claim (ADR 0041) there is one enrolment path, and this
+/// ticket is bound to the operator and a deadline — the account it belongs to can
+/// be replaced underneath it, and every enrolment happens behind a full
+/// credential.
 /// </para>
 /// </remarks>
 /// <param name="OperatorId">
-/// Whose re-enrolment this is. A ticket drawn before a Host Recovery is refused
+/// Whose enrolment this is. A ticket drawn before a Host Recovery is refused
 /// after it, because the account that drew it is gone and the one that exists
 /// now never saw it.
 /// </param>
 /// <param name="DrawnAt">
 /// When it was drawn, which is what <see cref="Lifetime"/> is measured from.
 /// </param>
-public sealed record ReEnrolmentTicket(
+public sealed record EnrolmentTicket(
     Guid OperatorId,
     DateTimeOffset DrawnAt,
     string SecondFactorSecret,
@@ -51,18 +49,25 @@ public sealed record ReEnrolmentTicket(
     /// </summary>
     /// <remarks>
     /// A ticket left in a closed tab admits nothing on its own — the request
-    /// that spends it carries the password and the current second factor as
-    /// well — so this is a deadline on a secret nobody can use rather than the
-    /// thing standing between an attacker and the account.
+    /// that spends it carries the password as well, and the second factor in use
+    /// when there is one — so this is a deadline on a secret nobody can use
+    /// rather than the thing standing between an attacker and the account.
     /// </remarks>
     public static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(30);
 
-    /// <inheritdoc cref="ClaimTicket.SealedWith"/>
+    /// <summary>
+    /// Seals the ticket under the key on the host volume and writes it in
+    /// base64url, which is what survives a JSON body and a copy-paste.
+    /// </summary>
     public string SealedWith(ISecretCipher cipher) =>
         Base64Url.EncodeToString(cipher.Encrypt(JsonSerializer.Serialize(this)));
 
-    /// <inheritdoc cref="ClaimTicket.TryOpen"/>
-    public static bool TryOpen(string? value, ISecretCipher cipher, out ReEnrolmentTicket ticket)
+    /// <summary>
+    /// Opens a returned ticket, and refuses anything this installation did not
+    /// seal — which needs the key, so a ticket cannot outlive the key that sealed
+    /// it while the installation is serving.
+    /// </summary>
+    public static bool TryOpen(string? value, ISecretCipher cipher, out EnrolmentTicket ticket)
     {
         ticket = null!;
 
@@ -73,7 +78,7 @@ public sealed record ReEnrolmentTicket(
 
         try
         {
-            var opened = JsonSerializer.Deserialize<ReEnrolmentTicket>(
+            var opened = JsonSerializer.Deserialize<EnrolmentTicket>(
                 cipher.Decrypt(Base64Url.DecodeFromChars(value)));
 
             if (opened is null

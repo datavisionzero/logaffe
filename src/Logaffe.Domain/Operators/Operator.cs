@@ -12,17 +12,17 @@ namespace Logaffe.Domain.Operators;
 /// (ADR 0013).
 /// </para>
 /// <para>
-/// It carries two of the operator's three secrets and stores them differently
-/// because what has to be done with them differs (ADR 0032): the password is
-/// proved without being held, and the second factor's secret is
-/// <em>encrypted</em>, because a code cannot be computed without it. The third —
-/// the backup codes — is <see cref="BackupCode"/>, which is a set rather than a
-/// field.
+/// It carries the operator's secrets and stores them differently because what has
+/// to be done with them differs (ADR 0032): the password is proved without being
+/// held, and the second factor's secret is <em>encrypted</em>, because a code
+/// cannot be computed without it. The backup codes are <see cref="BackupCode"/>,
+/// which is a set rather than a field.
 /// </para>
 /// <para>
-/// The claim is atomic and holds nothing (ADR 0014): an instance of this exists
-/// only when every part of it does, which is why there is one factory taking all
-/// of them and no way to build a half-claimed operator.
+/// <b>The password is the only one of them it must have.</b> The second factor is
+/// the operator's to enrol and to remove (ADR 0041), so an account that holds
+/// none is an ordinary account rather than a half-built one — which is why the
+/// claim takes a password and nothing else.
 /// </para>
 /// </remarks>
 public sealed class Operator
@@ -40,16 +40,10 @@ public sealed class Operator
         // EF Core materializes through this; every other route goes through Claim.
     }
 
-    private Operator(
-        Guid id,
-        string passwordHash,
-        byte[] encryptedSecondFactorSecret,
-        DateTimeOffset claimedAt)
+    private Operator(Guid id, string passwordHash, DateTimeOffset claimedAt)
     {
         Id = id;
         PasswordHash = passwordHash;
-        EncryptedSecondFactorSecret = encryptedSecondFactorSecret;
-        SecondFactorEnrolledAt = claimedAt;
         ClaimedAt = claimedAt;
     }
 
@@ -69,36 +63,40 @@ public sealed class Operator
     /// computed without it (ADR 0032). An installation restored without its key
     /// cannot verify a code at all, and the backup codes are then the only way
     /// in.
+    /// <para>
+    /// <c>null</c> on an account that has enrolled none, which is the state a
+    /// claim leaves behind (ADR 0041).
+    /// </para>
     /// </summary>
-    public byte[] EncryptedSecondFactorSecret { get; private set; } = null!;
+    public byte[]? EncryptedSecondFactorSecret { get; private set; }
 
     /// <summary>
-    /// When the second factor last became this one. A re-enrolment overwrites
-    /// the secret and moves this date; nothing of the previous enrolment
-    /// survives except the fact that there was one, which is the part of a
-    /// history worth keeping (ADR 0032).
+    /// When the second factor became this one, and <c>null</c> while there is
+    /// none. An enrolment over an existing one overwrites the secret and moves
+    /// this date; nothing of the previous enrolment survives except the fact that
+    /// there was one, which is the part of a history worth keeping (ADR 0032).
     /// </summary>
-    public DateTimeOffset SecondFactorEnrolledAt { get; private set; }
+    public DateTimeOffset? SecondFactorEnrolledAt { get; private set; }
+
+    /// <summary>
+    /// Whether a code is going to be asked for at the next sign-in. It is the one
+    /// question every path that touches the second factor starts from, and it is
+    /// asked of the row rather than derived twice.
+    /// </summary>
+    public bool HasSecondFactor => EncryptedSecondFactorSecret is not null;
 
     public DateTimeOffset ClaimedAt { get; private init; }
 
     /// <summary>
-    /// Establishes the account, which is the last step of the claim and the
-    /// moment the installation stops being unclaimed.
+    /// Establishes the account, which is the whole of the claim and the moment
+    /// the installation stops being unclaimed.
     /// </summary>
     /// <exception cref="ArgumentException">
-    /// The password was not hashed, or the second factor's secret was not
-    /// sealed. Either is a corrupt account rather than a claimable one.
+    /// The password was not hashed, which is a corrupt account rather than a
+    /// claimable one.
     /// </exception>
-    public static Operator Claim(
-        string passwordHash,
-        byte[] encryptedSecondFactorSecret,
-        DateTimeOffset claimedAt) =>
-        new(
-            Guid.CreateVersion7(),
-            Hashed(passwordHash),
-            Sealed(encryptedSecondFactorSecret),
-            claimedAt);
+    public static Operator Claim(string passwordHash, DateTimeOffset claimedAt) =>
+        new(Guid.CreateVersion7(), Hashed(passwordHash), claimedAt);
 
     /// <summary>
     /// Takes the password the operator just chose. It is the operator's own act,
@@ -119,20 +117,36 @@ public sealed class Operator
     public void RehashedTo(string passwordHash) => PasswordHash = Hashed(passwordHash);
 
     /// <summary>
-    /// Replaces the second factor with a freshly enrolled one, which is what
-    /// makes a replaced phone an ordinary afternoon (ADR 0016).
+    /// Takes a freshly enrolled second factor, whether or not there was one
+    /// before — which is what makes enrolling and replacing a phone one act
+    /// (ADR 0016, ADR 0041).
     /// </summary>
     /// <remarks>
-    /// An overwrite, not a second enrolment beside the first: the previous
-    /// secret is gone the moment this returns, and what is kept of it is the
-    /// date it stopped being current. Issuing the fresh set of backup codes that
-    /// goes with a re-enrolment is the caller's, because they are their own
-    /// rows.
+    /// An overwrite, not a second enrolment beside the first: a previous secret
+    /// is gone the moment this returns, and what is kept of it is the date it
+    /// stopped being current. Issuing the sheet of backup codes that goes with an
+    /// enrolment is the caller's, because they are their own rows.
     /// </remarks>
-    public void ReEnrolSecondFactor(byte[] encryptedSecondFactorSecret, DateTimeOffset at)
+    public void EnrolSecondFactor(byte[] encryptedSecondFactorSecret, DateTimeOffset at)
     {
         EncryptedSecondFactorSecret = Sealed(encryptedSecondFactorSecret);
         SecondFactorEnrolledAt = at;
+    }
+
+    /// <summary>
+    /// Removes the second factor, leaving an account behind a password alone.
+    /// </summary>
+    /// <remarks>
+    /// It is the operator's decision to make and it costs what enrolling costs —
+    /// the password and a current code — so that a session somebody else took
+    /// cannot strip the account down (ADR 0041). The backup codes go with it,
+    /// because a code that stands in for a second factor that is not there stands
+    /// in for nothing; they are rows, so removing them is the caller's.
+    /// </remarks>
+    public void RemoveSecondFactor()
+    {
+        EncryptedSecondFactorSecret = null;
+        SecondFactorEnrolledAt = null;
     }
 
     private static string Hashed(string? passwordHash) =>

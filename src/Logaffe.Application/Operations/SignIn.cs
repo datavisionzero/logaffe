@@ -32,9 +32,11 @@ public sealed record SignedIn(
 /// <remarks>
 /// <para>
 /// There is nothing to say which account is meant — there is one, and it has no
-/// username and no email address (ADR 0015) — so what arrives is a password and
-/// one second factor, being either the six digits or a backup code standing in
-/// for them (<c>docs/sign-in.md</c>).
+/// username and no email address (ADR 0015) — so what arrives is a password and,
+/// when the account has a second factor, either the six digits or a backup code
+/// standing in for them (<c>docs/sign-in.md</c>). The second factor is the
+/// operator's to enrol (ADR 0041), so an account that has none signs in on the
+/// password alone.
 /// </para>
 /// <para>
 /// <b>Every refusal is the same refusal.</b> A wrong password, a wrong code, a
@@ -107,11 +109,17 @@ public sealed class SignIn(
 
         var now = clock.GetUtcNow();
 
-        var spent = secondFactorCode is null
-            ? await SpendBackupCodeAsync(backupCode, now, cancellationToken)
-            : VerifiesSecondFactor(theOperator, secondFactorCode, now)
-                ? NoCodeWasSpent
-                : null;
+        // An account with no second factor has nothing to prove past the
+        // password, and anything sent alongside it is ignored rather than
+        // refused: what the operator decided is what the sign-in asks for
+        // (ADR 0041).
+        var spent = !theOperator.HasSecondFactor
+            ? NoCodeWasSpent
+            : secondFactorCode is null
+                ? await SpendBackupCodeAsync(backupCode, now, cancellationToken)
+                : VerifiesSecondFactor(theOperator, secondFactorCode, now)
+                    ? NoCodeWasSpent
+                    : null;
 
         if (spent is null)
         {
@@ -144,7 +152,7 @@ public sealed class SignIn(
     private bool VerifiesSecondFactor(
         Operator theOperator, string code, DateTimeOffset now) =>
         secondFactor.Verifies(
-            cipher.Decrypt(theOperator.EncryptedSecondFactorSecret), code, now);
+            cipher.Decrypt(theOperator.EncryptedSecondFactorSecret!), code, now);
 
     /// <summary>
     /// Spends the presented backup code, or answers <c>null</c> when it is not

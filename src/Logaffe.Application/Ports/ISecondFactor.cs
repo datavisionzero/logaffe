@@ -41,7 +41,7 @@ public interface ISecondFactor
 
     /// <summary>
     /// The <c>otpauth:</c> address an authenticator app is enrolled from, which
-    /// is what the QR code shown during the claim carries.
+    /// is what the QR code shown at an enrolment carries.
     /// </summary>
     /// <param name="secret">The secret just minted.</param>
     /// <param name="account">

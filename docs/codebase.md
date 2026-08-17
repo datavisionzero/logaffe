@@ -49,7 +49,8 @@ message template and the rendered form, the trace and span as the byte lengths
 they actually are, the caps and the truncation, the project with its retention
 window and the group it is listed under, the two tokens with the identifier and
 the alphabet they are written in,
-the operator with the session, the backup code and the claim window, and the
+the operator with the session, the backup code, the claim window and the claim
+secret, and the
 filters with the cursor. The test of whether something belongs here is stated
 in ADR 0030: **anything the documents already state as a rule.** A retention
 window that can be constructed above ninety days, or a search text that can be

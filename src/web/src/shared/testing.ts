@@ -67,17 +67,36 @@ export function anInstallationAnswering(routes: Record<Route, Answer | Answer[]>
 }
 
 /** A claimed installation, which is what most screens are reached from. */
-export const claimed = { body: { isClaimed: true, windowIsOpen: false, closesAt: null } };
+export const claimed = {
+  body: { isClaimed: true, canBeClaimed: false, needsSecret: false, closesAt: null },
+};
 
-/** One nobody owns, with the window still open. */
+/** One nobody owns, guarded by a claim secret, which is the default (ADR 0040). */
 export function unclaimed(closesAt: string | null = null) {
-  return { body: { isClaimed: false, windowIsOpen: true, closesAt } };
+  return {
+    body: { isClaimed: false, canBeClaimed: true, needsSecret: true, closesAt },
+  };
+}
+
+/** One nobody owns, guarded by an open window instead. */
+export function unclaimedInWindowMode(closesAt: string | null = null) {
+  return {
+    body: { isClaimed: false, canBeClaimed: true, needsSecret: false, closesAt },
+  };
 }
 
 /** One nobody owns and nobody can: the thirty minutes are up. */
 export const lapsed = {
-  body: { isClaimed: false, windowIsOpen: false, closesAt: null },
+  body: { isClaimed: false, canBeClaimed: false, needsSecret: false, closesAt: null },
 };
+
+/** An operator who has enrolled a second factor, which the shell asks about. */
+export const withSecondFactor = {
+  body: { isEnrolled: true, enrolledAt: "2026-08-16T09:00:00Z" },
+};
+
+/** One who has not, which is the state the banner exists for (ADR 0041). */
+export const withoutSecondFactor = { body: { isEnrolled: false, enrolledAt: null } };
 
 /** A row of the project list, with everything the contract requires on it. */
 export function aProject(project: {

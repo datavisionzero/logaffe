@@ -26,12 +26,45 @@ public sealed record IssueBackupCodesRequest(string? Password);
 public sealed record BackupCodesResponse(IReadOnlyList<string> Codes);
 
 /// <summary>
-/// Everything the last step of a re-enrolment needs, in one request.
+/// Whether a code will be asked for at the next sign-in.
+/// </summary>
+/// <param name="EnrolledAt">
+/// When the second factor became the current one, and <c>null</c> when there is
+/// none.
+/// </param>
+public sealed record SecondFactorResponse(bool IsEnrolled, DateTimeOffset? EnrolledAt);
+
+/// <summary>
+/// What the operator needs in hand before an enrolment can be confirmed, shown
+/// once.
+/// </summary>
+/// <param name="SecondFactorSecret">
+/// The secret in text, under the QR code, for anyone typing it into an app by
+/// hand.
+/// </param>
+/// <param name="EnrolmentUri">The <c>otpauth:</c> address the QR code carries.</param>
+/// <param name="BackupCodes">
+/// Ten codes, grouped for the sheet the operator prints. This is the only time
+/// they exist anywhere but in the operator's hands (ADR 0032).
+/// </param>
+/// <param name="Ticket">
+/// The same material sealed under the installation's key. The enrolment will not
+/// complete without it, and there is nothing in it the operator can read
+/// (ADR 0036).
+/// </param>
+public sealed record EnrolmentResponse(
+    string SecondFactorSecret,
+    string EnrolmentUri,
+    IReadOnlyList<string> BackupCodes,
+    string Ticket);
+
+/// <summary>
+/// Everything the last step of an enrolment needs, in one request.
 /// </summary>
 /// <param name="SecondFactorCode">
 /// Six digits from the authenticator in use, or left out when
 /// <paramref name="BackupCode"/> is given instead — which is the case of the
-/// phone that is already gone.
+/// phone that is already gone — or when there is no second factor in use at all.
 /// </param>
 /// <param name="NewSecondFactorCode">
 /// Six digits from the authenticator just enrolled, which is what proves it
@@ -39,14 +72,21 @@ public sealed record BackupCodesResponse(IReadOnlyList<string> Codes);
 /// </param>
 /// <param name="Ticket">
 /// The sealed enrolment the previous step handed over. There is nothing in it
-/// the operator can read (ADR 0035).
+/// the operator can read (ADR 0036).
 /// </param>
-public sealed record ReEnrolSecondFactorRequest(
+public sealed record EnrolSecondFactorRequest(
     string? Password,
     string? SecondFactorCode,
     string? BackupCode,
     string? NewSecondFactorCode,
     string? Ticket);
+
+/// <summary>
+/// The credentials that removing the second factor costs, which are the ones
+/// enrolling it costs.
+/// </summary>
+public sealed record TurnOffSecondFactorRequest(
+    string? Password, string? SecondFactorCode, string? BackupCode);
 
 /// <summary>
 /// The operator's own credentials: the password, the second factor and the
@@ -68,9 +108,11 @@ public sealed record ReEnrolSecondFactorRequest(
 /// reaching for after a cookie has gone somewhere it should not have.
 /// </para>
 /// <para>
-/// <b>The second factor cannot be turned off, only replaced</b> (ADR 0016).
-/// There is no route here that removes one, and a re-enrolment is a replacement
-/// that leaves no moment in between.
+/// <b>The second factor is enrolled, replaced and removed here, and nowhere
+/// else</b> (ADR 0041). Removing it costs exactly what enrolling it costs, so a
+/// taken session cannot strip the account down to a password — and the state
+/// itself is readable, because an installation running without one has to be able
+/// to say so.
 /// </para>
 /// </remarks>
 public static class OperatorEndpoints
@@ -113,23 +155,42 @@ public static class OperatorEndpoints
                 IssueBackupCodes issue,
                 CancellationToken cancellationToken) =>
             {
-                var codes = await issue.ExecuteAsync(request.Password, cancellationToken);
+                var sheet = await issue.ExecuteAsync(request.Password, cancellationToken);
 
                 // The one response body in the product that carries ten
                 // credentials at once, which is why the request log records no
                 // body anywhere (ADR 0002).
-                return codes is null
-                    ? NotRight("password", "That is not your password.")
-                    : Results.Ok(new BackupCodesResponse(
-                        [.. codes.Select(code => code.Display)]));
+                return sheet.Outcome switch
+                {
+                    SheetOutcome.PasswordRefused => NotRight(
+                        "password", "That is not your password."),
+                    SheetOutcome.NoSecondFactor => NoSecondFactor(),
+                    _ => Results.Ok(new BackupCodesResponse(
+                        [.. sheet.Codes.Select(code => code.Display)])),
+                };
             })
             .WithName("IssueBackupCodes")
             .WithSummary("Replaces the backup codes with a fresh set, shown once.")
             .Produces<BackupCodesResponse>()
+            .Produces(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
 
+        operatorSurface.MapGet("/second-factor", async (
+                CheckTheSecondFactor check, CancellationToken cancellationToken) =>
+            {
+                var state = await check.ExecuteAsync(cancellationToken);
+
+                return state is null
+                    ? Results.Unauthorized()
+                    : Results.Ok(new SecondFactorResponse(state.IsEnrolled, state.EnrolledAt));
+            })
+            .WithName("CheckSecondFactor")
+            .WithSummary("Whether the operator has a second factor, and since when.")
+            .Produces<SecondFactorResponse>()
+            .Produces(StatusCodes.Status401Unauthorized);
+
         operatorSurface.MapPost("/second-factor/enrolment", async (
-                BeginReEnrolment begin, HttpContext context, CancellationToken cancellationToken) =>
+                BeginEnrolment begin, HttpContext context, CancellationToken cancellationToken) =>
             {
                 // The name an authenticator app will show in its list is the
                 // address the operator reached this installation by, which only
@@ -149,18 +210,18 @@ public static class OperatorEndpoints
                         [.. enrolment.BackupCodes.Select(code => code.Display)],
                         enrolment.Ticket));
             })
-            .WithName("BeginReEnrolment")
+            .WithName("BeginEnrolment")
             .WithSummary("Draws a second factor and a sheet of backup codes, and stores neither.")
             .Produces<EnrolmentResponse>()
             .Produces(StatusCodes.Status401Unauthorized);
 
         operatorSurface.MapPut("/second-factor", async (
-                ReEnrolSecondFactorRequest request,
-                ReEnrolTheSecondFactor reEnrol,
+                EnrolSecondFactorRequest request,
+                EnrolTheSecondFactor enrol,
                 HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                var outcome = await reEnrol.ExecuteAsync(
+                var outcome = await enrol.ExecuteAsync(
                     request.Password,
                     request.SecondFactorCode,
                     request.BackupCode,
@@ -171,44 +232,87 @@ public static class OperatorEndpoints
 
                 return RefusedBy(outcome);
             })
-            .WithName("ReEnrolSecondFactor")
+            .WithName("EnrolSecondFactor")
             .WithSummary(
-                "Replaces the second factor, issues fresh backup codes, and ends every "
-                + "other session.")
+                "Enrols or replaces the second factor, issues fresh backup codes, and ends "
+                + "every other session.")
             .Produces(StatusCodes.Status204NoContent)
+            .ProducesValidationProblem();
+
+        // A removal rather than a `DELETE`, because this act carries credentials
+        // and a body on a `DELETE` is the one thing on the way between a browser
+        // and an installation that nothing guarantees survives.
+        operatorSurface.MapPost("/second-factor/removal", async (
+                TurnOffSecondFactorRequest request,
+                TurnOffTheSecondFactor turnOff,
+                HttpContext context,
+                CancellationToken cancellationToken) =>
+            {
+                var outcome = await turnOff.ExecuteAsync(
+                    request.Password,
+                    request.SecondFactorCode,
+                    request.BackupCode,
+                    context.OperatorSession(),
+                    cancellationToken);
+
+                return outcome switch
+                {
+                    TurningOffOutcome.PasswordRefused => NotRight(
+                        "password", "That is not your password."),
+                    TurningOffOutcome.SecondFactorRefused => NotRight(
+                        "secondFactorCode", NeitherACodeNorABackupCode),
+                    TurningOffOutcome.NoSecondFactor => NoSecondFactor(),
+                    _ => Results.NoContent(),
+                };
+            })
+            .WithName("TurnOffSecondFactor")
+            .WithSummary(
+                "Removes the second factor and its backup codes, and ends every other "
+                + "session.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
 
         return endpoints;
     }
 
     private static string APasswordIs =>
-        $"A password is between {Password.MinimumLength} and "
+        $"A password is at least {Password.MinimumLength} and at most "
         + $"{Password.MaximumLength} characters.";
+
+    private static string NeitherACodeNorABackupCode =>
+        "That is neither a code your current authenticator produces now nor an "
+        + "unspent backup code.";
 
     /// <summary>
     /// Which step refused, said by field. There is nobody here but the operator
-    /// — they proved it with the session — and somebody replacing their second
-    /// factor with a phone in one hand has to know which of the three
-    /// credentials did not take.
+    /// — they proved it with the session — and somebody enrolling with a phone in
+    /// one hand has to know which of the credentials did not take.
     /// </summary>
-    private static IResult RefusedBy(ReEnrolmentOutcome outcome) => outcome switch
+    private static IResult RefusedBy(EnrolmentOutcome outcome) => outcome switch
     {
-        ReEnrolmentOutcome.PasswordRefused => NotRight("password", "That is not your password."),
-        ReEnrolmentOutcome.SecondFactorRefused => NotRight(
-            "secondFactorCode",
-            "That is neither a code your current authenticator produces now nor an "
-            + "unspent backup code."),
-        ReEnrolmentOutcome.EnrolmentNotOurs => NotRight(
+        EnrolmentOutcome.PasswordRefused => NotRight("password", "That is not your password."),
+        EnrolmentOutcome.SecondFactorRefused => NotRight(
+            "secondFactorCode", NeitherACodeNorABackupCode),
+        EnrolmentOutcome.EnrolmentNotOurs => NotRight(
             "ticket",
             "This enrolment is not one this installation handed out, or it was drawn too "
             + "long ago. Start again."),
-        ReEnrolmentOutcome.NewSecondFactorRefused => NotRight(
+        EnrolmentOutcome.NewSecondFactorRefused => NotRight(
             "newSecondFactorCode",
             "That is not a code the authenticator you just enrolled produces now. Check "
             + "that the app scanned this installation's code and that the phone's clock "
             + "is right."),
         _ => Results.NoContent(),
     };
+
+    /// <summary>
+    /// A conflict with what the account holds rather than anything wrong with the
+    /// request: there is no second factor, so there is nothing to replace the
+    /// codes for and nothing to turn off. The screen does not offer either act in
+    /// that state.
+    /// </summary>
+    private static IResult NoSecondFactor() => Results.Conflict();
 
     /// <inheritdoc cref="ClaimEndpoints"/>
     private static IResult NotRight(string field, string message) =>

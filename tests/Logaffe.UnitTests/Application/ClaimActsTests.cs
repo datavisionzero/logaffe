@@ -1,6 +1,5 @@
-using System.Buffers.Text;
-using System.Text;
 using Logaffe.Application.Operations;
+using Logaffe.Application.Ports;
 using Logaffe.Domain.Operators;
 using Logaffe.Domain.Tokens;
 
@@ -12,17 +11,16 @@ namespace Logaffe.UnitTests.Application;
 public sealed class ClaimActsTests
 {
     private const string TheirPassword = "a passphrase they typed";
-    private const string TheCode = "314159";
 
     private static readonly DateTimeOffset FirstRun = new(2026, 8, 7, 9, 0, 0, TimeSpan.Zero);
 
     [Fact]
     public async Task The_first_run_opens_the_window_and_a_restart_does_not_extend_it()
     {
-        var installation = new Unclaimed();
+        var installation = new Unclaimed(InWindowMode);
 
         var opened = await installation.Open.ExecuteAsync(TestContext.Current.CancellationToken);
-        Assert.Equal(FirstRun.AddMinutes(30), opened.ClosesAt);
+        Assert.Equal(FirstRun.AddMinutes(30), opened.Guard.WindowClosesAt);
 
         // The deadline belongs to the installation rather than to the process,
         // so nobody gains anything by forcing a restart (docs/setup.md).
@@ -30,25 +28,80 @@ public sealed class ClaimActsTests
         var restarted = await installation.Open.ExecuteAsync(
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(opened.ClosesAt, restarted.ClosesAt);
+        Assert.Equal(opened.Guard.WindowClosesAt, restarted.Guard.WindowClosesAt);
         Assert.Equal(1, installation.Installation.Writes);
+    }
+
+    [Fact]
+    public async Task The_first_start_draws_a_secret_and_hands_it_over_once()
+    {
+        var installation = new Unclaimed(ClaimSettings.Default);
+
+        var opened = await installation.Open.ExecuteAsync(TestContext.Current.CancellationToken);
+
+        Assert.NotNull(opened.Drawn);
+        Assert.Equal(ClaimSecret.DrawnLength, opened.Drawn.Text.Length);
+
+        // The value goes to the volume for the operator to read; what the row
+        // holds is its hash (ADR 0040).
+        Assert.Equal(opened.Drawn.Text, installation.Handover.HandedOver);
+        Assert.True(opened.Guard.HasDrawnSecret);
+
+        // And a restart draws no second one: the secret that was handed over is
+        // the one that opens the door.
+        installation.Clock.Now = FirstRun.AddDays(3);
+        var restarted = await installation.Open.ExecuteAsync(
+            TestContext.Current.CancellationToken);
+
+        Assert.Null(restarted.Drawn);
+        Assert.Equal(opened.Drawn.Text, installation.Handover.HandedOver);
+    }
+
+    [Fact]
+    public async Task An_installation_told_its_secret_draws_none_and_writes_nothing()
+    {
+        var installation = new Unclaimed(WithSuppliedSecret);
+
+        var opened = await installation.Open.ExecuteAsync(TestContext.Current.CancellationToken);
+
+        // A supplied secret is compared against configuration and stored
+        // nowhere, so there is no second copy to disagree with it (ADR 0040).
+        Assert.Null(opened.Drawn);
+        Assert.False(opened.Guard.HasDrawnSecret);
+        Assert.Null(installation.Handover.HandedOver);
+    }
+
+    [Fact]
+    public async Task An_installation_with_an_operator_draws_no_secret_for_itself()
+    {
+        var installation = await new Unclaimed(ClaimSettings.Default).StartedAsync();
+        await installation.ClaimWith(installation.Secret);
+
+        // There is no re-claim while claimed, so a start now would be writing a
+        // live credential to the volume of an installation in ordinary use.
+        installation.Handover.Remove();
+        var started = await installation.Open.ExecuteAsync(TestContext.Current.CancellationToken);
+
+        Assert.Null(started.Drawn);
+        Assert.Null(installation.Handover.HandedOver);
     }
 
     [Fact]
     public async Task An_installation_nobody_owns_says_so_until_the_window_closes()
     {
-        var installation = await new Unclaimed().StartedAsync();
+        var installation = await new Unclaimed(InWindowMode).StartedAsync();
 
         var open = await installation.Check.ExecuteAsync(TestContext.Current.CancellationToken);
         Assert.False(open.IsClaimed);
-        Assert.True(open.WindowIsOpen);
+        Assert.True(open.CanBeClaimed);
+        Assert.False(open.NeedsSecret);
         Assert.Equal(FirstRun.AddMinutes(30), open.ClosesAt);
 
         installation.Clock.Now = FirstRun.AddMinutes(30);
 
         var lapsed = await installation.Check.ExecuteAsync(TestContext.Current.CancellationToken);
         Assert.False(lapsed.IsClaimed);
-        Assert.False(lapsed.WindowIsOpen);
+        Assert.False(lapsed.CanBeClaimed);
 
         // Nothing to count down to. What the screen needs now is the host
         // command, and it names it.
@@ -56,105 +109,127 @@ public sealed class ClaimActsTests
     }
 
     [Fact]
-    public async Task Drawing_an_enrolment_stores_nothing()
+    public async Task An_installation_guarded_by_a_secret_has_nothing_to_count_down_to()
     {
-        var installation = await new Unclaimed().StartedAsync();
+        var installation = await new Unclaimed(ClaimSettings.Default).StartedAsync();
 
-        var begun = await installation.Begin.ExecuteAsync(
-            "logs.example.org", TestContext.Current.CancellationToken);
+        // A door that is locked does not need a clock, so this is the same
+        // answer a week later as it is now (ADR 0040).
+        installation.Clock.Now = FirstRun.AddDays(7);
 
-        Assert.NotNull(begun.Enrolment);
-        Assert.Equal(BackupCode.SetSize, begun.Enrolment.BackupCodes.Count);
-        Assert.Contains("logs.example.org", begun.Enrolment.EnrolmentUri);
+        var state = await installation.Check.ExecuteAsync(TestContext.Current.CancellationToken);
 
-        // Every step before the last is a form with no effect (ADR 0014).
-        Assert.Equal(0, installation.Operators.Writes);
-        Assert.Equal(0, installation.Sessions.Writes);
-        Assert.Empty(installation.Operators.BackupCodes);
+        Assert.False(state.IsClaimed);
+        Assert.True(state.CanBeClaimed);
+        Assert.True(state.NeedsSecret);
+        Assert.Null(state.ClosesAt);
     }
 
     [Fact]
-    public async Task An_enrolment_is_refused_once_the_window_has_closed()
+    public async Task The_claim_writes_the_account_and_a_session_and_nothing_else()
     {
-        var installation = await new Unclaimed().StartedAsync();
-        installation.Clock.Now = FirstRun.AddMinutes(31);
+        var installation = await new Unclaimed(ClaimSettings.Default).StartedAsync();
 
-        var begun = await installation.Begin.ExecuteAsync(
-            "logs.example.org", TestContext.Current.CancellationToken);
-
-        Assert.Null(begun.Enrolment);
-        Assert.False(begun.State.IsClaimed);
-        Assert.False(begun.State.WindowIsOpen);
-    }
-
-    [Fact]
-    public async Task The_claim_writes_the_account_the_codes_and_a_session_and_nothing_before()
-    {
-        var installation = await new Unclaimed().StartedAsync();
-        var enrolment = await installation.EnrolAsync();
-
-        var attempt = await installation.ClaimWith(enrolment, "198.51.100.4");
+        var attempt = await installation.ClaimWith(installation.Secret, "198.51.100.4");
 
         Assert.Equal(ClaimOutcome.Claimed, attempt.Outcome);
         Assert.NotNull(attempt.Session);
         Assert.NotNull(attempt.Secret);
         Assert.Equal("198.51.100.4", attempt.Session.LastSeenFrom);
 
-        // The account and its first set of codes are one act, and the session
-        // the claim hands out is the second (ADR 0014).
+        // One statement for the account and one for the session, and no third:
+        // the second factor and its backup codes are the operator's to enrol
+        // afterwards (ADR 0041).
         Assert.Equal(1, installation.Operators.Writes);
-        Assert.Equal(BackupCode.SetSize, installation.Operators.BackupCodes.Count);
+        Assert.Empty(installation.Operators.BackupCodes);
         Assert.Equal([attempt.Session], installation.Sessions.Stored);
 
-        // The second factor was sealed on the way in, not stored as it arrived
-        // (ADR 0032).
         var stored = await installation.Operators.FindAsync(
             TestContext.Current.CancellationToken);
         Assert.NotNull(stored);
-        Assert.Equal(
-            installation.Cipher.Encrypt(StubSecondFactor.Secret),
-            stored.EncryptedSecondFactorSecret);
+        Assert.False(stored.HasSecondFactor);
+        Assert.Null(stored.SecondFactorEnrolledAt);
+
+        // The file the secret was handed over in delivered what it was for.
+        Assert.Null(installation.Handover.HandedOver);
+        Assert.Equal(1, installation.Handover.Removals);
     }
 
     [Fact]
-    public async Task The_codes_that_were_shown_are_the_codes_that_were_stored()
+    public async Task A_secret_that_is_not_the_one_is_refused_and_stores_nothing()
     {
-        var installation = await new Unclaimed().StartedAsync();
-        var enrolment = await installation.EnrolAsync();
+        var installation = await new Unclaimed(ClaimSettings.Default).StartedAsync();
 
-        Assert.Equal(ClaimOutcome.Claimed, (await installation.ClaimWith(enrolment)).Outcome);
+        foreach (var presented in new[] { null, string.Empty, "not the one at all" })
+        {
+            var attempt = await installation.Claim.ExecuteAsync(
+                TheirPassword, presented, null, TestContext.Current.CancellationToken);
 
-        // Every one of the ten on the sheet spends, and no eleventh does. The
-        // sheet is the only copy from the moment it is shown (ADR 0035).
-        Assert.All(
-            enrolment.BackupCodes,
-            code => Assert.Contains(
-                installation.Operators.BackupCodes, stored => stored.Matches(code)));
+            Assert.Equal(ClaimOutcome.SecretRefused, attempt.Outcome);
+        }
 
-        Assert.DoesNotContain(
-            installation.Operators.BackupCodes,
-            stored => stored.Matches(BackupCodeText.Mint()));
+        Assert.Equal(0, installation.Operators.Writes);
+        Assert.Equal(0, installation.Sessions.Writes);
+        Assert.Equal(0, installation.Handover.Removals);
     }
 
-    [Theory]
-    [InlineData("short", TheCode, true, ClaimOutcome.PasswordNotOne)]
-    [InlineData(TheirPassword, "000000", true, ClaimOutcome.SecondFactorRefused)]
-    [InlineData(TheirPassword, TheCode, false, ClaimOutcome.BackupCodeRefused)]
-    public async Task A_step_that_fails_names_itself_and_stores_nothing(
-        string password, string code, bool codeFromTheSheet, ClaimOutcome expected)
+    [Fact]
+    public async Task A_secret_admits_a_claim_however_long_the_installation_has_stood()
     {
-        var installation = await new Unclaimed().StartedAsync();
-        var enrolment = await installation.EnrolAsync();
+        var installation = await new Unclaimed(ClaimSettings.Default).StartedAsync();
+
+        // The window is not consulted in this mode at all: it is a fact about
+        // the row and not the guard in force (ADR 0040).
+        installation.Clock.Now = FirstRun.AddDays(30);
+
+        Assert.Equal(
+            ClaimOutcome.Claimed,
+            (await installation.ClaimWith(installation.Secret)).Outcome);
+    }
+
+    [Fact]
+    public async Task A_supplied_secret_is_the_one_that_admits()
+    {
+        var installation = await new Unclaimed(WithSuppliedSecret).StartedAsync();
+
+        var wrong = await installation.Claim.ExecuteAsync(
+            TheirPassword, "something else entirely", null,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(ClaimOutcome.SecretRefused, wrong.Outcome);
+
+        var right = await installation.Claim.ExecuteAsync(
+            TheirPassword, TheSuppliedSecret, null, TestContext.Current.CancellationToken);
+        Assert.Equal(ClaimOutcome.Claimed, right.Outcome);
+    }
+
+    [Fact]
+    public async Task A_window_takes_no_secret_and_closes()
+    {
+        var installation = await new Unclaimed(InWindowMode).StartedAsync();
 
         var attempt = await installation.Claim.ExecuteAsync(
-            password,
-            enrolment.Ticket,
-            code,
-            codeFromTheSheet ? enrolment.BackupCodes[3].Display : BackupCodeText.Mint().Symbols,
-            null,
-            TestContext.Current.CancellationToken);
+            TheirPassword, null, null, TestContext.Current.CancellationToken);
+        Assert.Equal(ClaimOutcome.Claimed, attempt.Outcome);
 
-        Assert.Equal(expected, attempt.Outcome);
+        var next = await new Unclaimed(InWindowMode).StartedAsync();
+        next.Clock.Now = FirstRun.AddMinutes(31);
+
+        var lapsed = await next.Claim.ExecuteAsync(
+            TheirPassword, null, null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ClaimOutcome.WindowClosed, lapsed.Outcome);
+        Assert.Equal(0, next.Operators.Writes);
+    }
+
+    [Fact]
+    public async Task A_password_that_is_not_one_names_itself_and_stores_nothing()
+    {
+        var installation = await new Unclaimed(ClaimSettings.Default).StartedAsync();
+
+        var attempt = await installation.Claim.ExecuteAsync(
+            "short", installation.Secret, null, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ClaimOutcome.PasswordNotOne, attempt.Outcome);
         Assert.Null(attempt.Session);
 
         // Refusing is a screen, not a state. Nothing was written on the way to
@@ -164,93 +239,90 @@ public sealed class ClaimActsTests
     }
 
     [Fact]
-    public async Task An_enrolment_this_installation_did_not_seal_is_refused()
+    public async Task An_installation_with_no_secret_to_present_to_cannot_be_claimed()
     {
-        var installation = await new Unclaimed().StartedAsync();
-        var enrolment = await installation.EnrolAsync();
+        // A database somebody made by hand: no start ever wrote the row, so
+        // there is nothing to present to and the host command is the way out.
+        var installation = new Unclaimed(ClaimSettings.Default);
 
-        foreach (var ticket in new[]
-        {
-            null,
-            string.Empty,
-            "not base64url at all !!",
-            Base64Url.EncodeToString(Encoding.UTF8.GetBytes("a ticket somebody made up")),
-        })
-        {
-            var attempt = await installation.Claim.ExecuteAsync(
-                TheirPassword,
-                ticket,
-                TheCode,
-                enrolment.BackupCodes[0].Display,
-                null,
-                TestContext.Current.CancellationToken);
+        var state = await installation.Check.ExecuteAsync(TestContext.Current.CancellationToken);
+        Assert.False(state.CanBeClaimed);
 
-            Assert.Equal(ClaimOutcome.EnrolmentNotOurs, attempt.Outcome);
-        }
-    }
+        var attempt = await installation.Claim.ExecuteAsync(
+            TheirPassword, "anything at all", null, TestContext.Current.CancellationToken);
 
-    [Fact]
-    public async Task An_enrolment_drawn_before_a_host_recovery_is_refused_after_it()
-    {
-        var installation = await new Unclaimed().StartedAsync();
-        var enrolment = await installation.EnrolAsync();
-
-        installation.Clock.Now = FirstRun.AddMinutes(5);
-        await installation.Recover.ExecuteAsync(TestContext.Current.CancellationToken);
-
-        // The window it was drawn in is not the current one any more, and a
-        // ticket belongs to one window (ADR 0035).
-        var attempt = await installation.ClaimWith(enrolment);
-
-        Assert.Equal(ClaimOutcome.EnrolmentNotOurs, attempt.Outcome);
+        Assert.Equal(ClaimOutcome.NoSecretToPresentTo, attempt.Outcome);
     }
 
     [Fact]
     public async Task There_is_no_re_claim_while_claimed()
     {
-        var installation = await new Unclaimed().StartedAsync();
-        Assert.Equal(
-            ClaimOutcome.Claimed,
-            (await installation.ClaimWith(await installation.EnrolAsync())).Outcome);
+        var installation = await new Unclaimed(ClaimSettings.Default).StartedAsync();
+        var secret = installation.Secret;
 
-        var again = await installation.Begin.ExecuteAsync(
-            "logs.example.org", TestContext.Current.CancellationToken);
+        Assert.Equal(ClaimOutcome.Claimed, (await installation.ClaimWith(secret)).Outcome);
 
-        Assert.Null(again.Enrolment);
-        Assert.True(again.State.IsClaimed);
-        Assert.False(again.State.WindowIsOpen);
+        var again = await installation.ClaimWith(secret);
+        Assert.Equal(ClaimOutcome.AlreadyClaimed, again.Outcome);
+
+        var state = await installation.Check.ExecuteAsync(TestContext.Current.CancellationToken);
+        Assert.True(state.IsClaimed);
+        Assert.False(state.CanBeClaimed);
     }
 
     [Fact]
-    public async Task Host_recovery_removes_the_account_and_arms_a_fresh_window()
+    public async Task Host_recovery_removes_the_account_and_draws_a_fresh_secret()
     {
-        var installation = await new Unclaimed().StartedAsync();
-        await installation.ClaimWith(await installation.EnrolAsync());
+        var installation = await new Unclaimed(ClaimSettings.Default).StartedAsync();
+        var first = installation.Secret;
+        await installation.ClaimWith(first);
 
-        // Long after the first window lapsed, which is the case this command
+        // Long after the account was made, which is the case this command
         // exists for: nobody can sign in any more (ADR 0013).
         installation.Clock.Now = FirstRun.AddDays(90);
         var recovered = await installation.Recover.ExecuteAsync(
             TestContext.Current.CancellationToken);
 
         Assert.True(recovered.ThereWasAnOperator);
-        Assert.Equal(FirstRun.AddDays(90).AddMinutes(30), recovered.Window.ClosesAt);
+        Assert.NotNull(recovered.DrawnSecret);
+        Assert.NotEqual(first, recovered.DrawnSecret.Text);
+        Assert.Equal(recovered.DrawnSecret.Text, installation.Handover.HandedOver);
 
         var state = await installation.Check.ExecuteAsync(TestContext.Current.CancellationToken);
         Assert.False(state.IsClaimed);
-        Assert.True(state.WindowIsOpen);
+        Assert.True(state.CanBeClaimed);
 
-        // And it is claimable again, which is the whole point of the reset.
+        // The secret the previous operator held opens nothing: this is the
+        // moment the installation's notion of who may claim it changes.
+        Assert.Equal(
+            ClaimOutcome.SecretRefused, (await installation.ClaimWith(first)).Outcome);
+
         Assert.Equal(
             ClaimOutcome.Claimed,
-            (await installation.ClaimWith(await installation.EnrolAsync())).Outcome);
+            (await installation.ClaimWith(recovered.DrawnSecret.Text)).Outcome);
+    }
+
+    [Fact]
+    public async Task Host_recovery_in_window_mode_arms_a_fresh_window_and_draws_nothing()
+    {
+        var installation = await new Unclaimed(InWindowMode).StartedAsync();
+        await installation.Claim.ExecuteAsync(
+            TheirPassword, null, null, TestContext.Current.CancellationToken);
+
+        installation.Clock.Now = FirstRun.AddDays(90);
+        var recovered = await installation.Recover.ExecuteAsync(
+            TestContext.Current.CancellationToken);
+
+        Assert.Null(recovered.DrawnSecret);
+        Assert.Null(installation.Handover.HandedOver);
+        Assert.Equal(FirstRun.AddDays(90).AddMinutes(30), recovered.Guard.WindowClosesAt);
     }
 
     [Fact]
     public async Task Host_recovery_takes_the_agent_tokens_and_leaves_the_ingest_tokens()
     {
-        var installation = await new Unclaimed().StartedAsync();
-        await installation.ClaimWith(await installation.EnrolAsync());
+        var installation = await new Unclaimed(ClaimSettings.Default).StartedAsync();
+        await installation.ClaimWith(installation.Secret);
 
         await installation.IssueAgentTokenAsync("terminal agent");
         await installation.IssueAgentTokenAsync("desktop agent");
@@ -273,9 +345,9 @@ public sealed class ClaimActsTests
     }
 
     [Fact]
-    public async Task Host_recovery_on_an_installation_nobody_claimed_still_arms_the_window()
+    public async Task Host_recovery_on_an_installation_nobody_claimed_still_opens_the_way_in()
     {
-        var installation = await new Unclaimed().StartedAsync();
+        var installation = await new Unclaimed(InWindowMode).StartedAsync();
         installation.Clock.Now = FirstRun.AddHours(3);
 
         // The other case VISION.md asks this command to cover: a window that
@@ -285,16 +357,27 @@ public sealed class ClaimActsTests
             TestContext.Current.CancellationToken);
 
         Assert.False(recovered.ThereWasAnOperator);
-        Assert.True(recovered.Window.IsOpenAt(installation.Clock.Now));
+        Assert.True(recovered.Guard.WindowIsOpenAt(installation.Clock.Now));
     }
+
+    private const string TheSuppliedSecret = "the-one-the-compose-file-names";
+
+    /// <summary>An installation whose claim is guarded by an open window.</summary>
+    private static ClaimSettings InWindowMode => new(ClaimMode.Window, null);
+
+    /// <summary>One whose secret the operator set before the first start.</summary>
+    private static ClaimSettings WithSuppliedSecret =>
+        new(ClaimMode.Secret, ClaimSecret.TryCreate(TheSuppliedSecret, out var secret)
+            ? secret
+            : throw new InvalidOperationException("The supplied secret is not one."));
 
     /// <summary>
     /// An installation that has just been started for the first time, with the
-    /// five acts of the claim wired to stores that hold nothing.
+    /// acts of the claim wired to stores that hold nothing.
     /// </summary>
     private sealed class Unclaimed
     {
-        public Unclaimed()
+        public Unclaimed(ClaimSettings settings)
         {
             Clock = new StoppedClock(FirstRun);
             Installation = new InMemoryInstallation();
@@ -302,20 +385,19 @@ public sealed class ClaimActsTests
             Sessions = new InMemorySessions();
             Tokens = new InMemoryTokens();
             Cipher = new ReversingCipher();
-            SecondFactor = new StubSecondFactor(TheCode);
+            Handover = new InMemoryClaimSecretHandover();
 
-            Check = new CheckTheClaim(Operators, Installation, Clock);
-            Open = new OpenTheClaimWindow(Installation, Clock);
-            Begin = new BeginEnrolment(Check, Installation, SecondFactor, Cipher);
+            Check = new CheckTheClaim(Operators, Installation, settings, Clock);
+            Open = new OpenTheClaim(Installation, Operators, Handover, settings, Clock);
             Claim = new ClaimTheInstallation(
                 Installation,
                 Operators,
                 Sessions,
+                Handover,
                 new StubPasswordHasher(),
-                SecondFactor,
-                Cipher,
+                settings,
                 Clock);
-            Recover = new Recover(Operators, Tokens, Installation, Clock);
+            Recover = new Recover(Operators, Tokens, Installation, Handover, settings, Clock);
         }
 
         public StoppedClock Clock { get; }
@@ -330,17 +412,23 @@ public sealed class ClaimActsTests
 
         public ReversingCipher Cipher { get; }
 
-        public StubSecondFactor SecondFactor { get; }
+        public InMemoryClaimSecretHandover Handover { get; }
 
         public CheckTheClaim Check { get; }
 
-        public OpenTheClaimWindow Open { get; }
-
-        public BeginEnrolment Begin { get; }
+        public OpenTheClaim Open { get; }
 
         public ClaimTheInstallation Claim { get; }
 
         public Recover Recover { get; }
+
+        /// <summary>
+        /// The secret the operator was handed, read the way they read it: off
+        /// the file the installation wrote it to.
+        /// </summary>
+        public string Secret =>
+            Handover.HandedOver
+            ?? throw new InvalidOperationException("Nothing was handed over.");
 
         /// <summary>
         /// An agent the operator connected, issued the way they issue one.
@@ -373,27 +461,9 @@ public sealed class ClaimActsTests
             return this;
         }
 
-        public async Task<Enrolment> EnrolAsync()
-        {
-            var begun = await Begin.ExecuteAsync(
-                "logs.example.org", TestContext.Current.CancellationToken);
-
-            Assert.NotNull(begun.Enrolment);
-
-            return begun.Enrolment;
-        }
-
-        /// <summary>
-        /// The last step, walked the way the operator walks it: the code typed
-        /// back off the sheet, grouped as it was printed.
-        /// </summary>
-        public Task<ClaimAttempt> ClaimWith(Enrolment enrolment, string? seenFrom = null) =>
+        /// <summary>The claim, walked the way the operator walks it.</summary>
+        public Task<ClaimAttempt> ClaimWith(string? secret, string? seenFrom = null) =>
             Claim.ExecuteAsync(
-                TheirPassword,
-                enrolment.Ticket,
-                TheCode,
-                enrolment.BackupCodes[0].Display,
-                seenFrom,
-                TestContext.Current.CancellationToken);
+                TheirPassword, secret, seenFrom, TestContext.Current.CancellationToken);
     }
 }

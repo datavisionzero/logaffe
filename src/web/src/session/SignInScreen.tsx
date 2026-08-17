@@ -9,6 +9,12 @@ import { api, asNumber } from "../api/client";
  * (ADR 0015), so a password and one second factor is the whole of it. Nothing
  * is bound to this browser, and nothing has to be prepared on a machine being
  * used for the first time.
+ *
+ * **The code is left empty by an account that has none** (ADR 0041), and the
+ * form says so rather than asking in two stages. Asking for the password first
+ * and the code afterwards would read better and would tell an attacker when they
+ * had found the password, which is the one thing this screen refuses to say:
+ * every way of not getting in is one refusal (ADR 0017).
  */
 export function SignInScreen({
   onSignedIn,
@@ -89,7 +95,7 @@ export function SignInScreen({
           </label>
         ) : (
           <label>
-            The six digits from the app
+            The six digits from the app, if you enrolled one
             {/* `autocomplete` is the standard's answer and browsers honour it,
                 but password managers find this field by their own heuristics,
                 and those read `name` and `id` before anything else.

@@ -34,20 +34,18 @@ public interface IOperators
     Task<Operator?> FindAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Writes the account and its first set of backup codes as one act, and
-    /// answers whether this claim is the one that took the installation.
+    /// Writes the account, and answers whether this claim is the one that took
+    /// the installation.
     /// </summary>
     /// <remarks>
-    /// This is the last step of the claim and the only step that stores
-    /// anything (ADR 0014). Two claimants racing both reach here, and
+    /// This is the whole of what the claim stores (ADR 0014): a password, and no
+    /// second factor and no backup codes, because those are the operator's to
+    /// enrol afterwards (ADR 0041). Two claimants racing both reach here, and
     /// <c>false</c> is what the loser gets — decided by the database holding one
     /// account rather than by a check this could have run first and been wrong
     /// about a moment later.
     /// </remarks>
-    Task<bool> TryClaimAsync(
-        Operator theOperator,
-        IReadOnlyList<BackupCode> backupCodes,
-        CancellationToken cancellationToken);
+    Task<bool> TryClaimAsync(Operator theOperator, CancellationToken cancellationToken);
 
     /// <summary>
     /// Writes back what was just changed on the account — a password, a rehash

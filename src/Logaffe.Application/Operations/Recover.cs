@@ -18,19 +18,28 @@ namespace Logaffe.Application.Operations;
 /// somewhere that has just stopped working, and the operator is the only person
 /// who can go and paste a new one in.
 /// </param>
-/// <param name="Window">The fresh window, which is what the operator is told.</param>
+/// <param name="Guard">The way back in, which is what the operator is told.</param>
+/// <param name="DrawnSecret">
+/// The fresh claim secret in the clear, on an installation guarded by one, and
+/// <c>null</c> in window mode. The command prints it: the operator running it is
+/// at the keyboard, which is the only moment this value is ever handed over.
+/// </param>
 public sealed record Recovered(
-    bool ThereWasAnOperator, int AgentTokensRemoved, ClaimWindow Window);
+    bool ThereWasAnOperator,
+    int AgentTokensRemoved,
+    ClaimGuard Guard,
+    ClaimSecret? DrawnSecret);
 
 /// <summary>
 /// The way back into an installation nobody can sign in to.
 /// </summary>
 /// <remarks>
 /// <para>
-/// It <b>returns the installation to unclaimed</b> and arms a fresh claim window
-/// (ADR 0013) — it does not reset a password, and the name will make somebody
-/// expect the smaller thing, so the command above says plainly what this does
-/// before calling it. Projects, ingest tokens and log entries are untouched: the
+/// It <b>returns the installation to unclaimed</b> and opens the way in again
+/// (ADR 0013) — a fresh claim secret, or a fresh window, whichever this
+/// installation is configured for (ADR 0040). It does not reset a password, and
+/// the name will make somebody expect the smaller thing, so the command above
+/// says plainly what this does before calling it. Projects, ingest tokens and log entries are untouched: the
 /// installation changes hands, it does not lose its contents, and an application
 /// shipping logs through it does not notice.
 /// </para>
@@ -57,19 +66,37 @@ public sealed record Recovered(
 /// </para>
 /// </remarks>
 public sealed class Recover(
-    IOperators operators, ITokens tokens, IInstallation installation, TimeProvider clock)
+    IOperators operators,
+    ITokens tokens,
+    IInstallation installation,
+    IClaimSecretHandover handover,
+    ClaimSettings settings,
+    TimeProvider clock)
 {
     public async Task<Recovered> ExecuteAsync(CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
 
-        // The window first, and the account second. The two are two statements,
-        // so the order decides what a failure between them leaves behind: an
-        // armed window on a still-claimed installation admits nothing, because
-        // there is no re-claim while claimed, while an unclaimed installation
-        // whose window has lapsed is a locked door needing the command run again
-        // (ADR 0034).
-        var window = await installation.ArmClaimWindowAsync(now, cancellationToken);
+        // The way in first, and the account second. The two are two statements,
+        // so the order decides what a failure between them leaves behind: a fresh
+        // window or a fresh secret on a still-claimed installation admits
+        // nothing, because there is no re-claim while claimed, while an unclaimed
+        // installation whose window has lapsed is a locked door needing the
+        // command run again (ADR 0034).
+        var guard = await installation.ArmClaimAsync(now, cancellationToken);
+
+        // Drawn rather than reused, because this is the moment the installation's
+        // notion of who may claim it changes and a secret that survived it is one
+        // the previous operator still holds. An installation whose secret comes
+        // from configuration keeps the one the compose file names: changing that
+        // is editing the file, and this command has nothing to say about it.
+        var drawn = settings.DrawsItsOwnSecret ? ClaimSecret.Draw() : null;
+        if (drawn is not null)
+        {
+            guard.DrewSecret(drawn);
+            await installation.RecordClaimAsync(guard, cancellationToken);
+            await handover.WriteAsync(drawn, cancellationToken);
+        }
 
         // And the agent tokens before the account, by the same reading of what a
         // failure in between leaves standing. Stopping here leaves an
@@ -90,6 +117,6 @@ public sealed class Recover(
             await operators.RemoveAsync(theOperator, cancellationToken);
         }
 
-        return new Recovered(theOperator is not null, agentTokens.Count, window);
+        return new Recovered(theOperator is not null, agentTokens.Count, guard, drawn);
     }
 }

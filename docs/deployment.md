@@ -141,24 +141,37 @@ session list showing whatever an intruder wanted it to show
 ([Signing in](./sign-in.md#sessions)). The setting looks configured, the
 installation serves perfectly, and neither of those is doing its job.
 
-## Claim it while the certificate is new
+## Claiming a deployment of this shape
 
 The moment the proxy obtains a certificate, the hostname is in the public
 Certificate Transparency logs, which [Setup](./setup.md#the-claim-window) names
 as *the* way a fresh installation gets found — within seconds, not within days.
-The claim window is **30 minutes from the first run** and a restart does not
-extend it.
+What that costs depends on which of the two guards the installation was brought
+up with.
 
-It opens when the installation first runs rather than when it first answers,
-which decides the order: the network, the proxy and its certificate first, the
-installation last, and the claim walked while it is all still fresh — password,
-second factor, backup codes, the last two stored somewhere that is not this
-host. Twenty minutes of DNS trouble after the container is already up is two
-thirds of the window gone on something unrelated to it.
+**With a claim secret**, which is the default, it costs nothing. Whoever finds
+the hostname finds a door they cannot open, the order of the steps above stops
+mattering, and the claim happens whenever the operator gets to it. This is the
+mode a deployment of this shape wants: there are four moving parts in front of
+the installation, and the one thing you do not also want is a clock.
 
-A window missed is `docker compose exec logaffe logaffe recover`
+**In window mode** the order is decided for you: the network, the proxy and its
+certificate first, the installation last, and the claim walked while it is all
+still fresh. The window is **30 minutes from the first run** — from when the
+installation first runs, not from when it first answers — so twenty minutes of
+DNS trouble after the container is already up is two thirds of it gone on
+something unrelated to it.
+
+A window missed, or a secret lost, is
+`docker compose exec logaffe logaffe recover`
 ([Host Recovery](./setup.md#host-recovery)) — a nuisance rather than a loss, and
 still worth not needing.
+
+Either way, enrol the second factor while sitting there, and put its backup codes
+somewhere that is not this host. It is not part of the claim
+([ADR 0041](./adr/0041-the-second-factor-is-offered-not-required.md)), the guide
+after the claim offers it first, and an installation of this shape — one account,
+reachable by name, on the open internet — is the case the offer is aimed at.
 
 ## The check that says it worked
 

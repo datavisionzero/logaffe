@@ -4,22 +4,21 @@ using Logaffe.Domain.Operators;
 namespace Logaffe.Application.Operations;
 
 /// <summary>
-/// How a re-enrolment ended.
+/// How an enrolment ended.
 /// </summary>
 /// <remarks>
 /// It says which step refused, as the claim does and for a reason of its own:
 /// the request came from a session, so there is nobody here but the operator,
-/// and somebody replacing their second factor with a phone in one hand needs to
-/// know whether it was the old code, the new one or the password that did not
-/// take.
+/// and somebody enrolling with a phone in one hand needs to know whether it was
+/// the old code, the new one or the password that did not take.
 /// </remarks>
-public enum ReEnrolmentOutcome
+public enum EnrolmentOutcome
 {
     /// <summary>
     /// The row holds the new secret, the sheet shown with it is the operator's,
     /// and every other session is over.
     /// </summary>
-    ReEnrolled,
+    Enrolled,
 
     /// <summary>
     /// The password was not it — or there is no account, in the moment after a
@@ -29,14 +28,15 @@ public enum ReEnrolmentOutcome
 
     /// <summary>
     /// The second factor in use was not proved: neither the six digits it
-    /// produces now nor an unspent backup code.
+    /// produces now nor an unspent backup code. It cannot be the answer on an
+    /// account that has none, where there is nothing in use to prove.
     /// </summary>
     SecondFactorRefused,
 
     /// <summary>
     /// The ticket is not one this installation sealed, belongs to an account
     /// that is not this one, or was drawn more than
-    /// <see cref="ReEnrolmentTicket.Lifetime"/> ago. The operator starts the
+    /// <see cref="EnrolmentTicket.Lifetime"/> ago. The operator starts the
     /// enrolment again, which costs them a QR code and nothing else.
     /// </summary>
     EnrolmentNotOurs,
@@ -52,36 +52,42 @@ public enum ReEnrolmentOutcome
 }
 
 /// <summary>
-/// The operator replacing their second factor, which is what makes a lost or
-/// replaced phone an ordinary afternoon (ADR 0016).
+/// The operator enrolling a second factor, or replacing the one they have.
 /// </summary>
 /// <remarks>
 /// <para>
-/// It asks for everything at once: the password, the second factor in use — the
-/// current code or a backup code standing in for it, which is the case of the
-/// phone that is already gone — and a code from the app just enrolled, with the
-/// enrolment itself arriving in the sealed ticket the previous step handed over.
-/// Either all of it is written or none of it is.
+/// It asks for everything at once: the password, a code from the app just
+/// enrolled, and — when the account already has a second factor — the current
+/// code or a backup code standing in for it, which is the case of the phone that
+/// is already gone. The enrolment itself arrives in the sealed ticket the previous
+/// step handed over. Either all of it is written or none of it is.
 /// </para>
 /// <para>
-/// <b>It issues the fresh set of backup codes with it</b>, shown at the step
-/// before this one. A re-enrolment is exactly the event after which the old
-/// sheet should not be the way back to the old authenticator, and ADR 0032 has
-/// the set replaced wholesale rather than topped up.
+/// <b>An account with no second factor has nothing in use to prove</b>
+/// (ADR 0041), so a first enrolment asks for the password and the new code and
+/// stops there. It is not a weaker act than a replacement: what stands in front
+/// of both is the password, and there is no set of backup codes to get past
+/// because there is none.
+/// </para>
+/// <para>
+/// <b>It issues the sheet of backup codes with it</b>, shown at the step before
+/// this one. An enrolment is exactly the event after which an old sheet should
+/// not be the way back to an old authenticator, and ADR 0032 has the set replaced
+/// wholesale rather than topped up.
 /// </para>
 /// <para>
 /// <b>A backup code offered here is not spent.</b> The set it belongs to is
-/// deleted by this same act a moment later, so consuming it would be writing
-/// down a fact about a row that is about to be gone — and a re-enrolment that
-/// then fails on the new code would have cost the operator one of the codes they
-/// have left.
+/// replaced by this same act a moment later, so consuming it would be writing
+/// down a fact about a row that is about to be gone — and an enrolment that then
+/// fails on the new code would have cost the operator one of the codes they have
+/// left.
 /// </para>
 /// <para>
 /// The steps are ordered by what they cost, as the claim's are: one read, one
 /// decryption, then arithmetic, and the slow hash last.
 /// </para>
 /// </remarks>
-public sealed class ReEnrolTheSecondFactor(
+public sealed class EnrolTheSecondFactor(
     IOperators operators,
     ISessions sessions,
     IPasswordHasher hasher,
@@ -91,7 +97,8 @@ public sealed class ReEnrolTheSecondFactor(
 {
     /// <param name="secondFactorCode">
     /// The six digits the app in use produces now, or <c>null</c> when a backup
-    /// code is being given instead.
+    /// code is being given instead — or when there is no second factor in use at
+    /// all.
     /// </param>
     /// <param name="newSecondFactorCode">
     /// The six digits from the app just enrolled, which is what proves it holds
@@ -100,7 +107,7 @@ public sealed class ReEnrolTheSecondFactor(
     /// <param name="keeping">
     /// The session making the request, which is the one that survives.
     /// </param>
-    public async Task<ReEnrolmentOutcome> ExecuteAsync(
+    public async Task<EnrolmentOutcome> ExecuteAsync(
         string? password,
         string? secondFactorCode,
         string? backupCode,
@@ -112,35 +119,34 @@ public sealed class ReEnrolTheSecondFactor(
         var theOperator = await operators.FindAsync(cancellationToken);
         if (theOperator is null || !Password.TryCreate(password, out var presented))
         {
-            return ReEnrolmentOutcome.PasswordRefused;
+            return EnrolmentOutcome.PasswordRefused;
         }
 
         var now = clock.GetUtcNow();
 
-        if (!ReEnrolmentTicket.TryOpen(ticket, cipher, out var enrolment)
+        if (!EnrolmentTicket.TryOpen(ticket, cipher, out var enrolment)
             || !enrolment.BelongsTo(theOperator, now))
         {
-            return ReEnrolmentOutcome.EnrolmentNotOurs;
+            return EnrolmentOutcome.EnrolmentNotOurs;
         }
 
         if (!await ProvesTheSecondFactorInUseAsync(
             theOperator, secondFactorCode, backupCode, now, cancellationToken))
         {
-            return ReEnrolmentOutcome.SecondFactorRefused;
+            return EnrolmentOutcome.SecondFactorRefused;
         }
 
         if (!secondFactor.Verifies(enrolment.SecondFactorSecret, newSecondFactorCode, now))
         {
-            return ReEnrolmentOutcome.NewSecondFactorRefused;
+            return EnrolmentOutcome.NewSecondFactorRefused;
         }
 
         if (hasher.Verify(theOperator.PasswordHash, presented) is PasswordCheck.Wrong)
         {
-            return ReEnrolmentOutcome.PasswordRefused;
+            return EnrolmentOutcome.PasswordRefused;
         }
 
-        theOperator.ReEnrolSecondFactor(
-            cipher.Encrypt(enrolment.SecondFactorSecret), now);
+        theOperator.EnrolSecondFactor(cipher.Encrypt(enrolment.SecondFactorSecret), now);
         await operators.RecordAsync(theOperator, cancellationToken);
 
         await operators.ReplaceBackupCodesAsync(
@@ -149,12 +155,13 @@ public sealed class ReEnrolTheSecondFactor(
 
         await sessions.RemoveEveryOtherAsync(keeping, cancellationToken);
 
-        return ReEnrolmentOutcome.ReEnrolled;
+        return EnrolmentOutcome.Enrolled;
     }
 
     /// <summary>
     /// Whether the second factor the account holds today was proved, by the app
-    /// that holds it or by one of the codes that stands in for it.
+    /// that holds it or by one of the codes that stands in for it — and
+    /// vacuously true on an account that holds none.
     /// </summary>
     /// <remarks>
     /// The set is read whole and every code compared, as a sign-in does it: a
@@ -169,10 +176,15 @@ public sealed class ReEnrolTheSecondFactor(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
+        if (!theOperator.HasSecondFactor)
+        {
+            return true;
+        }
+
         if (secondFactorCode is not null)
         {
             return secondFactor.Verifies(
-                cipher.Decrypt(theOperator.EncryptedSecondFactorSecret),
+                cipher.Decrypt(theOperator.EncryptedSecondFactorSecret!),
                 secondFactorCode,
                 now);
         }

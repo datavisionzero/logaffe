@@ -29,14 +29,14 @@ public sealed class OperatorConfiguration : IEntityTypeConfiguration<Operator>
 
         // The TOTP secret, sealed under the key on the host volume like a token
         // and for a different reason: a code cannot be computed without it
-        // (ADR 0032).
+        // (ADR 0032). Both columns are nullable together, because the second
+        // factor is the operator's to enrol and to remove (ADR 0041) and an
+        // account that has none is an ordinary account.
         builder.Property(o => o.EncryptedSecondFactorSecret)
-            .HasColumnName("second_factor_secret")
-            .IsRequired();
+            .HasColumnName("second_factor_secret");
 
         builder.Property(o => o.SecondFactorEnrolledAt)
-            .HasColumnName("second_factor_enrolled_at")
-            .IsRequired();
+            .HasColumnName("second_factor_enrolled_at");
 
         builder.Property(o => o.ClaimedAt).HasColumnName("claimed_at").IsRequired();
 

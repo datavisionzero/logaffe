@@ -28,7 +28,7 @@
         "tags": [
           "logaffe"
         ],
-        "summary": "Whether this installation has an operator, and whether it can be claimed.",
+        "summary": "Whether this installation has an operator, and how it can be claimed.",
         "operationId": "CheckTheClaim",
         "responses": {
           "200": {
@@ -84,36 +84,6 @@
                 }
               }
             }
-          }
-        }
-      }
-    },
-    "/claim/enrolment": {
-      "post": {
-        "tags": [
-          "logaffe"
-        ],
-        "summary": "Draws a second factor and a sheet of backup codes, and stores neither.",
-        "operationId": "BeginEnrolment",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/EnrolmentResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "409": {
-            "description": "Conflict"
-          },
-          "429": {
-            "description": "Too Many Requests"
           }
         }
       }
@@ -346,6 +316,65 @@
               }
             }
           },
+          "409": {
+            "description": "Conflict"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/second-factor": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Whether the operator has a second factor, and since when.",
+        "operationId": "CheckSecondFactor",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecondFactorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Enrols or replaces the second factor, issues fresh backup codes, and ends every other session.",
+        "operationId": "EnrolSecondFactor",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnrolSecondFactorRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
           "400": {
             "description": "Bad Request",
             "content": {
@@ -365,7 +394,7 @@
           "logaffe"
         ],
         "summary": "Draws a second factor and a sheet of backup codes, and stores neither.",
-        "operationId": "BeginReEnrolment",
+        "operationId": "BeginEnrolment",
         "responses": {
           "200": {
             "description": "OK",
@@ -383,18 +412,18 @@
         }
       }
     },
-    "/second-factor": {
-      "put": {
+    "/second-factor/removal": {
+      "post": {
         "tags": [
           "logaffe"
         ],
-        "summary": "Replaces the second factor, issues fresh backup codes, and ends every other session.",
-        "operationId": "ReEnrolSecondFactor",
+        "summary": "Removes the second factor and its backup codes, and ends every other session.",
+        "operationId": "TurnOffSecondFactor",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ReEnrolSecondFactorRequest"
+                "$ref": "#/components/schemas/TurnOffSecondFactorRequest"
               }
             }
           },
@@ -403,6 +432,9 @@
         "responses": {
           "204": {
             "description": "No Content"
+          },
+          "409": {
+            "description": "Conflict"
           },
           "400": {
             "description": "Bad Request",
@@ -1648,9 +1680,7 @@
       "ClaimRequest": {
         "required": [
           "password",
-          "ticket",
-          "secondFactorCode",
-          "backupCode"
+          "secret"
         ],
         "type": "object",
         "properties": {
@@ -1660,19 +1690,7 @@
               "string"
             ]
           },
-          "ticket": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "secondFactorCode": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "backupCode": {
+          "secret": {
             "type": [
               "null",
               "string"
@@ -1683,7 +1701,8 @@
       "ClaimStateResponse": {
         "required": [
           "isClaimed",
-          "windowIsOpen",
+          "canBeClaimed",
+          "needsSecret",
           "closesAt"
         ],
         "type": "object",
@@ -1691,7 +1710,10 @@
           "isClaimed": {
             "type": "boolean"
           },
-          "windowIsOpen": {
+          "canBeClaimed": {
+            "type": "boolean"
+          },
+          "needsSecret": {
             "type": "boolean"
           },
           "closesAt": {
@@ -1800,6 +1822,48 @@
             "items": {
               "$ref": "#/components/schemas/RejectedLineResponse"
             }
+          }
+        }
+      },
+      "EnrolSecondFactorRequest": {
+        "required": [
+          "password",
+          "secondFactorCode",
+          "backupCode",
+          "newSecondFactorCode",
+          "ticket"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secondFactorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "backupCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "newSecondFactorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ticket": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -2412,48 +2476,6 @@
           }
         }
       },
-      "ReEnrolSecondFactorRequest": {
-        "required": [
-          "password",
-          "secondFactorCode",
-          "backupCode",
-          "newSecondFactorCode",
-          "ticket"
-        ],
-        "type": "object",
-        "properties": {
-          "password": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "secondFactorCode": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "backupCode": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "newSecondFactorCode": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "ticket": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
       "ReadAgentTokenResponse": {
         "required": [
           "token",
@@ -2562,6 +2584,25 @@
           }
         }
       },
+      "SecondFactorResponse": {
+        "required": [
+          "isEnrolled",
+          "enrolledAt"
+        ],
+        "type": "object",
+        "properties": {
+          "isEnrolled": {
+            "type": "boolean"
+          },
+          "enrolledAt": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
       "SignInRequest": {
         "required": [
           "password",
@@ -2626,6 +2667,34 @@
           },
           "more": {
             "type": "boolean"
+          }
+        }
+      },
+      "TurnOffSecondFactorRequest": {
+        "required": [
+          "password",
+          "secondFactorCode",
+          "backupCode"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "secondFactorCode": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "backupCode": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       }

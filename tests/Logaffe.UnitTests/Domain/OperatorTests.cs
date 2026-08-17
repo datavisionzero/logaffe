@@ -11,40 +11,49 @@ public sealed class OperatorTests
     private const string Hash = "AQAAAAIAAYagAAAAE-not-a-real-hash";
 
     [Fact]
-    public void A_claimed_account_is_enrolled_at_the_moment_it_is_claimed()
+    public void A_claimed_account_is_a_password_and_nothing_else()
     {
-        var theOperator = Operator.Claim(Hash, SealedSecret, Now);
+        var theOperator = Operator.Claim(Hash, Now);
 
         Assert.NotEqual(Guid.Empty, theOperator.Id);
         Assert.Equal(Hash, theOperator.PasswordHash);
-        Assert.Equal(SealedSecret, theOperator.EncryptedSecondFactorSecret);
-        // The claim is one act: there is no operator without a second factor,
-        // so there is no moment between the two to have a date of its own.
-        Assert.Equal(Now, theOperator.SecondFactorEnrolledAt);
         Assert.Equal(Now, theOperator.ClaimedAt);
+
+        // The second factor is the operator's to enrol afterwards (ADR 0041), so
+        // an account that has none is an ordinary account rather than a
+        // half-built one.
+        Assert.False(theOperator.HasSecondFactor);
+        Assert.Null(theOperator.EncryptedSecondFactorSecret);
+        Assert.Null(theOperator.SecondFactorEnrolledAt);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
     public void An_operator_holds_their_password_hashed(string hash) =>
-        Assert.Throws<ArgumentException>(() => Operator.Claim(hash, SealedSecret, Now));
+        Assert.Throws<ArgumentException>(() => Operator.Claim(hash, Now));
 
     [Fact]
     public void A_hash_that_will_not_fit_the_column_is_refused_here() =>
         Assert.Throws<ArgumentException>(() => Operator.Claim(
-            new string('x', Operator.PasswordHashMaxLength + 1), SealedSecret, Now));
+            new string('x', Operator.PasswordHashMaxLength + 1), Now));
 
     [Fact]
-    public void An_operator_holds_their_second_factor_encrypted() =>
-        // A row without it is an account that cannot verify a code, which is a
-        // corrupt account rather than a claimable one.
-        Assert.Throws<ArgumentException>(() => Operator.Claim(Hash, [], Now));
+    public void Enrolling_takes_the_secret_and_the_date_together()
+    {
+        var theOperator = Operator.Claim(Hash, Now);
+
+        theOperator.EnrolSecondFactor(SealedSecret, Now.AddDays(1));
+
+        Assert.True(theOperator.HasSecondFactor);
+        Assert.Equal(SealedSecret, theOperator.EncryptedSecondFactorSecret);
+        Assert.Equal(Now.AddDays(1), theOperator.SecondFactorEnrolledAt);
+    }
 
     [Fact]
     public void Rehashing_keeps_the_same_password_at_the_current_cost()
     {
-        var theOperator = Operator.Claim(Hash, SealedSecret, Now);
+        var theOperator = Enrolled();
 
         theOperator.RehashedTo("AQAAAAIAAyagAAAAE-rewritten");
 
@@ -58,7 +67,7 @@ public sealed class OperatorTests
     [Fact]
     public void Changing_the_password_leaves_the_second_factor_alone()
     {
-        var theOperator = Operator.Claim(Hash, SealedSecret, Now);
+        var theOperator = Enrolled();
 
         theOperator.ChangePasswordTo("AQAAAAIAAyagAAAAE-chosen");
 
@@ -67,12 +76,12 @@ public sealed class OperatorTests
     }
 
     [Fact]
-    public void Re_enrolling_overwrites_the_secret_and_keeps_the_account()
+    public void Enrolling_over_one_overwrites_the_secret_and_keeps_the_account()
     {
-        var theOperator = Operator.Claim(Hash, SealedSecret, Now);
+        var theOperator = Enrolled();
         var identity = theOperator.Id;
 
-        theOperator.ReEnrolSecondFactor([9, 9, 9], Now.AddYears(1));
+        theOperator.EnrolSecondFactor([9, 9, 9], Now.AddYears(1));
 
         // An overwrite, not a second enrolment beside the first: nothing of the
         // previous secret survives, and what is kept of it is the date it
@@ -85,7 +94,36 @@ public sealed class OperatorTests
     }
 
     [Fact]
-    public void Re_enrolling_with_nothing_sealed_is_refused() =>
+    public void Enrolling_with_nothing_sealed_is_refused() =>
+        // A row without it is an account that cannot verify a code, which is a
+        // corrupt account rather than one with no second factor.
         Assert.Throws<ArgumentException>(
-            () => Operator.Claim(Hash, SealedSecret, Now).ReEnrolSecondFactor([], Now));
+            () => Operator.Claim(Hash, Now).EnrolSecondFactor([], Now));
+
+    [Fact]
+    public void Removing_it_leaves_the_account_behind_its_password_alone()
+    {
+        var theOperator = Enrolled();
+
+        theOperator.RemoveSecondFactor();
+
+        Assert.False(theOperator.HasSecondFactor);
+        Assert.Null(theOperator.EncryptedSecondFactorSecret);
+
+        // Both together, so that a date without a secret is not a state this
+        // type can be in.
+        Assert.Null(theOperator.SecondFactorEnrolledAt);
+
+        Assert.Equal(Hash, theOperator.PasswordHash);
+        Assert.Equal(Now, theOperator.ClaimedAt);
+    }
+
+    /// <summary>An account with a second factor, which is what enrolling makes.</summary>
+    private static Operator Enrolled()
+    {
+        var theOperator = Operator.Claim(Hash, Now);
+        theOperator.EnrolSecondFactor(SealedSecret, Now);
+
+        return theOperator;
+    }
 }

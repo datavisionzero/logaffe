@@ -25,12 +25,22 @@ product whose case is being small. `PasswordHasher<T>` arrives with the ASP.NET
 Core shared framework at no dependency cost at all, is maintained by the people
 who ship the runtime, and already carries a version marker in the hash it writes.
 
-What makes that trade affordable is the **second factor, which is mandatory and
-cannot be turned off** ([ADR 0016](./0016-the-second-factor-is-totp.md)). A
-cracked password on its own opens nothing —
-[ADR 0017](./0017-a-wrong-password-never-locks-the-account.md) already rests the
-whole of its argument on that same fact, and this decision rests on it a second
-time. Both are reopened together if the second factor ever becomes optional.
+What made that trade affordable was the **second factor, which was mandatory and
+could not be turned off** ([ADR 0016](./0016-the-second-factor-is-totp.md)): a
+cracked password on its own opened nothing.
+[ADR 0017](./0017-a-wrong-password-never-locks-the-account.md) rested the whole of
+its argument on that same fact, and this decision rested on it a second time. The
+sentence that followed here said both were reopened together if the second factor
+ever became optional, and
+[ADR 0041](./0041-the-second-factor-is-offered-not-required.md) made it optional.
+
+**So this one was reopened**, and it is answered in
+[ADR 0042](./0042-the-password-carries-more-so-it-gets-longer.md) rather than
+here: on an installation whose operator enrolled no second factor, a stolen dump
+ground offline yields the one credential that opens everything, and what changed
+is not the algorithm but what the password is worth — so what moved was its
+minimum length. The hasher below stands as chosen, and the premise it was chosen
+under is gone.
 
 ## Consequences
 

@@ -85,12 +85,12 @@ builder.Services.AddScoped<AuthenticateToken>();
 builder.Services.AddScoped<IngestBatch>();
 
 // The claim, which is the whole reachable surface of an installation nobody
-// owns. `Recover` is the other half of the same window and is registered by the
+// owns. `Recover` is the other half of the same guard and is registered by the
 // command line rather than here, because it is host-local and never reachable
 // over the network (ADR 0013).
-builder.Services.AddScoped<OpenTheClaimWindow>();
+builder.Services.AddSingleton(HostConfiguration.Claim(builder.Configuration));
+builder.Services.AddScoped<OpenTheClaim>();
 builder.Services.AddScoped<CheckTheClaim>();
-builder.Services.AddScoped<BeginEnrolment>();
 builder.Services.AddScoped<ClaimTheInstallation>();
 
 // The operator's door. Authenticating a session is the counterpart of
@@ -110,11 +110,13 @@ builder.Services.AddScoped<EndEveryOtherSession>();
 builder.Services.AddScoped<RemoveExpiredSessions>();
 
 // The operator's own credentials. Each of these requires the password again,
-// and two of them end every other session.
+// and the three that touch the second factor end every other session.
 builder.Services.AddScoped<ChangePassword>();
 builder.Services.AddScoped<IssueBackupCodes>();
-builder.Services.AddScoped<BeginReEnrolment>();
-builder.Services.AddScoped<ReEnrolTheSecondFactor>();
+builder.Services.AddScoped<CheckTheSecondFactor>();
+builder.Services.AddScoped<BeginEnrolment>();
+builder.Services.AddScoped<EnrolTheSecondFactor>();
+builder.Services.AddScoped<TurnOffTheSecondFactor>();
 
 // The unit everything else hangs off. Nothing creates one implicitly — a token
 // that names nothing admits nothing — so these four acts are the only way a
@@ -175,9 +177,9 @@ builder.Services.AddSingleton<DummySecret>();
 builder.Services.AddHostedService<SchemaMigrationService>();
 builder.Services.AddHostedService<KeyFitsService>();
 
-// Last, so that an installation about to refuse to start does not first arm a
-// window it will never serve.
-builder.Services.AddHostedService<ClaimWindowService>();
+// Last, so that an installation about to refuse to start does not first open a
+// claim it will never serve, or draw a secret nobody will be able to use.
+builder.Services.AddHostedService<ClaimService>();
 
 // After the migrations, whose service has finished before these start: the
 // first pass reads a table a migration may have been about to create. Each has

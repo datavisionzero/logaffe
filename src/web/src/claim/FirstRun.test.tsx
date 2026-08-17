@@ -20,7 +20,38 @@ function open(onDone = () => undefined) {
 
 afterEach(() => vi.unstubAllGlobals());
 
+/**
+ * Past the offer the guide opens with. The second factor is optional
+ * (ADR 0041), and declining it is a plain button rather than a dare — so every
+ * test below that is about the project starts by taking it.
+ */
+async function skipTheSecondFactor() {
+  const operator = userEvent.setup();
+
+  await operator.click(screen.getByRole("button", { name: /skip this/i }));
+
+  return operator;
+}
+
 describe("the first-run guide", () => {
+  it("opens with the second factor, and takes no for an answer", async () => {
+    const installation = anInstallationAnswering({});
+
+    open();
+
+    expect(screen.getByRole("heading", { name: /a second factor/i })).toBeInTheDocument();
+
+    await skipTheSecondFactor();
+
+    expect(
+      screen.getByRole("heading", { name: /a project for the entries/i }),
+    ).toBeInTheDocument();
+
+    // Declining costs nothing and asks the installation nothing: the enrolment
+    // is drawn only when the operator says yes.
+    expect(installation.asked).toEqual([]);
+  });
+
   it("walks the project and the token, and hands over the delivery", async () => {
     const installation = anInstallationAnswering({
       "POST /projects": { body: { id: "3f0", name: "orders-api", retentionDays: 30 } },
@@ -32,7 +63,7 @@ describe("the first-run guide", () => {
       done = true;
     });
 
-    const operator = userEvent.setup();
+    const operator = await skipTheSecondFactor();
 
     await operator.type(screen.getByLabelText(/name/i), "orders-api");
     await operator.click(screen.getByRole("button", { name: /create the project/i }));
@@ -65,7 +96,8 @@ describe("the first-run guide", () => {
       done = true;
     });
 
-    await userEvent.setup().click(screen.getByRole("button", { name: /skip this/i }));
+    const operator = await skipTheSecondFactor();
+    await operator.click(screen.getByRole("button", { name: /skip this/i }));
 
     expect(done).toBe(true);
     expect(installation.asked).toEqual([]);
@@ -83,7 +115,7 @@ describe("the first-run guide", () => {
 
     open();
 
-    const operator = userEvent.setup();
+    const operator = await skipTheSecondFactor();
 
     await operator.type(screen.getByLabelText(/name/i), "orders-api");
     await operator.click(screen.getByRole("button", { name: /create the project/i }));
@@ -99,7 +131,7 @@ describe("the first-run guide", () => {
 
     open();
 
-    const operator = userEvent.setup();
+    const operator = await skipTheSecondFactor();
 
     await operator.type(screen.getByLabelText(/name/i), "orders-api");
     await operator.click(screen.getByRole("button", { name: /create the project/i }));

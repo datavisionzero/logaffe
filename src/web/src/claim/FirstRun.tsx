@@ -2,8 +2,10 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { api, problemWith } from "../api/client";
 import { RETENTION_MAXIMUM, RETENTION_MINIMUM, RETENTION_OFFERED } from "../projects/retention";
+import { EnrolSecondFactor } from "../session/EnrolSecondFactor";
 
 type Step =
+  | { at: "second-factor" }
   | { at: "project" }
   | { at: "token"; projectId: string; name: string }
   | { at: "snippet"; projectId: string; name: string; snippet: string };
@@ -11,11 +13,16 @@ type Step =
 /**
  * What follows the claim: **a guide, not a stage** (`docs/setup.md`).
  *
- * It offers the first project and hands over a copy-paste delivery pointed at
- * this installation with the ingest token already in it, because `VISION.md`
- * makes ingestion friction the adoption barrier and the shortest path from a
- * running installation to a log arriving is a snippet the operator does not
- * have to assemble from documentation.
+ * It offers the second factor first, then the first project, and hands over a
+ * copy-paste delivery pointed at this installation with the ingest token already
+ * in it — because `VISION.md` makes ingestion friction the adoption barrier and
+ * the shortest path from a running installation to a log arriving is a snippet
+ * the operator does not have to assemble from documentation.
+ *
+ * **The second factor comes first because it is the one thing on the list that
+ * nothing else reminds them of later** except the banner, and because it costs a
+ * phone that is already in their hand. Skipping it is a decision (ADR 0041), not
+ * an oversight, and the interface keeps saying so.
  *
  * **The backend knows nothing about it.** This is the act that creates a
  * project and the act that issues an ingest token, walked in order by the
@@ -32,7 +39,7 @@ type Step =
  */
 export function FirstRun({ onDone }: { onDone: () => void }) {
   const navigate = useNavigate();
-  const [step, setStep] = useState<Step>({ at: "project" });
+  const [step, setStep] = useState<Step>({ at: "second-factor" });
 
   function leave(projectId?: string) {
     if (projectId !== undefined) {
@@ -46,12 +53,14 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
     <main>
       <h1>This installation is yours</h1>
       <p>
-        The account is made and you are signed in. What is left is somewhere for entries
-        to arrive and something to deliver them with — two steps, and you can leave at
-        any point.
+        The account is made and you are signed in. What is left is a second factor,
+        somewhere for entries to arrive, and something to deliver them with — three
+        steps, and you can leave at any point.
       </p>
 
-      {step.at === "project" ? (
+      {step.at === "second-factor" ? (
+        <TheSecondFactor onDone={() => setStep({ at: "project" })} />
+      ) : step.at === "project" ? (
         <FirstProject
           onCreated={(projectId, name) => setStep({ at: "token", projectId, name })}
           onSkipped={() => leave()}
@@ -72,6 +81,58 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
         />
       )}
     </main>
+  );
+}
+
+/**
+ * The offer the claim no longer makes.
+ *
+ * The second factor is optional and is enrolled from the settings by a
+ * signed-in operator (ADR 0041) — which this operator is, one screen after
+ * claiming, with the account fresh in their hands. That is the moment it costs
+ * least, and it is the reason the guide opens with it rather than closing with
+ * it.
+ *
+ * Declining is a plain button and not a dare. What follows an installation with
+ * no second factor is a banner that does not go away, which is the honest way to
+ * hold somebody to a decision they made on purpose.
+ */
+function TheSecondFactor({ onDone }: { onDone: () => void }) {
+  const [enrolled, setEnrolled] = useState(false);
+
+  return (
+    <section>
+      <h2>1. A second factor</h2>
+      <p>
+        A code from an authenticator app, asked for after your password. This account can
+        see and do everything in an installation reachable from the internet, and a
+        password on its own is all that stands in front of it until you enrol one.
+      </p>
+
+      {enrolled ? (
+        <>
+          <p className="quiet">
+            Enrolled. Keep the backup codes somewhere that is not the phone.
+          </p>
+          <button type="button" onClick={onDone}>
+            Continue
+          </button>
+        </>
+      ) : (
+        <>
+          <EnrolSecondFactor replacing={false} onEnrolled={() => setEnrolled(true)}>
+            <p>
+              Nothing is stored until the last step. Leaving this screen costs the
+              enrolment and nothing else.
+            </p>
+          </EnrolSecondFactor>
+
+          <button type="button" className="plain" onClick={onDone}>
+            Skip this
+          </button>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -136,7 +197,7 @@ function FirstProject({
 
   return (
     <form onSubmit={create}>
-      <h2>1. A project for the entries to arrive in</h2>
+      <h2>2. A project for the entries to arrive in</h2>
       <p>
         One per application is the usual shape. Nothing creates one implicitly, and there
         can be as many as you like afterwards.
@@ -230,7 +291,7 @@ function FirstToken({
 
   return (
     <section>
-      <h2>2. A token to deliver with</h2>
+      <h2>3. A token to deliver with</h2>
       <p>
         <strong>{name}</strong> exists. An ingest token is what an application presents to
         write into it — it permits writing and grants no read access of any kind, and the

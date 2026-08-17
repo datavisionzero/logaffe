@@ -8,10 +8,12 @@ namespace Logaffe.Domain.Operators;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A set is shown once during the claim and confirmed there, and a fresh set can
-/// be generated at any time — which replaces the previous one entirely
-/// (<c>docs/sign-in.md</c>). What is held here is a hash and a pair of dates;
-/// the code itself exists for as long as it takes to show it.
+/// A set is shown once when a second factor is enrolled, and a fresh set can be
+/// generated at any time — which replaces the previous one entirely
+/// (<c>docs/sign-in.md</c>). It belongs to the second factor rather than to the
+/// account: an operator who has enrolled none holds none and needs none
+/// (ADR 0041). What is held here is a hash and a pair of dates; the code itself
+/// exists for as long as it takes to show it.
 /// </para>
 /// <para>
 /// It is <em>consumed by a timestamp rather than by a deletion</em> (ADR 0032),
@@ -86,10 +88,10 @@ public sealed class BackupCode
     }
 
     /// <summary>
-    /// The rows for a set that was drawn before there was an operator to hang
-    /// them on, which is the claim: the sheet is shown and one code confirmed
-    /// while the installation is still unclaimed, and what carries the set
-    /// across those two requests is its hashes (ADR 0035).
+    /// The rows for a set that was drawn before it could be written: an
+    /// enrolment shows the sheet and stores nothing until the confirming
+    /// request, and what carries the set across those two requests is its hashes
+    /// (ADR 0036).
     /// </summary>
     /// <exception cref="ArgumentException">
     /// Not a set this product draws — the wrong number of codes, something that

@@ -58,8 +58,11 @@ material value to understanding the decision.
 - [0032 – Each operator secret is stored for what it is](./0032-each-operator-secret-is-stored-for-what-it-is.md)
 - [0033 – The last use of a token is written coarsely](./0033-the-last-use-of-a-token-is-written-coarsely.md)
 - [0034 – The claim window is a row in the database](./0034-the-claim-window-is-a-row-in-the-database.md)
-- [0035 – The claim hands its enrolment back sealed](./0035-the-claim-hands-its-enrolment-back-sealed.md)
-- [0036 – A re-enrolment carries its own sealed ticket](./0036-a-re-enrolment-carries-its-own-sealed-ticket.md)
+- [0035 – The claim hands its enrolment back sealed](./0035-the-claim-hands-its-enrolment-back-sealed.md) — superseded by 0041
+- [0036 – An enrolment carries its own sealed ticket](./0036-an-enrolment-carries-its-own-sealed-ticket.md)
 - [0037 – The installation dumps its own database](./0037-the-installation-dumps-its-own-database.md)
 - [0038 – Both installations pull on a timer, and the tag is the deliberate act](./0038-both-installations-pull-on-a-timer-and-the-tag-is-the-deliberate-act.md)
 - [0039 – A group has an identity and holds nothing](./0039-a-group-has-an-identity-and-holds-nothing.md)
+- [0040 – The claim is guarded by a secret or by a window, and whoever installs chooses](./0040-the-claim-is-guarded-by-a-secret-or-by-a-window.md)
+- [0041 – The second factor is offered, not required](./0041-the-second-factor-is-offered-not-required.md)
+- [0042 – The password carries more, so it gets longer](./0042-the-password-carries-more-so-it-gets-longer.md)

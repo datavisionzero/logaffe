@@ -110,7 +110,7 @@ public sealed class ExpiredSessionSweepTests(PostgresFixture postgres) : IDispos
     }
 
     /// <summary>Claims the installation, and answers the session that left.</summary>
-    private static async Task<Guid> ClaimAsync(
+    private async Task<Guid> ClaimAsync(
         WebApplicationFactory<Program> installation, string connectionString)
     {
         using var client = installation.CreateClient();
@@ -119,24 +119,12 @@ public sealed class ExpiredSessionSweepTests(PostgresFixture postgres) : IDispos
             HttpStatusCode.OK,
             (await client.GetAsync("/health", TestContext.Current.CancellationToken)).StatusCode);
 
-        var enrolment = await ReadAsync<Enrolment>(await client.PostAsync(
-            "/claim/enrolment", null, TestContext.Current.CancellationToken));
-
-        using var claimed = await client.PostAsJsonAsync(
-            "/claim",
-            new
-            {
-                password = TheirPassword,
-                ticket = enrolment.Ticket,
-                secondFactorCode = Authenticator.CodeFor(enrolment.SecondFactorSecret),
-                backupCode = enrolment.BackupCodes[0],
-            },
-            TestContext.Current.CancellationToken);
-
-        Assert.Equal(HttpStatusCode.NoContent, claimed.StatusCode);
+        await AClaimedInstallation.ClaimAsync(installation, _volume);
 
         await using var context = ContextFor(connectionString);
 
+        // The enrolment that follows the claim ends every other session, so the
+        // one left standing is the one it was made from.
         return (await context.Sessions.SingleAsync(TestContext.Current.CancellationToken)).Id;
     }
 

@@ -3,8 +3,8 @@ using Logaffe.Domain.Operators;
 namespace Logaffe.Application.Ports;
 
 /// <summary>
-/// What an installation knows about itself, which today is one fact: when it
-/// last became claimable.
+/// What an installation knows about itself: when it last became claimable, and
+/// the hash of the claim secret it drew.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -15,20 +15,22 @@ namespace Logaffe.Application.Ports;
 /// <para>
 /// It is a table rather than a file on the host volume beside the key
 /// (ADR 0034), which is what makes "first run" mean the run that created the
-/// schema and what keeps Host Recovery writing to one store.
+/// schema and what keeps Host Recovery writing to one store. The secret itself is
+/// not here: what the row holds is a hash, and the value goes to the volume for
+/// the operator to read (<see cref="IClaimSecretHandover"/>).
 /// </para>
 /// </remarks>
 public interface IInstallation
 {
     /// <summary>
-    /// The window as it stands, or <c>null</c> on an installation that has not
-    /// had its first run written yet — which is a database somebody created by
-    /// hand, since the start writes it.
+    /// The guard as it stands, or <c>null</c> on an installation that has not had
+    /// its first run written yet — which is a database somebody created by hand,
+    /// since the start writes it.
     /// </summary>
-    Task<ClaimWindow?> ReadClaimWindowAsync(CancellationToken cancellationToken);
+    Task<ClaimGuard?> ReadClaimGuardAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Writes the first run, and answers the window either way.
+    /// Writes the first run, and answers the guard either way.
     /// </summary>
     /// <remarks>
     /// Called on every start and writing on exactly one of them: this is where
@@ -36,13 +38,23 @@ public interface IInstallation
     /// at once are decided by the row that is already there rather than by a
     /// check either of them could have run first.
     /// </remarks>
-    Task<ClaimWindow> OpenClaimWindowAsync(
+    Task<ClaimGuard> OpenClaimAsync(
         DateTimeOffset firstRunAt, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Arms a fresh window, which is Host Recovery handing the installation back
-    /// (ADR 0013).
+    /// Opens the way in again, which is Host Recovery handing the installation
+    /// back (ADR 0013): a fresh window, and no drawn secret until one is drawn.
     /// </summary>
-    Task<ClaimWindow> ArmClaimWindowAsync(
-        DateTimeOffset at, CancellationToken cancellationToken);
+    Task<ClaimGuard> ArmClaimAsync(DateTimeOffset at, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Writes back the secret the installation just drew for itself.
+    /// </summary>
+    /// <remarks>
+    /// Separate from the two above because it happens on some starts and not
+    /// others, and because it is the one thing here whose failure has to leave the
+    /// installation unclaimable rather than claimable by a secret nobody was
+    /// handed.
+    /// </remarks>
+    Task RecordClaimAsync(ClaimGuard guard, CancellationToken cancellationToken);
 }

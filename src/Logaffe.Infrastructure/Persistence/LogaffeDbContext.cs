@@ -49,7 +49,7 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
     /// claimable. It is written by the start that created the schema and by
     /// Host Recovery, and by nothing else (ADR 0034).
     /// </summary>
-    public DbSet<ClaimWindow> ClaimWindows => Set<ClaimWindow>();
+    public DbSet<ClaimGuard> ClaimGuards => Set<ClaimGuard>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -15,11 +15,14 @@ Two stores, and both are needed.
   **encryption key** at `keys/token.key` that makes the stored tokens readable
   ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)),
   and with them the operator's TOTP secret, which is encrypted under the same key
-  ([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)).
+  ([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)). On an
+  installation nobody has claimed yet it also holds `claim-secret.txt`, if the
+  installation drew one ([Setup](./setup.md#the-claim-secret)); that file is
+  removed by the claim.
 
 **The key is written on first start and never again.** There is no step for the
-operator here, in the same spirit as the claim needing no setup secret: an
-installation that came up is one that has a key. It is base64 in a file readable
+operator here, in the same spirit as the claim secret being drawn rather than
+fetched from anywhere: an installation that came up is one that has a key. It is base64 in a file readable
 by its owner alone, and a start that finds one uses it rather than replacing
 it — including two containers starting at once, where only the first creates and
 the second reads what the first wrote.

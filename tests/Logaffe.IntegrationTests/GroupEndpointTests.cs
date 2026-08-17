@@ -349,25 +349,9 @@ public sealed class GroupEndpointTests(PostgresFixture postgres) : IAsyncLifetim
     /// </summary>
     private async Task ClaimAsync()
     {
-        using var client = _installation.CreateClient();
+        var enrolled = await AClaimedInstallation.ClaimAsync(_installation, _volume);
 
-        var enrolment = await ReadAsync<Enrolment>(await client.PostAsync(
-            "/claim/enrolment", null, TestContext.Current.CancellationToken));
-
-        _secondFactorSecret = enrolment.SecondFactorSecret;
-
-        using var claimed = await client.PostAsJsonAsync(
-            "/claim",
-            new
-            {
-                password = TheirPassword,
-                ticket = enrolment.Ticket,
-                secondFactorCode = Authenticator.CodeFor(enrolment.SecondFactorSecret),
-                backupCode = enrolment.BackupCodes[0],
-            },
-            TestContext.Current.CancellationToken);
-
-        Assert.Equal(HttpStatusCode.NoContent, claimed.StatusCode);
+        _secondFactorSecret = enrolled.SecondFactorSecret;
     }
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)

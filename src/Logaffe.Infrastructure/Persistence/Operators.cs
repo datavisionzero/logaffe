@@ -22,12 +22,9 @@ public sealed class Operators(LogaffeDbContext context) : IOperators
         context.Operators.SingleOrDefaultAsync(cancellationToken);
 
     public async Task<bool> TryClaimAsync(
-        Operator theOperator,
-        IReadOnlyList<BackupCode> backupCodes,
-        CancellationToken cancellationToken)
+        Operator theOperator, CancellationToken cancellationToken)
     {
         context.Operators.Add(theOperator);
-        context.BackupCodes.AddRange(backupCodes);
 
         try
         {

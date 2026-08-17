@@ -9,14 +9,16 @@ namespace Logaffe.IntegrationTests;
 
 /// <summary>
 /// The whole reachable surface of an installation nobody owns, asked of one that
-/// is actually running.
+/// is actually running — guarded by the claim secret it drew for itself, which is
+/// what an installation does by default (ADR 0040).
 /// </summary>
 /// <remarks>
 /// <para>
 /// The properties worth a running host here are the ones no registration can
 /// vouch for: that an unclaimed installation admits <b>nothing but the claim</b>,
-/// that the claim really stores nothing until its last step, and that the
-/// session it hands out is the same session everything else stands behind.
+/// that the secret it wrote to its volume is the secret that opens it, that the
+/// claim really stores nothing until it succeeds, and that the session it hands
+/// out is the same session everything else stands behind.
 /// </para>
 /// <para>
 /// The cookie is carried by hand rather than by a cookie container, for the
@@ -41,6 +43,11 @@ public sealed class ClaimEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         Environment.SetEnvironmentVariable("ConnectionStrings__Postgres", _connectionString);
         Environment.SetEnvironmentVariable("Logaffe__VolumePath", _volume);
 
+        // Said rather than left to the default, so that this class does not
+        // depend on what another one set the variable to.
+        Environment.SetEnvironmentVariable("Logaffe__Claim__Mode", "secret");
+        Environment.SetEnvironmentVariable("Logaffe__Claim__Secret", null);
+
         _installation = new WebApplicationFactory<Program>();
 
         using var client = _installation.CreateClient();
@@ -54,7 +61,7 @@ public sealed class ClaimEndpointTests(PostgresFixture postgres) : IAsyncLifetim
     }
 
     [Fact]
-    public async Task The_first_run_opens_a_window_and_the_installation_says_it_is_unclaimed()
+    public async Task The_first_run_draws_a_secret_and_the_installation_says_it_wants_one()
     {
         using var client = _installation.CreateClient();
 
@@ -62,22 +69,29 @@ public sealed class ClaimEndpointTests(PostgresFixture postgres) : IAsyncLifetim
             "/claim", TestContext.Current.CancellationToken));
 
         Assert.False(state.IsClaimed);
-        Assert.True(state.WindowIsOpen);
-        Assert.NotNull(state.ClosesAt);
+        Assert.True(state.CanBeClaimed);
+        Assert.True(state.NeedsSecret);
 
-        // Thirty minutes from the run that created the schema (ADR 0034), and
-        // the row is what says so.
+        // A door that is locked does not need a clock, so there is nothing to
+        // count down to (ADR 0040).
+        Assert.Null(state.ClosesAt);
+
+        // The secret is on the volume for the operator to read, and what the row
+        // holds is its hash.
+        var drawn = TheSecretOnTheVolume();
+        Assert.Equal(ClaimSecret.DrawnLength, drawn.Length);
+
         await using var context = ContextFor(_connectionString);
-        var window = await context.ClaimWindows.SingleAsync(
-            TestContext.Current.CancellationToken);
-        Assert.Equal(window.ClosesAt, state.ClosesAt);
-        Assert.Equal(ClaimWindow.Duration, window.ClosesAt - window.OpenedAt);
+        var guard = await context.ClaimGuards.SingleAsync(TestContext.Current.CancellationToken);
+        Assert.NotNull(guard.DrawnSecretHash);
+        Assert.DoesNotContain(drawn, Convert.ToHexString(guard.DrawnSecretHash));
     }
 
     [Theory]
     [InlineData("GET", "/agent-tokens")]
     [InlineData("POST", "/agent-tokens")]
     [InlineData("POST", "/sign-out")]
+    [InlineData("POST", "/second-factor/enrolment")]
     public async Task An_unclaimed_installation_admits_nothing_but_the_claim(
         string method, string path)
     {
@@ -91,38 +105,13 @@ public sealed class ClaimEndpointTests(PostgresFixture postgres) : IAsyncLifetim
     }
 
     [Fact]
-    public async Task Drawing_an_enrolment_writes_nothing_at_all()
-    {
-        using var client = _installation.CreateClient();
-
-        var enrolment = await EnrolAsync(client);
-
-        Assert.Equal(BackupCode.SetSize, enrolment.BackupCodes.Count);
-        Assert.StartsWith("otpauth://totp/", enrolment.EnrolmentUri);
-        Assert.NotEmpty(enrolment.Ticket);
-
-        // Every step before the last is a form with no effect (ADR 0014), and
-        // that is a claim about the database rather than about the response.
-        await using var context = ContextFor(_connectionString);
-        Assert.Empty(await context.Operators.ToListAsync(TestContext.Current.CancellationToken));
-        Assert.Empty(await context.BackupCodes.ToListAsync(TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
     public async Task The_claim_hands_out_the_session_every_other_surface_stands_behind()
     {
         using var client = _installation.CreateClient();
-        var enrolment = await EnrolAsync(client);
 
         using var claimed = await client.PostAsJsonAsync(
             "/claim",
-            new
-            {
-                password = TheirPassword,
-                ticket = enrolment.Ticket,
-                secondFactorCode = Authenticator.CodeFor(enrolment.SecondFactorSecret),
-                backupCode = enrolment.BackupCodes[0],
-            },
+            new { password = TheirPassword, secret = TheSecretOnTheVolume() },
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, claimed.StatusCode);
@@ -140,94 +129,63 @@ public sealed class ClaimEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         var state = await ReadAsync<ClaimStateBody>(await client.GetAsync(
             "/claim", TestContext.Current.CancellationToken));
         Assert.True(state.IsClaimed);
-        Assert.False(state.WindowIsOpen);
+        Assert.False(state.CanBeClaimed);
+
+        // The file the secret was handed over in is removed by the claim: what
+        // is left otherwise is a credential for a door that no longer opens.
+        Assert.False(File.Exists(Path.Combine(_volume, "claim-secret.txt")));
     }
 
     [Fact]
-    public async Task A_backup_code_from_the_sheet_signs_the_operator_in_afterwards()
+    public async Task The_claim_establishes_a_password_and_no_second_factor()
     {
         using var client = _installation.CreateClient();
-        var enrolment = await ClaimedAsync(client);
+        await ClaimedAsync(client);
 
-        // The sheet is what stands in when the phone is gone, so the codes it
-        // showed have to be the codes the rows hold — and there is no second
-        // chance to find out (ADR 0035).
-        using var response = await client.PostAsJsonAsync(
+        // The second factor is the operator's to enrol afterwards (ADR 0041), so
+        // the account this leaves behind holds neither it nor a sheet of codes —
+        // and the sign-in asks for neither.
+        await using var context = ContextFor(_connectionString);
+        var stored = await context.Operators.SingleAsync(TestContext.Current.CancellationToken);
+        Assert.Null(stored.EncryptedSecondFactorSecret);
+        Assert.Null(stored.SecondFactorEnrolledAt);
+        Assert.Empty(await context.BackupCodes.ToListAsync(TestContext.Current.CancellationToken));
+
+        using var signedIn = await client.PostAsJsonAsync(
             "/sign-in",
-            new { password = TheirPassword, backupCode = enrolment.BackupCodes[7] },
+            new { password = TheirPassword },
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var signedIn = await response.Content.ReadFromJsonAsync<SignInBody>(
-            TestContext.Current.CancellationToken);
-        Assert.Equal(BackupCode.SetSize - 1, signedIn!.BackupCodesRemaining);
+        Assert.Equal(HttpStatusCode.OK, signedIn.StatusCode);
     }
 
     [Fact]
-    public async Task A_second_claim_is_refused_and_so_is_a_second_enrolment()
+    public async Task A_second_claim_is_refused()
     {
         using var client = _installation.CreateClient();
-        var enrolment = await ClaimedAsync(client);
+        var secret = await ClaimedAsync(client);
 
         // There is no re-claim while claimed, and the only route back is the
-        // host (ADR 0013). The loser of a race meets this at their last step,
-        // which is the price of holding nothing (ADR 0014).
+        // host (ADR 0013). The loser of a race meets this at the one step there
+        // is, which is the price of holding nothing (ADR 0014).
         using var again = await client.PostAsJsonAsync(
             "/claim",
-            new
-            {
-                password = TheirPassword,
-                ticket = enrolment.Ticket,
-                secondFactorCode = Authenticator.CodeFor(enrolment.SecondFactorSecret),
-                backupCode = enrolment.BackupCodes[1],
-            },
+            new { password = TheirPassword, secret },
             TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
 
-        using var enrolling = await client.PostAsync(
-            "/claim/enrolment", null, TestContext.Current.CancellationToken);
-        Assert.Equal(HttpStatusCode.Conflict, enrolling.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
     }
 
     [Fact]
-    public async Task A_step_that_fails_names_the_field_and_leaves_the_installation_unclaimed()
+    public async Task A_field_that_is_wrong_names_itself_and_leaves_the_installation_unclaimed()
     {
         using var client = _installation.CreateClient();
-        var enrolment = await EnrolAsync(client);
-
-        var code = Authenticator.CodeFor(enrolment.SecondFactorSecret);
+        var secret = TheSecretOnTheVolume();
 
         var wrong = new (string Field, object Body)[]
         {
-            ("password", new
-            {
-                password = "short",
-                ticket = enrolment.Ticket,
-                secondFactorCode = code,
-                backupCode = enrolment.BackupCodes[0],
-            }),
-            ("ticket", new
-            {
-                password = TheirPassword,
-                ticket = "not a ticket this installation sealed",
-                secondFactorCode = code,
-                backupCode = enrolment.BackupCodes[0],
-            }),
-            ("secondFactorCode", new
-            {
-                password = TheirPassword,
-                ticket = enrolment.Ticket,
-                secondFactorCode = "000000",
-                backupCode = enrolment.BackupCodes[0],
-            }),
-            ("backupCode", new
-            {
-                password = TheirPassword,
-                ticket = enrolment.Ticket,
-                secondFactorCode = code,
-                backupCode = "aaaa-bbbb-cccc-dddd",
-            }),
+            ("password", new { password = "short", secret }),
+            ("secret", new { password = TheirPassword, secret = "not the one" }),
         };
 
         foreach (var (field, body) in wrong)
@@ -238,7 +196,8 @@ public sealed class ClaimEndpointTests(PostgresFixture postgres) : IAsyncLifetim
             Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
             // The operator is filling in a form and has to be told which box is
-            // wrong. There is nothing to give away: the door is open by design.
+            // wrong. What this says about the secret is only whether the one
+            // presented was right.
             Assert.Contains(
                 $"\"{field}\"",
                 await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
@@ -246,35 +205,39 @@ public sealed class ClaimEndpointTests(PostgresFixture postgres) : IAsyncLifetim
 
         await using var context = ContextFor(_connectionString);
         Assert.Empty(await context.Operators.ToListAsync(TestContext.Current.CancellationToken));
+
+        // And the secret is still there to be presented, because nothing
+        // happened.
+        Assert.Equal(secret, TheSecretOnTheVolume());
     }
 
     /// <summary>
-    /// Walks the whole flow and leaves the client carrying the session it
+    /// Claims the installation and leaves the client carrying the session it
     /// handed out.
     /// </summary>
-    private async Task<EnrolmentBody> ClaimedAsync(HttpClient client)
+    private async Task<string> ClaimedAsync(HttpClient client)
     {
-        var enrolment = await EnrolAsync(client);
+        var secret = TheSecretOnTheVolume();
 
         using var claimed = await client.PostAsJsonAsync(
             "/claim",
-            new
-            {
-                password = TheirPassword,
-                ticket = enrolment.Ticket,
-                secondFactorCode = Authenticator.CodeFor(enrolment.SecondFactorSecret),
-                backupCode = enrolment.BackupCodes[0],
-            },
+            new { password = TheirPassword, secret },
             TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NoContent, claimed.StatusCode);
 
-        return enrolment;
+        var cookie = Assert.Single(claimed.Headers.GetValues("Set-Cookie"));
+        client.DefaultRequestHeaders.Add("Cookie", cookie.Split(';')[0]);
+
+        return secret;
     }
 
-    private static async Task<EnrolmentBody> EnrolAsync(HttpClient client) =>
-        await ReadAsync<EnrolmentBody>(await client.PostAsync(
-            "/claim/enrolment", null, TestContext.Current.CancellationToken));
+    /// <summary>
+    /// The secret the way the operator gets it: read off the file the
+    /// installation wrote it to on its first start.
+    /// </summary>
+    private string TheSecretOnTheVolume() =>
+        File.ReadAllText(Path.Combine(_volume, "claim-secret.txt")).Trim();
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)
     {
@@ -293,13 +256,79 @@ public sealed class ClaimEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         new(new DbContextOptionsBuilder<LogaffeDbContext>().UseNpgsql(connectionString).Options);
 
     private sealed record ClaimStateBody(
-        bool IsClaimed, bool WindowIsOpen, DateTimeOffset? ClosesAt);
+        bool IsClaimed, bool CanBeClaimed, bool NeedsSecret, DateTimeOffset? ClosesAt);
+}
 
-    private sealed record EnrolmentBody(
-        string SecondFactorSecret,
-        string EnrolmentUri,
-        IReadOnlyList<string> BackupCodes,
-        string Ticket);
+/// <summary>
+/// The other guard: no secret, and anyone who reaches the installation may claim
+/// it for thirty minutes after its first run (ADR 0040).
+/// </summary>
+[Collection(nameof(PostgresCollection))]
+public sealed class ClaimWindowEndpointTests(PostgresFixture postgres) : IAsyncLifetime
+{
+    private const string TheirPassword = "a passphrase they typed";
 
-    private sealed record SignInBody(int? BackupCodesRemaining);
+    private readonly string _volume = InstallationVolume.Create(nameof(ClaimWindowEndpointTests));
+
+    private WebApplicationFactory<Program> _installation = null!;
+
+    public async ValueTask InitializeAsync()
+    {
+        Environment.SetEnvironmentVariable(
+            "ConnectionStrings__Postgres", await postgres.CreateDatabaseAsync());
+        Environment.SetEnvironmentVariable("Logaffe__VolumePath", _volume);
+        Environment.SetEnvironmentVariable("Logaffe__Claim__Mode", "window");
+        Environment.SetEnvironmentVariable("Logaffe__Claim__Secret", null);
+
+        _installation = new WebApplicationFactory<Program>();
+
+        using var client = _installation.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _installation.DisposeAsync();
+        InstallationVolume.Delete(_volume);
+        Environment.SetEnvironmentVariable("Logaffe__Claim__Mode", null);
+    }
+
+    [Fact]
+    public async Task The_window_counts_down_and_nothing_is_drawn_to_present()
+    {
+        using var client = _installation.CreateClient();
+
+        using var response = await client.GetAsync(
+            "/claim", TestContext.Current.CancellationToken);
+        var state = (await response.Content.ReadFromJsonAsync<ClaimStateBody>(
+            TestContext.Current.CancellationToken))!;
+
+        Assert.False(state.IsClaimed);
+        Assert.True(state.CanBeClaimed);
+        Assert.False(state.NeedsSecret);
+        Assert.NotNull(state.ClosesAt);
+
+        // Thirty minutes from the run that created the schema (ADR 0034).
+        Assert.True(state.ClosesAt > DateTimeOffset.UtcNow);
+        Assert.True(state.ClosesAt <= DateTimeOffset.UtcNow + ClaimGuard.WindowDuration);
+
+        // No secret was drawn, so there is no file holding one.
+        Assert.False(File.Exists(Path.Combine(_volume, "claim-secret.txt")));
+    }
+
+    [Fact]
+    public async Task A_claim_needs_no_secret_while_the_window_is_open()
+    {
+        using var client = _installation.CreateClient();
+
+        using var claimed = await client.PostAsJsonAsync(
+            "/claim",
+            new { password = TheirPassword },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, claimed.StatusCode);
+    }
+
+    private sealed record ClaimStateBody(
+        bool IsClaimed, bool CanBeClaimed, bool NeedsSecret, DateTimeOffset? ClosesAt);
 }

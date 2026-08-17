@@ -158,31 +158,35 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                     b.ToTable("backup_code", (string)null);
                 });
 
-            modelBuilder.Entity("Logaffe.Domain.Operators.ClaimWindow", b =>
+            modelBuilder.Entity("Logaffe.Domain.Operators.ClaimGuard", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<bool>("OnlyWindow")
+                    b.Property<byte[]>("DrawnSecretHash")
+                        .HasColumnType("bytea")
+                        .HasColumnName("drawn_secret_hash");
+
+                    b.Property<bool>("OnlyGuard")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(true)
-                        .HasColumnName("only_window");
+                        .HasColumnName("only_guard");
 
                     b.Property<DateTimeOffset>("OpenedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("opened_at");
 
                     b.HasKey("Id")
-                        .HasName("pk_claim_window");
+                        .HasName("pk_claim_guard");
 
-                    b.HasIndex("OnlyWindow")
+                    b.HasIndex("OnlyGuard")
                         .IsUnique()
-                        .HasDatabaseName("ix_claim_window_only_one");
+                        .HasDatabaseName("ix_claim_guard_only_one");
 
-                    b.ToTable("claim_window", (string)null);
+                    b.ToTable("claim_guard", (string)null);
                 });
 
             modelBuilder.Entity("Logaffe.Domain.Operators.Operator", b =>
@@ -197,7 +201,6 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                         .HasColumnName("claimed_at");
 
                     b.Property<byte[]>("EncryptedSecondFactorSecret")
-                        .IsRequired()
                         .HasColumnType("bytea")
                         .HasColumnName("second_factor_secret");
 
@@ -213,7 +216,7 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("password_hash");
 
-                    b.Property<DateTimeOffset>("SecondFactorEnrolledAt")
+                    b.Property<DateTimeOffset?>("SecondFactorEnrolledAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("second_factor_enrolled_at");
 

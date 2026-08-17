@@ -5,7 +5,14 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { GroupsProvider } from "../projects/groups";
 import { ProjectsProvider } from "../projects/projects";
 import { InstallationSettings } from "./InstallationSettings";
-import { aGroup, aProject, anInstallationAnswering, type Answer } from "../shared/testing";
+import {
+  aGroup,
+  aProject,
+  anInstallationAnswering,
+  withSecondFactor,
+  withoutSecondFactor,
+  type Answer,
+} from "../shared/testing";
 
 function aSession(session: {
   id: string;
@@ -54,6 +61,7 @@ function open(routes: Record<string, Answer | Answer[]> = {}, at = "/settings") 
   const installation = anInstallationAnswering({
     "GET /sessions": { body: [aSession({ id: "s1", isCurrent: true })] },
     "GET /agent-tokens": { body: [] },
+    "GET /second-factor": withSecondFactor,
     ...routes,
   });
 
@@ -331,7 +339,7 @@ describe("the operator's own credentials", () => {
     expect(screen.getByText(/replace the sheet you have now/i)).toBeInTheDocument();
   });
 
-  it("stores nothing of a re-enrolment until the confirming request", async () => {
+  it("stores nothing of an enrolment until the confirming request", async () => {
     const installation = openCredentials({ "POST /second-factor/enrolment": ENROLMENT });
 
     const operator = userEvent.setup();
@@ -348,7 +356,7 @@ describe("the operator's own credentials", () => {
     expect(installation.asked).not.toContain("PUT /second-factor");
   });
 
-  it("says which of the three credentials a re-enrolment refused", async () => {
+  it("says which credential an enrolment refused", async () => {
     openCredentials({
       "POST /second-factor/enrolment": ENROLMENT,
       "PUT /second-factor": {
@@ -492,5 +500,86 @@ describe("the groups", () => {
     expect(
       await screen.findByText(/already holds a group by that name/i),
     ).toBeInTheDocument();
+  });
+});
+
+describe("a second factor that is optional", () => {
+  it("says an account has none, and offers to enrol one", async () => {
+    openCredentials({ "GET /second-factor": withoutSecondFactor });
+
+    const factor = section("Second factor");
+
+    expect(
+      await factor.findByRole("button", { name: /enrol a second factor/i }),
+    ).toBeInTheDocument();
+
+    // The state is said where the act is, and the shell says it everywhere
+    // else: an omission must not pass for a setting (ADR 0041).
+    expect(
+      factor.getByText(/no second factor on this account/i),
+    ).toBeInTheDocument();
+  });
+
+  it("asks for no current code when there is no second factor in use", async () => {
+    const installation = openCredentials({
+      "GET /second-factor": withoutSecondFactor,
+      "POST /second-factor/enrolment": ENROLMENT,
+      "PUT /second-factor": { status: 204 },
+    });
+
+    const operator = userEvent.setup();
+    const factor = section("Second factor");
+
+    await operator.click(
+      await factor.findByRole("button", { name: /enrol a second factor/i }),
+    );
+    await operator.click(await screen.findByRole("checkbox"));
+    await operator.click(screen.getByRole("button", { name: "Continue" }));
+
+    // There is nothing in use to prove, so the form does not ask for it.
+    expect(factor.queryByLabelText(/authenticator you have now/i)).not.toBeInTheDocument();
+
+    await operator.type(factor.getByLabelText("Password"), "a passphrase nobody guesses");
+    await operator.type(factor.getByLabelText(/you just enrolled/i), "111111");
+    await operator.click(factor.getByRole("button", { name: "Enrol it" }));
+
+    expect(await screen.findByText(/^Enrolled\./)).toBeInTheDocument();
+    expect(installation.sentTo("PUT /second-factor")).toEqual([
+      {
+        password: "a passphrase nobody guesses",
+        secondFactorCode: null,
+        backupCode: null,
+        newSecondFactorCode: "111111",
+        ticket: "sealed",
+      },
+    ]);
+  });
+
+  it("turns it off for the password and a current code, and says what is left", async () => {
+    const installation = openCredentials({ "POST /second-factor/removal": { status: 204 } });
+
+    const operator = userEvent.setup();
+    const factor = section("Second factor");
+
+    await operator.click(
+      await factor.findByRole("button", { name: /turn the second factor off/i }),
+    );
+
+    expect(
+      factor.getByText(/password becomes the only credential on this account/i),
+    ).toBeInTheDocument();
+
+    await operator.type(factor.getByLabelText("Password"), "a passphrase nobody guesses");
+    await operator.type(factor.getByLabelText(/six digits from the authenticator/i), "123456");
+    await operator.click(factor.getByRole("button", { name: "Turn it off" }));
+
+    expect(await screen.findByText(/behind its password alone/i)).toBeInTheDocument();
+    expect(installation.sentTo("POST /second-factor/removal")).toEqual([
+      {
+        password: "a passphrase nobody guesses",
+        secondFactorCode: "123456",
+        backupCode: null,
+      },
+    ]);
   });
 });

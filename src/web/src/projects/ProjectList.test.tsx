@@ -3,7 +3,13 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { Shell } from "../shell/Shell";
-import { aGroup, aProject, anInstallationAnswering, noGroups } from "../shared/testing";
+import {
+  aGroup,
+  aProject,
+  anInstallationAnswering,
+  noGroups,
+  withSecondFactor,
+} from "../shared/testing";
 
 function open() {
   window.history.pushState({}, "", "/");
@@ -81,6 +87,7 @@ describe("the project list", () => {
     const installation = anInstallationAnswering({
       "GET /groups": noGroups,
       "GET /projects": { body: [aProject({ id: "3f0", name: "checkout" })] },
+      "GET /second-factor": withSecondFactor,
     });
 
     open();
@@ -89,8 +96,13 @@ describe("the project list", () => {
 
     // A dashboard is a set of counts nobody asked for over the largest table in
     // the database. The list asks for the projects and the headings they are
-    // listed under, and for nothing else.
-    expect([...installation.asked].sort()).toEqual(["GET /groups", "GET /projects"]);
+    // listed under, and for nothing else — the third is the shell's, asking
+    // whether this account has a second factor to say so if it has not.
+    expect([...installation.asked].sort()).toEqual([
+      "GET /groups",
+      "GET /projects",
+      "GET /second-factor",
+    ]);
   });
 
   it("lists the projects in no group first and the groups by name after them", async () => {

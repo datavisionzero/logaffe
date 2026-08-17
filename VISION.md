@@ -90,36 +90,60 @@ the normal case rather than an edge case. Two consequences follow:
   and the agent interface is designed so that content cannot be mistaken for
   direction from the operator.
 
-## Guided setup and the installation claim
+## Setup and the installation claim
 
-A fresh installation is **unclaimed**. Setup is a guided flow in the web UI
-through which the operator claims the installation and establishes their account:
+A fresh installation is **unclaimed**. The claim is a flow in the web UI through
+which the operator takes the installation and establishes their account, and what
+it establishes is a **password**. It is one act: until it completes the
+installation belongs to nobody, and nothing about it is half-done.
 
-- credentials,
-- two-factor authentication as part of the guided setup, not an optional extra
-  buried in settings,
-- backup codes, presented and confirmed during setup.
+**How the claim is guarded is decided by whoever installs**, before the first
+start, because they are the one who knows which of the two they can actually
+perform.
 
-While an installation is unclaimed, **anyone who can reach it may start the
-claim**. There is no data to take yet, but the installation itself can be taken,
-so the exposure is real rather than nil — it is accepted because it is narrow and
-because it is recoverable, not because it is absent. The larger risk is an
-installation that is spun up and then forgotten: it would sit unclaimed and
-claimable indefinitely.
+- **A claim secret.** The installation is not claimable by anyone who cannot
+  present it. Whoever installs either sets it beforehand or leaves it to the
+  installation, which draws one on its first start and writes it where the host
+  can read it. There is no deadline, because a door that is locked does not need
+  a clock: an installation that is spun up and then forgotten is not an open
+  door, and the operator can claim it a week later.
+- **An open window.** No secret, and anyone who can reach the installation may
+  claim it — for a short, time-limited window after it first runs. There is no
+  data to take yet, but the installation itself can be taken, so the exposure is
+  real rather than nil; it is accepted because it is narrow and because it is
+  recoverable. The time limit is the whole of what keeps it narrow, and when it
+  lapses, claiming over the network is over until the operator intervenes on the
+  host.
 
-Therefore the claim window is **time-limited**. If nobody claims the installation
-within that window, claiming over the network is no longer possible and the
-operator has to intervene locally on the host to re-enable it. An abandoned
-installation must not remain an open door.
+The claim secret is the default. The window is for the installation where reading
+a file or a container log is not on offer — a one-click host, a panel — and it is
+the older of the two rather than the better one. The secret is also what makes an
+**unattended installation** work: whoever or whatever performs it writes the
+configuration before the first start and hands the secret over, and the operator
+claims when they get to it rather than within minutes of the container coming up.
 
-**There is always a way back in from the host.** With a single account protected
-by two-factor authentication and exposed to the public internet, losing the
-second factor and the backup codes would otherwise mean losing the installation.
-Whoever has access to the machine logaffe runs on can therefore run **Host
-Recovery**, which returns the installation to unclaimed and arms a fresh claim
-window while keeping its projects, tokens and entries. It is one operation for
-both cases, and it is deliberately host-local: it is reachable from the Docker
-host, never over the network. See [`docs/setup.md`](./docs/setup.md).
+**The second factor is offered, not required.** An operator enrols a TOTP
+authenticator, and takes the sheet of backup codes that comes with it, whenever
+they decide to — from the settings, behind their own password — and can turn it
+off again. It is deliberately not part of the claim. Requiring it there buys
+account strength at the price of a claim that cannot be finished by someone
+without an authenticator to hand, and a forced enrolment is the one most likely
+to be done badly. This is a real concession: one god-mode account on the public
+internet behind a password alone is weaker than the same account behind two
+factors, and nothing else in the product compensates for it. What the product
+owes in return is that the choice is never made by accident — an installation
+whose second factor is off says so in the UI for as long as it is off — and that
+the sign-in rate limits stand either way.
+
+**There is always a way back in from the host.** With a single account, no email
+and no reset channel, a forgotten password — or a lost second factor with the
+backup codes gone too — would otherwise mean losing the installation. Whoever has
+access to the machine logaffe runs on can therefore run **Host Recovery**, which
+returns the installation to unclaimed and opens the way back in the form that
+installation is configured for, a fresh claim secret or a fresh window, while
+keeping its projects, tokens and entries. It is one operation for every case, and
+it is deliberately host-local: it is reachable from the Docker host, never over
+the network. See [`docs/setup.md`](./docs/setup.md).
 
 ## Core capabilities
 
@@ -293,9 +317,10 @@ in [`docs/adr/`](./docs/adr/), and how the repository is laid out around them is
 - **Live updates:** polling on the order of five seconds, no push streaming
 - **Deployment:** containerized, runnable with Docker Compose as the standard
   way to operate it — including on a public cloud host
-- **Authentication:** a single operator account with a password, a TOTP second
-  factor and backup codes, established through the guided claim flow, with no
-  username and no email address. See [`docs/sign-in.md`](./docs/sign-in.md)
+- **Authentication:** a single operator account with a password, established
+  through the claim and guarded by a claim secret or a time-limited window, with
+  no username and no email address; an optional TOTP second factor and its backup
+  codes are enrolled afterwards. See [`docs/sign-in.md`](./docs/sign-in.md)
 - **Distribution:** the project is intended to be released as open source
 
 ## Operating an installation: upgrades and backup

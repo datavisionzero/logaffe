@@ -1,9 +1,10 @@
 # Host Recovery Returns the Installation to Unclaimed
 
 The host command does one thing: it puts the installation back into the state it
-was in before anyone claimed it, and arms a fresh claim window. `VISION.md` asks
-the escape hatch to cover two cases — an operator who lost their second factor
-and their backup codes, and a claim window that lapsed before anyone used it —
+was in before anyone claimed it, and opens the way in again. `VISION.md` asks
+the escape hatch to cover two cases — an operator locked out of their own
+account, whether by a forgotten password or by a lost second factor with the
+backup codes gone with it, and an installation nobody claimed while it could be —
 and describes them as the same hatch. Making them the same *operation* rather
 than two that share a door means one state to reason about, one code path that
 can grant access to an installation, and one flow that establishes an operator,
@@ -37,10 +38,19 @@ its operator and has lost its agent configurations — recoverable by running th
 command again — rather than live read-everything credentials on an installation
 anybody can claim.
 
-The installation is briefly claimable by anyone again, exactly as it was on first
-boot. That is the same exposure, accepted for the same reason and bounded by the
-same 30-minute window — and the operator running the command is at the keyboard,
-which is the best moment the product ever gets for that window to be open.
+**It opens whichever door the installation is configured for**
+([ADR 0040](./0040-the-claim-is-guarded-by-a-secret-or-by-a-window.md)): it draws
+and prints a fresh claim secret, or it arms a fresh window. The secret is drawn
+rather than reused, because this is precisely the moment at which the
+installation's notion of who may claim it changes, and a secret that survived the
+change would be one the previous operator still holds.
+
+In window mode the installation is briefly claimable by anyone again, exactly as
+it was on first boot. That is the same exposure, accepted for the same reason and
+bounded by the same 30-minute window — and the operator running the command is at
+the keyboard, which is the best moment the product ever gets for that window to
+be open. In secret mode nothing is open at any point, and the printed secret goes
+where the command's output goes.
 
 There is deliberately no second, gentler mechanism **on the host** — no host-side
 password reset, and no host-side way to re-enrol a second factor while keeping

@@ -4,22 +4,14 @@ using Logaffe.Domain.Operators;
 namespace Logaffe.Application.Operations;
 
 /// <summary>
-/// What the claimant is shown before they can finish: an authenticator to
-/// enrol, a sheet of codes to keep, and the sealed copy that carries both back.
+/// What the operator is shown before an enrolment can be confirmed: an
+/// authenticator to enrol, the sheet of codes that comes with it, and the sealed
+/// copy that carries both back.
 /// </summary>
-/// <param name="SecondFactorSecret">
-/// The secret in text, for anyone typing it into an app by hand rather than
-/// scanning.
-/// </param>
-/// <param name="EnrolmentUri">The <c>otpauth:</c> address the QR code carries.</param>
 /// <param name="BackupCodes">
-/// Ten codes, shown once. Nothing keeps them afterwards — not the installation
-/// and not this record, which lives for the length of one response
-/// (ADR 0032).
-/// </param>
-/// <param name="Ticket">
-/// The same material sealed under the installation's key, handed back with the
-/// last step so that the installation knows it drew them (ADR 0035).
+/// Ten codes, shown once and not the operator's yet. Nothing keeps them: they
+/// become rows only if the enrolment is confirmed, and whatever set was there
+/// before is untouched until then.
 /// </param>
 public sealed record Enrolment(
     string SecondFactorSecret,
@@ -28,62 +20,47 @@ public sealed record Enrolment(
     string Ticket);
 
 /// <summary>
-/// The state the enrolment was asked for in, and the enrolment when that state
-/// allowed one.
-/// </summary>
-/// <remarks>
-/// The state comes back whether or not anything was drawn, because the two ways
-/// of refusing are two different screens — an installation that already has an
-/// operator, and one whose window has lapsed — and the caller would otherwise
-/// have to ask a second time to tell them apart.
-/// </remarks>
-public sealed record BegunEnrolment(ClaimState State, Enrolment? Enrolment);
-
-/// <summary>
-/// The step before the claim, which stores nothing.
+/// The step before an enrolment, which stores nothing.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every step before the last is a form with no effect (ADR 0014): the secret
-/// drawn here is not enrolled, the codes are not the operator's, and abandoning
-/// the flow at this point leaves the installation exactly as unclaimed as it
-/// was. What makes that affordable without a half-claimed row is the ticket —
-/// the material goes back to the browser, and the installation keeps only the
-/// ability to recognize its own seal.
+/// It is one act whether the operator is enrolling a second factor for the first
+/// time or replacing the phone that held the last one (ADR 0041), and it holds
+/// the same promise either way: the secret drawn here is not enrolled, the codes
+/// are not the operator's, and abandoning the screen leaves the account exactly as
+/// it was — a second factor that worked this morning still works this evening,
+/// and an account that had none still has none.
 /// </para>
 /// <para>
-/// It is drawn here rather than in the last step because the operator has to
-/// enrol an authenticator and write down a sheet of codes <em>before</em> they
-/// can prove they have either, and proving it is what the last step asks for.
+/// It asks for nothing but the session. Drawing a secret and ten codes proves
+/// nothing and changes nothing, and demanding the password twice — once to see
+/// the QR code and again to confirm it — would be asking for it at the step
+/// where it does no work. The step that writes the row is where every credential
+/// is required.
 /// </para>
 /// </remarks>
 public sealed class BeginEnrolment(
-    CheckTheClaim check,
-    IInstallation installation,
+    IOperators operators,
     ISecondFactor secondFactor,
-    ISecretCipher cipher)
+    ISecretCipher cipher,
+    TimeProvider clock)
 {
     /// <param name="installationName">
     /// What an authenticator app should call this installation in its list.
     /// There is no username to put there (ADR 0015), so it is the address the
     /// operator reached it by — which only an adapter knows.
     /// </param>
-    public async Task<BegunEnrolment> ExecuteAsync(
+    /// <returns>
+    /// The enrolment to show, or <c>null</c> when there is no account to enrol
+    /// for — which behind a session means Host Recovery ran a moment ago.
+    /// </returns>
+    public async Task<Enrolment?> ExecuteAsync(
         string installationName, CancellationToken cancellationToken)
     {
-        var state = await check.ExecuteAsync(cancellationToken);
-        if (state.IsClaimed || !state.WindowIsOpen)
+        var theOperator = await operators.FindAsync(cancellationToken);
+        if (theOperator is null)
         {
-            return new BegunEnrolment(state, null);
-        }
-
-        // Read again rather than carried out of the check, because the ticket
-        // names the window it belongs to and that name has to be the row's own
-        // value rather than the deadline derived from it.
-        var window = await installation.ReadClaimWindowAsync(cancellationToken);
-        if (window is null)
-        {
-            return new BegunEnrolment(state, null);
+            return null;
         }
 
         var secret = secondFactor.MintSecret();
@@ -91,15 +68,16 @@ public sealed class BeginEnrolment(
             .Select(_ => BackupCodeText.Mint())
             .ToList();
 
-        var ticket = new ClaimTicket(
-            window.OpenedAt, secret, [.. codes.Select(code => code.Hash)]);
+        var ticket = new EnrolmentTicket(
+            theOperator.Id,
+            clock.GetUtcNow(),
+            secret,
+            [.. codes.Select(code => code.Hash)]);
 
-        return new BegunEnrolment(
-            state,
-            new Enrolment(
-                secret,
-                secondFactor.EnrolmentUri(secret, installationName),
-                codes,
-                ticket.SealedWith(cipher)));
+        return new Enrolment(
+            secret,
+            secondFactor.EnrolmentUri(secret, installationName),
+            codes,
+            ticket.SealedWith(cipher));
     }
 }

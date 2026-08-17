@@ -293,6 +293,63 @@ public sealed class OperatorEndpointTests(PostgresFixture postgres) : IAsyncLife
         Assert.Equal(HttpStatusCode.OK, unchanged.StatusCode);
     }
 
+    [Fact]
+    public async Task The_second_factor_says_whether_there_is_one_and_can_be_turned_off()
+    {
+        using var here = await SignedInAsync();
+
+        var enrolled = await ReadAsync<SecondFactorBody>(await here.GetAsync(
+            "/second-factor", TestContext.Current.CancellationToken));
+        Assert.True(enrolled.IsEnrolled);
+        Assert.NotNull(enrolled.EnrolledAt);
+
+        // It costs what enrolling costs, so a session somebody took cannot
+        // strip the account down to one credential (ADR 0041).
+        using var withoutTheCode = await here.PostAsJsonAsync(
+            "/second-factor/removal",
+            new { password = TheirPassword, secondFactorCode = "000000" },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, withoutTheCode.StatusCode);
+
+        using var removed = await here.PostAsJsonAsync(
+            "/second-factor/removal",
+            new
+            {
+                password = TheirPassword,
+                secondFactorCode = Authenticator.CodeFor(_secondFactorSecret),
+            },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+
+        var gone = await ReadAsync<SecondFactorBody>(await here.GetAsync(
+            "/second-factor", TestContext.Current.CancellationToken));
+        Assert.False(gone.IsEnrolled);
+        Assert.Null(gone.EnrolledAt);
+
+        // The account is behind its password alone, and the sheet went with the
+        // factor it stood in for.
+        using var onThePassword = await SignInAsync(
+            _installation.CreateClient(), TheirPassword);
+        Assert.Equal(HttpStatusCode.OK, onThePassword.StatusCode);
+
+        // A code sent to an account that has no second factor is ignored rather
+        // than refused — what the operator decided is what the sign-in asks for
+        // — and nothing is spent, because there is no sheet left to spend from.
+        using var withTheOldSheet = await SignInAsync(
+            _installation.CreateClient(), TheirPassword, backupCode: _backupCodes[3]);
+        Assert.Equal(HttpStatusCode.OK, withTheOldSheet.StatusCode);
+        Assert.Null(
+            (await withTheOldSheet.Content.ReadFromJsonAsync<SignInBody>(
+                TestContext.Current.CancellationToken))!.BackupCodesRemaining);
+
+        // And there is nothing left to issue a sheet for.
+        using var sheet = await here.PostAsJsonAsync(
+            "/backup-codes",
+            new { password = TheirPassword },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.Conflict, sheet.StatusCode);
+    }
+
     private async Task<HttpClient> SignedInAsync()
     {
         var client = _installation.CreateClient();
@@ -326,26 +383,10 @@ public sealed class OperatorEndpointTests(PostgresFixture postgres) : IAsyncLife
     /// </summary>
     private async Task ClaimAsync()
     {
-        using var client = _installation.CreateClient();
+        var enrolled = await AClaimedInstallation.ClaimAsync(_installation, _volume);
 
-        var enrolment = await ReadAsync<Enrolment>(await client.PostAsync(
-            "/claim/enrolment", null, TestContext.Current.CancellationToken));
-
-        _secondFactorSecret = enrolment.SecondFactorSecret;
-        _backupCodes = enrolment.BackupCodes;
-
-        using var claimed = await client.PostAsJsonAsync(
-            "/claim",
-            new
-            {
-                password = TheirPassword,
-                ticket = enrolment.Ticket,
-                secondFactorCode = Authenticator.CodeFor(enrolment.SecondFactorSecret),
-                backupCode = enrolment.BackupCodes[0],
-            },
-            TestContext.Current.CancellationToken);
-
-        Assert.Equal(HttpStatusCode.NoContent, claimed.StatusCode);
+        _secondFactorSecret = enrolled.SecondFactorSecret;
+        _backupCodes = enrolled.BackupCodes;
     }
 
     private static async Task<T> ReadAsync<T>(HttpResponseMessage response)
@@ -360,6 +401,10 @@ public sealed class OperatorEndpointTests(PostgresFixture postgres) : IAsyncLife
                 TestContext.Current.CancellationToken))!;
         }
     }
+
+    private sealed record SecondFactorBody(bool IsEnrolled, DateTimeOffset? EnrolledAt);
+
+    private sealed record SignInBody(int? BackupCodesRemaining);
 
     private sealed record Enrolment(
         string SecondFactorSecret,

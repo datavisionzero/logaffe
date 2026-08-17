@@ -9,49 +9,32 @@ namespace Logaffe.Api.Http;
 /// Whether this installation belongs to anybody, which is what decides the
 /// first screen the single-page application shows.
 /// </summary>
+/// <param name="CanBeClaimed">
+/// Whether a claim would be considered at all — false once the installation has
+/// an operator, and in window mode once the window has closed, which is the
+/// screen that names the host command.
+/// </param>
+/// <param name="NeedsSecret">
+/// Whether the screen has to ask for the claim secret, which it does on every
+/// installation guarded by one (ADR 0040).
+/// </param>
 /// <param name="ClosesAt">
 /// When the window shuts, so that the screen can count down to it, and
-/// <c>null</c> when there is nothing to count down to.
+/// <c>null</c> when there is nothing to count down to — which is every
+/// installation guarded by a secret.
 /// </param>
 public sealed record ClaimStateResponse(
-    bool IsClaimed, bool WindowIsOpen, DateTimeOffset? ClosesAt);
+    bool IsClaimed, bool CanBeClaimed, bool NeedsSecret, DateTimeOffset? ClosesAt);
 
 /// <summary>
-/// What the claimant needs in hand before they can finish, shown once.
+/// The whole claim, which is one request (ADR 0014).
 /// </summary>
-/// <param name="SecondFactorSecret">
-/// The secret in text, under the QR code, for anyone typing it into an app by
-/// hand.
+/// <param name="Secret">
+/// The claim secret, on an installation guarded by one, read out of the file the
+/// installation wrote it to or out of the compose file that set it. Left out in
+/// window mode, where there is none to present.
 /// </param>
-/// <param name="EnrolmentUri">The <c>otpauth:</c> address the QR code carries.</param>
-/// <param name="BackupCodes">
-/// Ten codes, grouped for the sheet the operator prints. This is the only time
-/// they exist anywhere but in the operator's hands (ADR 0032).
-/// </param>
-/// <param name="Ticket">
-/// The same material sealed under the installation's key. The claim will not
-/// complete without it, and there is nothing in it the claimant can read
-/// (ADR 0035).
-/// </param>
-public sealed record EnrolmentResponse(
-    string SecondFactorSecret,
-    string EnrolmentUri,
-    IReadOnlyList<string> BackupCodes,
-    string Ticket);
-
-/// <summary>
-/// The last step, which is the only one that stores anything (ADR 0014).
-/// </summary>
-/// <param name="SecondFactorCode">
-/// Six digits out of the authenticator that was just enrolled, which is what
-/// proves the enrolment took.
-/// </param>
-/// <param name="BackupCode">
-/// One of the ten, typed back off the sheet — spacing, grouping and capitals are
-/// all forgiven.
-/// </param>
-public sealed record ClaimRequest(
-    string? Password, string? Ticket, string? SecondFactorCode, string? BackupCode);
+public sealed record ClaimRequest(string? Password, string? Secret);
 
 /// <summary>
 /// The whole reachable surface of an installation nobody owns.
@@ -60,20 +43,25 @@ public sealed record ClaimRequest(
 /// <para>
 /// There is no ingestion, no MCP, nothing to read and nothing to configure until
 /// somebody claims it: ingestion needs a token, a token needs a project, and a
-/// project needs an operator (<c>docs/setup.md</c>). These three routes are it.
+/// project needs an operator (<c>docs/setup.md</c>). These two routes are it.
 /// </para>
 /// <para>
-/// <b>Anyone who can reach an unclaimed installation may claim it.</b> There is
-/// no setup secret to fetch first — that is settled in <c>VISION.md</c> — and
-/// what keeps the exposure bounded is the thirty-minute window and the fact that
-/// there is nothing here to take. So these are anonymous by design rather than
-/// by omission, and what stands in front of them is the throttle.
+/// <b>What stands in front of them is whichever guard the installation was
+/// brought up with</b> (ADR 0040): a claim secret, which is the default and has
+/// no deadline, or an open window of thirty minutes. They are anonymous either
+/// way — there is no account yet to authenticate against — and the throttle is
+/// on both.
+/// </para>
+/// <para>
+/// <b>The claim establishes a password and nothing else</b> (ADR 0041). The
+/// second factor is enrolled afterwards, from the settings, by an operator who
+/// has one to enrol; the routes for it are <see cref="OperatorEndpoints"/>.
 /// </para>
 /// <para>
 /// <b>Every refusal says which step failed</b>, which is the opposite of the
-/// sign-in's one answer for everything. There is nothing to give away here: the
-/// door is open on purpose, and the person on the other end is setting up their
-/// own installation.
+/// sign-in's one answer for everything. The person on the other end is setting up
+/// their own installation, and what a refusal says about the secret is only ever
+/// whether the one presented was right.
 /// </para>
 /// </remarks>
 public static class ClaimEndpoints
@@ -86,43 +74,13 @@ public static class ClaimEndpoints
                 var state = await check.ExecuteAsync(cancellationToken);
 
                 return Results.Ok(new ClaimStateResponse(
-                    state.IsClaimed, state.WindowIsOpen, state.ClosesAt));
+                    state.IsClaimed, state.CanBeClaimed, state.NeedsSecret, state.ClosesAt));
             })
             .WithName("CheckTheClaim")
-            .WithSummary("Whether this installation has an operator, and whether it can be claimed.")
+            .WithSummary("Whether this installation has an operator, and how it can be claimed.")
             .RequireRateLimiting(PublicRateLimits.ClaimState)
             .AllowAnonymous()
             .Produces<ClaimStateResponse>()
-            .Produces(StatusCodes.Status429TooManyRequests);
-
-        endpoints.MapPost("/claim/enrolment", async (
-                BeginEnrolment begin, HttpContext context, CancellationToken cancellationToken) =>
-            {
-                // The name an authenticator app will show in its list is the
-                // address the operator reached this installation by, which only
-                // an adapter knows — and behind a reverse proxy it is the
-                // forwarded one.
-                var begun = await begin.ExecuteAsync(
-                    context.Request.Host.Value ?? "logaffe", cancellationToken);
-
-                if (begun.Enrolment is null)
-                {
-                    return RefusedBy(begun.State);
-                }
-
-                return Results.Ok(new EnrolmentResponse(
-                    begun.Enrolment.SecondFactorSecret,
-                    begun.Enrolment.EnrolmentUri,
-                    [.. begun.Enrolment.BackupCodes.Select(code => code.Display)],
-                    begun.Enrolment.Ticket));
-            })
-            .WithName("BeginEnrolment")
-            .WithSummary("Draws a second factor and a sheet of backup codes, and stores neither.")
-            .RequireRateLimiting(PublicRateLimits.Claim)
-            .AllowAnonymous()
-            .Produces<EnrolmentResponse>()
-            .Produces(StatusCodes.Status403Forbidden)
-            .Produces(StatusCodes.Status409Conflict)
             .Produces(StatusCodes.Status429TooManyRequests);
 
         endpoints.MapPost("/claim", async (
@@ -133,9 +91,7 @@ public static class ClaimEndpoints
             {
                 var attempt = await claim.ExecuteAsync(
                     request.Password,
-                    request.Ticket,
-                    request.SecondFactorCode,
-                    request.BackupCode,
+                    request.Secret,
                     context.SeenFrom(),
                     cancellationToken);
 
@@ -167,32 +123,19 @@ public static class ClaimEndpoints
         return endpoints;
     }
 
-    /// <summary>
-    /// The two ways an installation refuses to be enrolled against at all,
-    /// which are two different screens.
-    /// </summary>
-    private static IResult RefusedBy(ClaimState state) =>
-        state.IsClaimed ? AlreadyClaimed() : WindowClosed();
-
     private static IResult RefusedBy(ClaimOutcome outcome) => outcome switch
     {
         ClaimOutcome.AlreadyClaimed => AlreadyClaimed(),
-        ClaimOutcome.WindowClosed => WindowClosed(),
+        ClaimOutcome.WindowClosed or ClaimOutcome.NoSecretToPresentTo => Shut(),
+        ClaimOutcome.SecretRefused => NotRight(
+            "secret",
+            "That is not this installation's claim secret. It is in "
+            + "`claim-secret.txt` on the host volume, or it is the one the compose "
+            + "file names."),
         ClaimOutcome.PasswordNotOne => NotRight(
             "password",
-            $"A password is between {Password.MinimumLength} and "
+            $"A password is at least {Password.MinimumLength} and at most "
             + $"{Password.MaximumLength} characters."),
-        ClaimOutcome.EnrolmentNotOurs => NotRight(
-            "ticket",
-            "This enrolment is not one this installation handed out, or it belongs to a "
-            + "claim window that has since been replaced. Start again."),
-        ClaimOutcome.SecondFactorRefused => NotRight(
-            "secondFactorCode",
-            "That is not a code the authenticator you just enrolled produces now. Check "
-            + "that the app scanned this installation's code and that the phone's clock "
-            + "is right."),
-        ClaimOutcome.BackupCodeRefused => NotRight(
-            "backupCode", "That is not one of the backup codes you were just shown."),
         _ => Results.NoContent(),
     };
 
@@ -204,11 +147,11 @@ public static class ClaimEndpoints
     private static IResult AlreadyClaimed() => Results.Conflict();
 
     /// <summary>
-    /// The thirty minutes are up, and no request will ever be right again until
-    /// the host arms a fresh window — which is a refusal to act rather than a
-    /// conflict.
+    /// The window is up, or there is no secret to present to. Either way no
+    /// request will ever be right again until the host opens the way in — which
+    /// is a refusal to act rather than a conflict.
     /// </summary>
-    private static IResult WindowClosed() => Results.StatusCode(StatusCodes.Status403Forbidden);
+    private static IResult Shut() => Results.StatusCode(StatusCodes.Status403Forbidden);
 
     /// <summary>
     /// Named by field, because this is a form the operator is filling in and

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, NavLink, Route, Routes, useLocation } from "react-router";
 import { api } from "../api/client";
 import { ProjectList } from "../projects/ProjectList";
@@ -72,6 +72,8 @@ export function Shell({
         <ProjectTabs />
       </header>
 
+      <NoSecondFactor />
+
       {/* A set of backup codes that quietly runs out ends at Host Recovery, so
           the product says how many remain whenever one is spent. */}
       {remaining !== null && (
@@ -110,6 +112,52 @@ export function Shell({
         </Routes>
       </main>
     </WhatTheInstallationHolds>
+  );
+}
+
+/**
+ * An installation running behind a password alone says so, for as long as that
+ * is true.
+ *
+ * The second factor is optional (ADR 0041), and the interface is the only thing
+ * that can keep an omission from passing for a setting — so this is **not
+ * dismissible**. It is not a warning about something that went wrong; it is the
+ * state of the account, and it goes away by enrolling one.
+ */
+function NoSecondFactor() {
+  const [enrolled, setEnrolled] = useState<boolean>();
+
+  useEffect(() => {
+    let current = true;
+
+    void (async () => {
+      try {
+        const { data } = await api.GET("/second-factor");
+
+        if (current && data !== undefined) {
+          setEnrolled(data.isEnrolled);
+        }
+      } catch {
+        // Asked once and never insisted on. A banner that cannot be shown is
+        // not a thing to say a second sentence about.
+      }
+    })();
+
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  if (enrolled !== false) {
+    return null;
+  }
+
+  return (
+    <p className="notice">
+      This installation has no second factor. Its password is the only thing between the
+      internet and everything it holds.{" "}
+      <Link to="/settings/credentials">Enrol one</Link>.
+    </p>
   );
 }
 
