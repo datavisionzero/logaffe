@@ -41,6 +41,18 @@ premise. That is ADR 0041's decision and not this one's to relitigate.
 
 ## Consequences
 
+**The minimum applies to choosing a password and not to presenting one.** A
+sign-in, a password change, an enrolment and every other act that asks for the
+password again reads what was typed and lets the hasher answer. The alternative
+is what this document originally shipped and it is a trap: raising the minimum
+would lock out every operator whose password was long enough when they set it,
+at the moment they upgrade, with Host Recovery — which removes the account — as
+the only way back. A rule that arrives with an upgrade and takes the installation
+with it is not a rule about passwords, and the honest answer to a short one
+presented is that it is either right or wrong. What survives on that path is the
+*maximum*, because that is not a rule about passwords either: it is a bound on
+what a public, pre-authentication surface may ask PBKDF2 to do.
+
 **A stolen dump ground offline is still the place this credential is attacked
 without limit**, and on an installation with no second factor what it yields is
 everything. Sixteen characters and 210,000 iterations are what stands there. This

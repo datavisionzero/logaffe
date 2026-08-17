@@ -95,6 +95,13 @@ second factor it is the only property there is
 ([ADR 0042](./adr/0042-the-password-carries-more-so-it-gets-longer.md)). Sixteen
 is a passphrase — three words and a separator — rather than a rule about symbols.
 
+**It is a rule about choosing a password and not about giving one.** A sign-in
+takes what was typed and lets the hash answer, so an operator whose password was
+long enough when they set it is never locked out by the minimum rising later —
+they are asked for their password, and it is right or it is wrong. What is
+refused before the hasher is only what would make it work for nothing: an empty
+box, and anything past a few hundred characters.
+
 It is stored as a **slow hash** — the framework's PBKDF2-HMAC-SHA512, at OWASP's
 current figure — whose cost parameters are versioned, and a successful sign-in
 rewrites the hash at the current cost, so raising that cost later is a thing the

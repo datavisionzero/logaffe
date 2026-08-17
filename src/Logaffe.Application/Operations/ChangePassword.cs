@@ -75,7 +75,11 @@ public sealed class ChangePassword(
             return PasswordChangeOutcome.ChosenPasswordNotOne;
         }
 
-        if (!Password.TryCreate(currentPassword, out var presented))
+        // Read rather than created: the minimum is a rule about the password
+        // being chosen above and not about the one being proved here, so an
+        // operator whose password was long enough when they set it can still
+        // change it after the minimum has risen (ADR 0042).
+        if (!Password.TryRead(currentPassword, out var presented))
         {
             return PasswordChangeOutcome.CurrentPasswordRefused;
         }

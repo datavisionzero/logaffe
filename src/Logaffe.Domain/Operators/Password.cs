@@ -58,14 +58,40 @@ public sealed class Password
                 nameof(value));
 
     /// <summary>
-    /// Reads a typed password, and refuses one that is not long enough. It is
-    /// deliberately not trimmed and not normalized: what the operator typed is
-    /// what they will type again, and quietly dropping a leading space would
-    /// make a password that works today fail against a client that does not.
+    /// Reads a password the operator is <b>choosing</b>, and refuses one that is
+    /// not long enough. It is deliberately not trimmed and not normalized: what
+    /// the operator typed is what they will type again, and quietly dropping a
+    /// leading space would make a password that works today fail against a
+    /// client that does not.
     /// </summary>
     public static bool TryCreate(string? value, out Password password)
     {
         if (value is null || value.Length < MinimumLength || value.Length > MaximumLength)
+        {
+            password = null!;
+            return false;
+        }
+
+        password = new Password(value);
+        return true;
+    }
+
+    /// <summary>
+    /// Reads a password the operator is <b>presenting</b>, which is bounded by
+    /// what the hasher may be asked to do and by nothing else.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="MinimumLength"/> is a rule about choosing a password and not
+    /// about proving one. Applying it here would mean that raising the minimum
+    /// locks out every operator whose password was long enough when they set it —
+    /// a rule that arrives with an upgrade and takes the installation with it,
+    /// where the honest answer is that their password is simply either right or
+    /// wrong. A short one reaches the hasher and fails there, which costs one
+    /// verification on a throttled surface (ADR 0017).
+    /// </remarks>
+    public static bool TryRead(string? value, out Password password)
+    {
+        if (string.IsNullOrEmpty(value) || value.Length > MaximumLength)
         {
             password = null!;
             return false;

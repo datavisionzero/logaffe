@@ -79,7 +79,7 @@ public sealed class TurnOffTheSecondFactor(
         CancellationToken cancellationToken)
     {
         var theOperator = await operators.FindAsync(cancellationToken);
-        if (theOperator is null || !Password.TryCreate(password, out var presented))
+        if (theOperator is null || !Password.TryRead(password, out var presented))
         {
             return TurningOffOutcome.PasswordRefused;
         }

@@ -85,8 +85,11 @@ public sealed class SignIn(
     {
         // The shape first, and before the hasher: hashing is deliberately slow
         // and this surface is public, so a megabyte of input is refused here
-        // rather than inside PBKDF2.
-        if (!Password.TryCreate(password, out var presented))
+        // rather than inside PBKDF2. The minimum length is not applied — it is a
+        // rule about choosing a password, and applying it to one being presented
+        // would lock out an operator whose password was long enough when they
+        // set it (ADR 0042).
+        if (!Password.TryRead(password, out var presented))
         {
             return null;
         }

@@ -1,7 +1,12 @@
 /**
- * The shortest password the installation will take (`docs/sign-in.md`), which
- * is a minimum length and nothing else: no composition rules, no rotation, and
- * nothing checked against an outside service.
+ * The shortest password the installation will let anyone **choose**
+ * (`docs/sign-in.md`), which is a minimum length and nothing else: no
+ * composition rules, no rotation, and nothing checked against an outside
+ * service.
+ *
+ * It is not a rule about signing in. The sign-in screen asks for a password and
+ * lets the installation answer, so that raising this number never locks out an
+ * operator whose password was long enough when they set it (ADR 0042).
  *
  * Sixteen rather than twelve because the second factor is optional (ADR 0041),
  * so this may be the only credential on the account — and length is the one

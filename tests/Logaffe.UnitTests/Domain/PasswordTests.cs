@@ -21,6 +21,28 @@ public sealed class PasswordTests
     public void A_password_that_is_too_short_is_refused(string value) =>
         Assert.False(Password.TryCreate(value, out _));
 
+    [Theory]
+    [InlineData("short")]
+    [InlineData("fifteencharacte")]
+    public void A_password_being_presented_is_read_however_short_it_is(string value)
+    {
+        // The minimum is a rule about choosing (ADR 0042). Applying it to a
+        // password being proved would mean that raising it locks out every
+        // operator whose password was long enough when they set it, which is a
+        // rule that arrives with an upgrade and takes the installation with it.
+        Assert.True(Password.TryRead(value, out var presented));
+        Assert.Equal(value, presented.Text);
+    }
+
+    [Fact]
+    public void A_password_that_was_not_typed_at_all_is_not_one() =>
+        Assert.False(Password.TryRead(string.Empty, out _));
+
+    [Fact]
+    public void The_bound_on_the_hasher_holds_for_a_presented_password_too() =>
+        Assert.False(
+            Password.TryRead(new string('x', Password.MaximumLength + 1), out _));
+
     [Fact]
     public void The_minimum_is_a_length_the_operator_can_reach() =>
         Assert.True(Password.TryCreate(new string('x', Password.MinimumLength), out _));

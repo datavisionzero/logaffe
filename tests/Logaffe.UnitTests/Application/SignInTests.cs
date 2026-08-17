@@ -87,16 +87,36 @@ public sealed class SignInTests
     }
 
     [Fact]
-    public async Task A_password_below_the_minimum_never_reaches_the_hasher()
+    public async Task A_password_below_the_minimum_is_wrong_rather_than_malformed()
     {
         var installation = Claimed_installation();
 
         Assert.Null(await installation.SignIn.ExecuteAsync(
             "short", TheCode, null, null, TestContext.Current.CancellationToken));
 
-        // Hashing is deliberately slow and this surface is public, so what is
-        // not a password is refused before PBKDF2 is asked to spend anything on
-        // it.
+        // The minimum is a rule about choosing a password (ADR 0042). A short
+        // one presented here is simply not the one, and it is the hasher that
+        // says so — because refusing it for its length is what would lock out an
+        // operator whose password was long enough when they set it.
+        Assert.Equal(1, installation.Hasher.Verifications);
+        Assert.Empty(installation.Sessions.Stored);
+    }
+
+    [Fact]
+    public async Task A_password_that_would_be_a_denial_of_service_never_reaches_the_hasher()
+    {
+        var installation = Claimed_installation();
+
+        Assert.Null(await installation.SignIn.ExecuteAsync(
+            new string('x', Password.MaximumLength + 1),
+            TheCode,
+            null,
+            null,
+            TestContext.Current.CancellationToken));
+
+        // Hashing is deliberately slow and this surface is public, so a megabyte
+        // of input is refused before PBKDF2 is asked to spend anything on it.
+        // That bound is the one shape a presented password still has.
         Assert.Equal(0, installation.Hasher.Verifications);
     }
 

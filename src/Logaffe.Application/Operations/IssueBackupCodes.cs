@@ -62,7 +62,7 @@ public sealed class IssueBackupCodes(
     public async Task<IssuedSheet> ExecuteAsync(
         string? password, CancellationToken cancellationToken)
     {
-        if (!Password.TryCreate(password, out var presented))
+        if (!Password.TryRead(password, out var presented))
         {
             return Refused(SheetOutcome.PasswordRefused);
         }
