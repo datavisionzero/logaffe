@@ -196,6 +196,20 @@ whole call comes back as an expired read saying what to narrow — rather than a
 entries with an unknown number behind them, which would be the failure the number
 exists to prevent, wearing the shape of a success.
 
+## What an answer leaves out, its schema leaves optional
+
+A field carrying nothing is left out rather than written as `null`. The compact
+shape is the largest case of it, but not the only one: a project in no group, a
+project that has never received an entry, a search with no cursor to hand back,
+and a count that came back with what to narrow all leave a field out.
+
+A client validates the structured content of a result against the output schema
+the tool declared, so the two have to agree — **the schema requires only what
+every answer of that tool carries.** A field that the description calls sometimes
+absent and the schema calls required is an answer the client throws away while
+the installation believes it has answered, and the operator is left looking for a
+fault at their end of a call that succeeded.
+
 ## Entries reach the agent as data
 
 Entries are structured values in named fields — never markdown, never a

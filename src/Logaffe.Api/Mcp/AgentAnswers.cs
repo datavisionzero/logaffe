@@ -47,37 +47,51 @@ public static class AgentCap
 /// <summary>
 /// One project, as <c>list_projects</c> answers with it.
 /// </summary>
-public sealed record AgentProject(
-    [property: Description("Names this project in every other tool.")]
-    Guid Id,
-    string Name,
-    [property: Description(
+/// <remarks>
+/// The group and the last receipt are the two a project may not have, and they
+/// are declared optional for the reason <see cref="AgentJson"/> gives: a project
+/// in no group leaves the field out, and a schema requiring it would have the
+/// client throw the whole list away.
+/// </remarks>
+public sealed record AgentProject
+{
+    [Description("Names this project in every other tool.")]
+    public required Guid Id { get; init; }
+
+    public required string Name { get; init; }
+
+    [Description(
         "The group this project is listed under, or absent when it is in none. "
         + "It is the operator's own word for a set of projects that belong "
         + "together — one product's environments, one customer's applications — "
         + "and it is what resolves a request naming one of those. It narrows "
         + "nothing: every tool reads one project, and a group is not one.")]
-    string? Group,
-    [property: Description("How long the project keeps its entries, counted from receipt.")]
-    int RetentionDays,
-    DateTimeOffset CreatedAt,
-    [property: Description(
+    public string? Group { get; init; }
+
+    [Description("How long the project keeps its entries, counted from receipt.")]
+    public required int RetentionDays { get; init; }
+
+    public required DateTimeOffset CreatedAt { get; init; }
+
+    [Description(
         "When this project last received an entry, or absent when it never has. "
         + "Whether it is still being delivered to, which is the cheapest health "
         + "question there is about one.")]
-    DateTimeOffset? LastReceivedAt)
-{
+    public DateTimeOffset? LastReceivedAt { get; init; }
+
     /// <param name="group">
     /// The name of the group the project points at, which the caller resolves —
     /// a project carries the identity, and the name is on the group list.
     /// </param>
-    public static AgentProject Of(ListedProject project, string? group) => new(
-        project.Id,
-        project.Name,
-        group,
-        project.Retention.Days,
-        project.CreatedAt,
-        project.LastReceivedAt);
+    public static AgentProject Of(ListedProject project, string? group) => new()
+    {
+        Id = project.Id,
+        Name = project.Name,
+        Group = group,
+        RetentionDays = project.Retention.Days,
+        CreatedAt = project.CreatedAt,
+        LastReceivedAt = project.LastReceivedAt,
+    };
 }
 
 /// <summary>Every project the installation holds.</summary>
@@ -192,70 +206,94 @@ public sealed record AgentEntry
 /// <summary>
 /// What a search answers with.
 /// </summary>
-/// <param name="Matched">
-/// How many entries the filters match in the project — not how many are in
-/// <paramref name="Entries"/>. An agent that receives fifty entries and is not
-/// told there were nine thousand will answer as though there were fifty, and
-/// that is the quietest way this product could produce a wrong answer. Absent
-/// only on a read that expired, which answered nothing to count against.
-/// </param>
-/// <param name="Capped">
-/// Whether this answer stopped at the cap with more still to read.
-/// <paramref name="Cursor"/> is where to continue from.
-/// </param>
-/// <param name="Cursor">
-/// What to hand the next call to carry on, or absent when this answer reached
-/// the end of the matches. Opaque: it is passed back unread.
-/// </param>
-/// <param name="Narrow">
-/// Present when the read used up its five seconds, and then the only thing
-/// present besides the verbosity. These are the adjustments to make, in the
-/// order to try them — values rather than a sentence, because the operator's
-/// screen writes the sentence and an agent gets the fact (ADR 0012).
-/// </param>
-public sealed record SearchAnswer(
-    Verbosity Verbosity,
-    IReadOnlyList<AgentEntry> Entries,
-    long? Matched,
-    bool Capped,
-    string? Cursor,
-    IReadOnlyList<Narrowing>? Narrow)
+/// <remarks>
+/// The verbosity, the entries and the cap are on every answer; the total, the
+/// cursor and the narrowings are each on some of them, and are optional for the
+/// reason <see cref="AgentJson"/> gives.
+/// </remarks>
+public sealed record SearchAnswer
 {
+    public required Verbosity Verbosity { get; init; }
+
+    public required IReadOnlyList<AgentEntry> Entries { get; init; }
+
+    /// <summary>
+    /// How many entries the filters match in the project — not how many are in
+    /// <see cref="Entries"/>. An agent that receives fifty entries and is not
+    /// told there were nine thousand will answer as though there were fifty, and
+    /// that is the quietest way this product could produce a wrong answer. Absent
+    /// only on a read that expired, which answered nothing to count against.
+    /// </summary>
+    public long? Matched { get; init; }
+
+    /// <summary>
+    /// Whether this answer stopped at the cap with more still to read.
+    /// <see cref="Cursor"/> is where to continue from.
+    /// </summary>
+    public required bool Capped { get; init; }
+
+    /// <summary>
+    /// What to hand the next call to carry on, or absent when this answer reached
+    /// the end of the matches. Opaque: it is passed back unread.
+    /// </summary>
+    public string? Cursor { get; init; }
+
+    /// <summary>
+    /// Present when the read used up its five seconds, and then the only thing
+    /// present besides the verbosity. These are the adjustments to make, in the
+    /// order to try them — values rather than a sentence, because the operator's
+    /// screen writes the sentence and an agent gets the fact (ADR 0012).
+    /// </summary>
+    public IReadOnlyList<Narrowing>? Narrow { get; init; }
+
     public static SearchAnswer Of(
         Verbosity verbosity,
         IReadOnlyList<LogEntry> entries,
         long matched,
         bool capped,
-        EntryCursor? cursor) => new(
-            verbosity,
-            [.. entries.Select(entry => AgentEntry.Of(entry, verbosity))],
-            matched,
-            capped,
-            cursor?.ToString(),
-            null);
+        EntryCursor? cursor) => new()
+    {
+        Verbosity = verbosity,
+        Entries = [.. entries.Select(entry => AgentEntry.Of(entry, verbosity))],
+        Matched = matched,
+        Capped = capped,
+        Cursor = cursor?.ToString(),
+    };
 
     /// <summary>
     /// A read that met the five seconds, and what to change so that the next one
     /// does not (ADR 0026).
     /// </summary>
     public static SearchAnswer RanOut(
-        Verbosity verbosity, IReadOnlyList<Narrowing> narrow) =>
-        new(verbosity, [], null, false, null, narrow);
+        Verbosity verbosity, IReadOnlyList<Narrowing> narrow) => new()
+    {
+        Verbosity = verbosity,
+        Entries = [],
+        Capped = false,
+        Narrow = narrow,
+    };
 }
 
 /// <summary>
 /// One row of a count.
 /// </summary>
-/// <param name="Value">
-/// The value that was grouped by, or absent both for the ungrouped count and for
-/// the entries carrying no value in the grouped column.
-/// </param>
-public sealed record CountedGroupAnswer(string? Value, long Entries);
+public sealed record CountedGroupAnswer
+{
+    /// <summary>
+    /// The value that was grouped by, or absent for the entries carrying no
+    /// value in the grouped column — a row that is every entry with no logger
+    /// name on it, and which is a row and not an omission.
+    /// </summary>
+    public string? Value { get; init; }
+
+    public required long Entries { get; init; }
+}
 
 /// <summary>
 /// What a count answers with: a number, or the rows it was broken into.
 /// </summary>
 /// <remarks>
+/// <para>
 /// <b>The two are exclusive, and an ungrouped count is the number.</b>
 /// <c>docs/mcp.md</c> promises a count answered "as a number instead of as the
 /// entries", and a one-row list under a <c>groups</c> key, whose single row
@@ -264,33 +302,49 @@ public sealed record CountedGroupAnswer(string? Value, long Entries);
 /// through a collection for something the tool was asked for directly. Which
 /// one is present says which question was asked, the way
 /// <see cref="SearchAnswer.Narrow"/> says a read ran out.
+/// </para>
+/// <para>
+/// Which is also why not one of the three is required: each of them is absent
+/// from some answer this tool makes, and the schema has to say so
+/// (<see cref="AgentJson"/>).
+/// </para>
 /// </remarks>
-/// <param name="Entries">
-/// How many entries matched, on a count that was not grouped.
-/// </param>
-/// <param name="Groups">
-/// One row per value, on a count that was — and absent rather than empty when it
-/// was not.
-/// </param>
-/// <inheritdoc cref="SearchAnswer" path="/param[@name='Narrow']"/>
-public sealed record CountAnswer(
-    long? Entries,
-    IReadOnlyList<CountedGroupAnswer>? Groups,
-    IReadOnlyList<Narrowing>? Narrow)
+public sealed record CountAnswer
 {
+    /// <summary>
+    /// How many entries matched, on a count that was not grouped.
+    /// </summary>
+    public long? Entries { get; init; }
+
+    /// <summary>
+    /// One row per value, on a count that was — and absent rather than empty when
+    /// it was not.
+    /// </summary>
+    public IReadOnlyList<CountedGroupAnswer>? Groups { get; init; }
+
+    /// <inheritdoc cref="SearchAnswer.Narrow"/>
+    public IReadOnlyList<Narrowing>? Narrow { get; init; }
+
     public static CountAnswer Of(IReadOnlyList<CountedGroup> groups, Grouping grouping) =>
         grouping is Grouping.None
 
             // An ungrouped count is one row of SQL and always exactly one, so
             // this is the number itself rather than a row that has to be read
             // out of a list of one.
-            ? new(groups.Single().Entries, null, null)
-            : new(
-                null,
-                [.. groups.Select(group => new CountedGroupAnswer(
-                    EntryFilterText.NamedGroup(grouping, group.Value), group.Entries))],
-                null);
+            ? new() { Entries = groups.Single().Entries }
+            : new()
+            {
+                Groups =
+                [
+                    .. groups.Select(group => new CountedGroupAnswer
+                    {
+                        Value = EntryFilterText.NamedGroup(grouping, group.Value),
+                        Entries = group.Entries,
+                    }),
+                ],
+            };
 
     /// <inheritdoc cref="SearchAnswer.RanOut"/>
-    public static CountAnswer RanOut(IReadOnlyList<Narrowing> narrow) => new(null, null, narrow);
+    public static CountAnswer RanOut(IReadOnlyList<Narrowing> narrow) =>
+        new() { Narrow = narrow };
 }

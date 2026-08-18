@@ -216,6 +216,78 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_field_an_answer_may_leave_out_is_not_required_by_its_own_schema()
+    {
+        await using var agent = await ConnectAsync();
+
+        var tools = await agent.ListToolsAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // A field carrying nothing is left out rather than written as null, and
+        // a client validates the structured content of a result against this
+        // schema. The two only agree while what may be absent is also what is
+        // not required — otherwise a project in no group, a search with no
+        // cursor to hand back, or a count that came back with what to narrow is
+        // thrown away by the client while the server believes it answered.
+        foreach (var tool in tools)
+        {
+            if (tool.ProtocolTool.OutputSchema is { } output)
+            {
+                NothingNullableIsRequired($"{tool.Name}.outputSchema", output);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Walks a schema and asserts that no property admitting <c>null</c> — which
+    /// is how a field this surface may leave out is declared — is named in the
+    /// <c>required</c> beside it.
+    /// </summary>
+    private static void NothingNullableIsRequired(string path, JsonElement schema)
+    {
+        if (schema.TryGetProperty("properties", out var properties))
+        {
+            var required = schema.TryGetProperty("required", out var names)
+                ? names.EnumerateArray().Select(name => name.GetString()).ToHashSet()
+                : [];
+
+            foreach (var member in properties.EnumerateObject())
+            {
+                Assert.False(
+                    required.Contains(member.Name) && AdmitsNull(member.Value),
+                    $"{path}.{member.Name} may be absent and is required.");
+
+                NothingNullableIsRequired($"{path}.{member.Name}", member.Value);
+            }
+        }
+
+        foreach (var keyword in (ReadOnlySpan<string>)["items", "additionalProperties"])
+        {
+            if (schema.TryGetProperty(keyword, out var nested))
+            {
+                NothingNullableIsRequired($"{path}.{keyword}", nested);
+            }
+        }
+
+        if (schema.TryGetProperty("$defs", out var defs))
+        {
+            foreach (var member in defs.EnumerateObject())
+            {
+                NothingNullableIsRequired($"{path}.$defs.{member.Name}", member.Value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether the schema of one field says <c>null</c> is one of the things it
+    /// can be, which on this surface is how an absent field is written.
+    /// </summary>
+    private static bool AdmitsNull(JsonElement schema) =>
+        schema.TryGetProperty("type", out var type)
+        && type.ValueKind is JsonValueKind.Array
+        && type.EnumerateArray().Any(one => one.GetString() is "null");
+
+    [Fact]
     public async Task A_level_is_a_closed_set_in_the_schema_and_not_a_sentence_about_one()
     {
         await using var agent = await ConnectAsync();

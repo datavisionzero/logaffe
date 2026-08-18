@@ -111,11 +111,26 @@ public static class AgentSurface
 /// How the four tools are written on the wire.
 /// </summary>
 /// <remarks>
+/// <para>
 /// One difference from the SDK's own: a field carrying nothing is left out
 /// rather than written as <c>null</c>. That is what makes the compact shape
 /// compact — it exists to keep a broad search from spending an agent's whole
 /// context, and seven null fields on each of two hundred entries would spend a
 /// good part of what it saved.
+/// </para>
+/// <para>
+/// <b>What that costs the answers is that a field an answer may leave out cannot
+/// be required by the schema that declares it.</b> A client validates the
+/// structured content of a result against the tool's output schema and throws
+/// away an answer that does not match, so a project in no group, an uncapped
+/// search with no cursor to hand back, or a count that came back with what to
+/// narrow would each be lost — and lost as a client-side failure, with the
+/// server having answered correctly. The answers in <c>AgentAnswers</c>
+/// therefore say which of their fields are always there, one field at a time,
+/// with <c>required</c>. Positional records cannot: every parameter of one is
+/// required, including the nullable ones, and the description saying a field is
+/// absent sometimes is prose the schema does not read.
+/// </para>
 /// </remarks>
 internal static class AgentJson
 {
