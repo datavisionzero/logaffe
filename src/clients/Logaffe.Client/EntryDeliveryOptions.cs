@@ -132,6 +132,11 @@ public sealed class EntryDeliveryOptions
     /// nothing of the application's logging stack; the two packages above it
     /// wire it to whichever one is there.
     /// </para>
+    /// <para>
+    /// <b>Left unset, reports go to <see cref="Console.Error"/></b>, which is
+    /// where a container's own log is. Silence is a callback that says nothing,
+    /// written on purpose rather than arrived at by leaving this out.
+    /// </para>
     /// </remarks>
     public Action<string, Exception?>? OnFailure { get; init; }
 }

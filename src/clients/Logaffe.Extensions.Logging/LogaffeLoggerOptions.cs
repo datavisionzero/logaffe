@@ -90,10 +90,9 @@ public sealed class LogaffeLoggerOptions
         BatchInterval = BatchInterval,
         FlushTimeout = FlushTimeout,
         DeliveryTimeout = DeliveryTimeout,
-        OnFailure = OnFailure ?? Report,
-    };
 
-    private static void Report(string what, Exception? cause) =>
-        Console.Error.WriteLine(
-            cause is null ? $"logaffe: {what}" : $"logaffe: {what} {cause}");
+        // Left unset it stays unset, and the delivery underneath writes to
+        // Console.Error itself. One fallback, in the one place that reports.
+        OnFailure = OnFailure,
+    };
 }
