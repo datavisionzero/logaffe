@@ -276,6 +276,50 @@ public sealed class EntryDeliveryTests
         await _installation.TakeAsync(1);
     }
 
+    /// <summary>
+    /// The copy carries every setting there is.
+    /// </summary>
+    /// <remarks>
+    /// It is what lets a package above this one put its own default under a
+    /// member the sender left unset — the Serilog sink does exactly that for
+    /// <c>SelfLog</c> — and a setting added to the options and forgotten in the
+    /// copy would be lost by everything that copies, quietly and at the worst
+    /// possible moment. So it is asked by reflection rather than member by
+    /// member.
+    /// </remarks>
+    [Fact]
+    public void A_copy_of_the_options_carries_every_setting()
+    {
+        var unwritten = new EntryDeliveryOptions
+        {
+            Installation = Installation,
+            IngestToken = Token,
+        };
+
+        var written = new EntryDeliveryOptions
+        {
+            Installation = new Uri("https://elsewhere.example.com"),
+            IngestToken = "logaffe_ingest_019fe17a_0ther",
+            QueueCapacity = 17,
+            BatchInterval = TimeSpan.FromMilliseconds(123),
+            FlushTimeout = TimeSpan.FromSeconds(7),
+            DeliveryTimeout = TimeSpan.FromSeconds(11),
+            OnFailure = (_, _) => { },
+        };
+
+        var copy = new EntryDeliveryOptions(written);
+
+        foreach (var setting in typeof(EntryDeliveryOptions).GetProperties())
+        {
+            // A setting this test leaves at its default is one it could not tell
+            // a copy of from a default of, so it is a failure here rather than a
+            // pass that means nothing.
+            Assert.NotEqual(setting.GetValue(unwritten), setting.GetValue(written));
+
+            Assert.Equal(setting.GetValue(written), setting.GetValue(copy));
+        }
+    }
+
     private EntryDelivery Delivery(
         TimeSpan? batchInterval = null, int queueCapacity = 10_000) =>
         new(

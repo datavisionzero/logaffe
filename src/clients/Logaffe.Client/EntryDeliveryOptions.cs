@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Logaffe.Client;
 
 /// <summary>
@@ -21,6 +23,43 @@ namespace Logaffe.Client;
 /// </remarks>
 public sealed class EntryDeliveryOptions
 {
+    /// <summary>Options as a sender writes them, member by member.</summary>
+    public EntryDeliveryOptions()
+    {
+    }
+
+    /// <summary>
+    /// The same options again, so that a package above this one can put its own
+    /// default under a member the sender left unset.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A copy rather than a write into the caller's object: the options belong
+    /// to whoever wrote them, who may be holding them for a second sender, and a
+    /// default written into them would follow the object rather than the
+    /// delivery it was meant for.
+    /// </para>
+    /// <para>
+    /// <b>It carries every member.</b> A setting added above and not added here
+    /// would be silently lost by everything that copies, which is why a test
+    /// asks it of this constructor by reflection rather than by name.
+    /// </para>
+    /// </remarks>
+    /// <param name="other">The options to copy.</param>
+    [SetsRequiredMembers]
+    public EntryDeliveryOptions(EntryDeliveryOptions other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+
+        Installation = other.Installation;
+        IngestToken = other.IngestToken;
+        QueueCapacity = other.QueueCapacity;
+        BatchInterval = other.BatchInterval;
+        FlushTimeout = other.FlushTimeout;
+        DeliveryTimeout = other.DeliveryTimeout;
+        OnFailure = other.OnFailure;
+    }
+
     /// <summary>
     /// Where this installation answers — scheme and host, as the operator reaches
     /// it. The ingest path is appended and is not a setting.

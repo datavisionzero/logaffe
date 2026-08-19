@@ -71,6 +71,10 @@ would hand it straight back to this sink. Turn it on while setting things up:
 Serilog.Debugging.SelfLog.Enable(Console.Error);
 ```
 
+That holds however the sink was configured, including the overloads taking
+`EntryDeliveryOptions`. Set `OnFailure` on those options to send the reports
+somewhere else instead; what you set is kept.
+
 **Call `Log.CloseAndFlush()` on shutdown**, as with any Serilog sink. Without it
 the application's last entries never leave.
 
