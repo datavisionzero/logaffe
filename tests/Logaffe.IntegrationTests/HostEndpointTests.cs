@@ -359,29 +359,37 @@ public sealed class HostEndpointTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_bucket_count_outside_what_a_read_is_divided_into_is_refused()
+    public async Task A_read_says_how_it_divided_the_range_because_the_caller_did_not()
     {
         using var client = await SignedInAsync();
 
         var host = await MakeAsync(client, "web-01");
 
-        foreach (var buckets in new[] { 0, 201 })
-        {
-            using var refused = await client.GetAsync(
-                $"/hosts/{host.Id}/samples"
-                + $"?from=2026-08-08T10:00:00Z&to=2026-08-08T11:00:00Z&buckets={buckets}",
-                TestContext.Current.CancellationToken);
-
-            Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
-        }
-
-        // And saying nothing is the count the range implies, which is what the
-        // agent is given as well.
-        using var chosen = await client.GetAsync(
+        var window = await ReadAsync<SampleWindowBody>(await client.GetAsync(
             $"/hosts/{host.Id}/samples?from=2026-08-08T10:00:00Z&to=2026-08-08T11:00:00Z",
-            TestContext.Current.CancellationToken);
+            TestContext.Current.CancellationToken));
 
-        Assert.Equal(HttpStatusCode.OK, chosen.StatusCode);
+        // An hour is sixty spans of a minute: a bucket is never finer than the
+        // interval that fills it. The number is on the answer because nothing
+        // asked for it — and a band cannot tell a run from a gap without it.
+        Assert.Equal(60, window.BucketSeconds);
+        Assert.Equal("web-01", window.HostName);
+    }
+
+    [Fact]
+    public async Task A_range_far_wider_than_two_hundred_readings_is_still_two_hundred_spans()
+    {
+        using var client = await SignedInAsync();
+
+        var host = await MakeAsync(client, "web-01");
+
+        var window = await ReadAsync<SampleWindowBody>(await client.GetAsync(
+            $"/hosts/{host.Id}/samples?from=2026-08-01T00:00:00Z&to=2026-08-08T00:00:00Z",
+            TestContext.Current.CancellationToken));
+
+        // A week is ten thousand readings, and the cap is what keeps the size
+        // of an answer a property of the product rather than of the question.
+        Assert.Equal(TimeSpan.FromDays(7).TotalSeconds / 200, window.BucketSeconds);
     }
 
     [Fact]
@@ -499,4 +507,11 @@ public sealed class HostEndpointTests(PostgresFixture postgres) : IAsyncLifetime
     private sealed record SampleRetentionBody(int RetentionDays);
 
     private sealed record SamplesOutsideBody(int RetentionDays, long Samples);
+
+    /// <summary>
+    /// Only what a read of an empty host answers with. The buckets themselves
+    /// are asserted where there are samples to put in them
+    /// (<c>SampleEndpointTests</c>, <c>SampleReaderTests</c>).
+    /// </summary>
+    private sealed record SampleWindowBody(string HostName, double BucketSeconds);
 }

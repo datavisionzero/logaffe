@@ -5,7 +5,15 @@ import { MemoryRouter, Route, Routes } from "react-router";
 import { GroupsProvider } from "../projects/groups";
 import { ProjectsProvider } from "../projects/projects";
 import { ProjectSettings } from "./ProjectSettings";
-import { aGroup, aProject, anInstallationAnswering, noGroups, type Answer } from "../shared/testing";
+import {
+  aGroup,
+  aHost,
+  aProject,
+  anInstallationAnswering,
+  noGroups,
+  noHosts,
+  type Answer,
+} from "../shared/testing";
 
 /** One of a project's tokens, carrying no secret — a list decrypts nothing. */
 function anIngestToken(token: {
@@ -30,6 +38,7 @@ const ONE_TOKEN: Answer = {
 function open(routes: Record<string, Answer | Answer[]>, at = "/project/p1/settings") {
   const installation = anInstallationAnswering({
     "GET /groups": noGroups,
+    "GET /hosts": noHosts,
     "GET /projects": { body: [aProject({ id: "p1", name: "checkout", retentionDays: 30 })] },
     "GET /projects/p1/ingest-tokens": ONE_TOKEN,
     ...routes,
@@ -82,7 +91,18 @@ describe("the areas", () => {
 
     // The project is read off the list the shell already fetched, the groups
     // off the one beside it, and the tokens belong to an area nobody opened.
-    expect([...installation.asked].sort()).toEqual(["GET /groups", "GET /projects"]);
+    //
+    // The hosts are the one thing this area does ask for, and they are the
+    // reason this rule is stated as *what an area needs* rather than *nothing*:
+    // a field offering the machines to run on cannot offer them without them.
+    // They are not a provider beside the groups because their answer carries
+    // when each host last reported, read across the sample table — a cost every
+    // sign-in should not pay for a field on one area.
+    expect([...installation.asked].sort()).toEqual([
+      "GET /groups",
+      "GET /hosts",
+      "GET /projects",
+    ]);
   });
 });
 
@@ -305,5 +325,56 @@ describe("deleting a project", () => {
     const deletion = installation.asked.filter((route) => route.startsWith("DELETE"));
 
     expect(deletion).toEqual(["DELETE /projects/p1"]);
+  });
+});
+
+describe("the machine a project runs on", () => {
+  it("offers the hosts and puts the project on one", async () => {
+    const installation = open({
+      "GET /hosts": { body: [aHost({ id: "h1", name: "web-01" })] },
+      "PUT /projects/p1/host": { status: 204 },
+      "GET /projects": [
+        { body: [aProject({ id: "p1", name: "checkout" })] },
+        { body: [aProject({ id: "p1", name: "checkout", hostId: "h1" })] },
+      ],
+    });
+
+    // The field waits for the hosts, which this area asks for on the way in.
+    await screen.findByRole("option", { name: "web-01" });
+
+    await userEvent.selectOptions(screen.getByLabelText("Host"), "h1");
+
+    await waitFor(() =>
+      expect(installation.sentTo("PUT /projects/p1/host")).toEqual([{ hostId: "h1" }]),
+    );
+  });
+
+  it("takes a project off every machine, which is where every project starts", async () => {
+    const installation = open({
+      "GET /hosts": { body: [aHost({ id: "h1", name: "web-01" })] },
+      "PUT /projects/p1/host": { status: 204 },
+      "GET /projects": { body: [aProject({ id: "p1", name: "checkout", hostId: "h1" })] },
+    });
+
+    await screen.findByRole("option", { name: "web-01" });
+
+    await userEvent.selectOptions(screen.getByLabelText("Host"), "");
+
+    await waitFor(() =>
+      expect(installation.sentTo("PUT /projects/p1/host")).toEqual([{ hostId: null }]),
+    );
+  });
+
+  // A host is made in the installation's settings, for the reason a group is:
+  // a screen about one project is the wrong place to bring into existence a
+  // thing that outlives it.
+  it("sends the operator elsewhere to make one, and offers no field until there is", async () => {
+    open({});
+
+    expect(await screen.findByRole("link", { name: /Make a host in the/ })).toHaveAttribute(
+      "href",
+      "/settings/hosts",
+    );
+    expect(screen.queryByLabelText("Host")).toBeNull();
   });
 });

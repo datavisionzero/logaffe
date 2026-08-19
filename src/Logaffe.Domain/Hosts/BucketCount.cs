@@ -6,9 +6,10 @@ namespace Logaffe.Domain.Hosts;
 /// <remarks>
 /// A week at one sample a minute is ten thousand readings, which would spend an
 /// agent's context on the shape of a line and give a band far more points than
-/// it has pixels. Bucketing is therefore not an option a caller may decline —
-/// what it chooses is how many, and the ceiling is what makes the answer's size
-/// a property of the product rather than of the range asked for.
+/// it has pixels. Bucketing is therefore not an option a caller may decline, and
+/// it is not a number a caller picks either: the range implies it, and the
+/// ceiling is what makes the answer's size a property of the product rather than
+/// of the range asked for.
 /// </remarks>
 public sealed record BucketCount
 {
@@ -52,9 +53,10 @@ public sealed record BucketCount
     /// </para>
     /// <para>
     /// It is here rather than in either adapter because both of them need it and
-    /// they must agree: the agent is given no say in it at all
-    /// (<c>docs/mcp.md</c>), and the operator's band asks for a number only
-    /// because it knows how wide it is on the screen.
+    /// they must agree. Neither caller is given a say in it: an agent names a
+    /// host and a range (<c>docs/mcp.md</c>), the operator's band names the
+    /// range its filters already state, and both are told how the installation
+    /// divided it — which is the only part either of them has to know.
     /// </para>
     /// </remarks>
     public static BucketCount For(TimeSpan range)

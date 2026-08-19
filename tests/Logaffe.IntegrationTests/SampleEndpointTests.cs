@@ -102,6 +102,11 @@ public sealed class SampleEndpointTests(PostgresFixture postgres) : IAsyncLifeti
 
         var window = await ReadSamplesAsync(client, host.Id);
 
+        // The name rides along with the read, which is what the band over a
+        // project's entries has to draw: the project carries the host's
+        // identity and nothing that names it.
+        Assert.Equal("web-01", window.HostName);
+
         var bucket = Assert.Single(window.Samples);
         Assert.Equal(0.42, bucket.CpuAverage, 3);
         Assert.Equal(0.42, bucket.CpuPeak, 3);
@@ -130,7 +135,7 @@ public sealed class SampleEndpointTests(PostgresFixture postgres) : IAsyncLifeti
             HttpStatusCode.NoContent,
             await DeliverAsync(token, Reading.Replace("0.42", "0.99")));
 
-        var window = await ReadSamplesAsync(client, host.Id, buckets: 200);
+        var window = await ReadSamplesAsync(client, host.Id);
 
         var bucket = Assert.Single(window.Samples);
         Assert.Equal(0.42, bucket.CpuAverage, 3);
@@ -258,16 +263,14 @@ public sealed class SampleEndpointTests(PostgresFixture postgres) : IAsyncLifeti
     /// A range wide enough to hold whatever minute the installation's own clock
     /// stamped the delivery with — which is the only clock a sample has.
     /// </summary>
-    private async Task<SampleWindowBody> ReadSamplesAsync(
-        HttpClient client, Guid hostId, int? buckets = null)
+    private async Task<SampleWindowBody> ReadSamplesAsync(HttpClient client, Guid hostId)
     {
         var from = DateTimeOffset.UtcNow.AddHours(-1).ToString("O");
         var to = DateTimeOffset.UtcNow.AddHours(1).ToString("O");
-        var span = buckets is null ? string.Empty : $"&buckets={buckets}";
 
         return await ReadAsync<SampleWindowBody>(await client.GetAsync(
             $"/hosts/{hostId}/samples?from={Uri.EscapeDataString(from)}"
-            + $"&to={Uri.EscapeDataString(to)}{span}",
+            + $"&to={Uri.EscapeDataString(to)}",
             TestContext.Current.CancellationToken));
     }
 
@@ -359,6 +362,8 @@ public sealed class SampleEndpointTests(PostgresFixture postgres) : IAsyncLifeti
         DateTimeOffset Start, string Mount, long UsedAverage, long UsedPeak, long Total);
 
     private sealed record SampleWindowBody(
+        string HostName,
+        double BucketSeconds,
         IReadOnlyList<SampleBucketBody> Samples,
         IReadOnlyList<FilesystemBucketBody> Filesystems);
 }

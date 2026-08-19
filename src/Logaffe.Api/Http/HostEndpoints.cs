@@ -88,7 +88,22 @@ public sealed record FilesystemBucketResponse(
 /// machine that was switched off reported nothing, which is an answer, and the
 /// band draws the gap rather than drawing through it.
 /// </remarks>
+/// <param name="BucketSeconds">
+/// How long one span is, which the caller does not choose and therefore has to
+/// be told. It is what turns a list of spans back into a picture: a band draws
+/// a run the host reported in as a run, and the distance between two spans that
+/// is wider than this as the gap it is.
+/// </param>
+/// <param name="HostName">
+/// Which machine this is, which the band over a project's entries has no other
+/// way to learn: it is drawn for the host the open project sits on, and the
+/// project carries that host's identity and not its name. It rides along here
+/// rather than being a second request because the read had to find the host
+/// anyway — the same argument that puts it on the agent's answer.
+/// </param>
 public sealed record SampleWindowResponse(
+    string HostName,
+    double BucketSeconds,
     IEnumerable<SampleBucketResponse> Samples,
     IEnumerable<FilesystemBucketResponse> Filesystems);
 
@@ -262,18 +277,19 @@ public static class HostEndpoints
                 Guid id,
                 DateTimeOffset from,
                 DateTimeOffset to,
-                int? buckets,
                 ReadSamples read,
                 CancellationToken cancellationToken) =>
             {
-                // Left to the range when the caller says nothing, which is the
-                // number the agent's tool is given as well: a bucket is never
-                // finer than the interval that fills it. The band asks for one
-                // because it knows how wide it is on the screen.
-                if (!Chosen(buckets, from, to, out var count))
-                {
-                    return NotABucketCount();
-                }
+                // The caller names a range and the installation says how it
+                // divided it, exactly as the agent's tool works. A count on the
+                // wire was offered here first, on the theory that the band knows
+                // how wide it is on the screen — but the range already answers
+                // that (a bucket is never finer than the interval that fills it,
+                // and never more than two hundred of them), and a parameter no
+                // caller has a better answer for is a parameter to be wrong
+                // about.
+                var span = (to - from).Duration();
+                var count = BucketCount.For(span);
 
                 var samples = await read.ExecuteAsync(id, from, to, count, cancellationToken);
 
@@ -284,14 +300,13 @@ public static class HostEndpoints
 
                 return samples.Expired
                     ? ReadExpiredResponse.Of(samples.Narrow)
-                    : Results.Ok(Shown(samples.Answer!.Window));
+                    : Results.Ok(Shown(samples.Answer!, span / count.Value));
             })
             .WithName("ReadHostSamples")
             .WithSummary("What one host reported over a range, in equal spans.")
             .Produces<SampleWindowResponse>()
             .Produces<ReadExpiredResponse>(StatusCodes.Status408RequestTimeout)
-            .Produces(StatusCodes.Status404NotFound)
-            .ProducesValidationProblem();
+            .Produces(StatusCodes.Status404NotFound);
     }
 
     private static void MapSampleRetention(this IEndpointRouteBuilder endpoints)
@@ -359,8 +374,10 @@ public static class HostEndpoints
 
     private static HostResponse Shown(Host host) => new(host.Id, host.Name, host.CreatedAt);
 
-    private static SampleWindowResponse Shown(SampleWindow window) => new(
-        window.Samples.Select(bucket => new SampleBucketResponse(
+    private static SampleWindowResponse Shown(HostSamples read, TimeSpan span) => new(
+        read.Name,
+        span.TotalSeconds,
+        read.Window.Samples.Select(bucket => new SampleBucketResponse(
             bucket.Start,
             bucket.CpuAverage,
             bucket.CpuPeak,
@@ -369,28 +386,12 @@ public static class HostEndpoints
             bucket.MemoryTotal,
             bucket.LoadAverage,
             bucket.LoadPeak)),
-        window.Filesystems.Select(bucket => new FilesystemBucketResponse(
+        read.Window.Filesystems.Select(bucket => new FilesystemBucketResponse(
             bucket.Start,
             bucket.MountPath.Value,
             bucket.UsedAverage,
             bucket.UsedPeak,
             bucket.Total)));
-
-    /// <summary>
-    /// The count the caller asked for, or the one the range implies when they
-    /// asked for none.
-    /// </summary>
-    private static bool Chosen(
-        int? buckets, DateTimeOffset from, DateTimeOffset to, out BucketCount count)
-    {
-        if (buckets is null)
-        {
-            count = BucketCount.For((to - from).Duration());
-            return true;
-        }
-
-        return BucketCount.TryOf(buckets.Value, out count);
-    }
 
     /// <summary>
     /// The domain refuses a name that is not one as a backstop; a caller taking
@@ -406,16 +407,6 @@ public static class HostEndpoints
             [
                 "A host has a name, of at most "
                 + $"{Host.NameMaxLength} characters.",
-            ],
-        });
-
-    private static IResult NotABucketCount() => Results.ValidationProblem(
-        new Dictionary<string, string[]>
-        {
-            ["buckets"] =
-            [
-                "A read is divided into between "
-                + $"{BucketCount.Minimum} and {BucketCount.Maximum} buckets.",
             ],
         });
 

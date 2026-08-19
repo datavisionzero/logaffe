@@ -364,32 +364,44 @@ that do not come back
 
 **The hosts are here for the same reason, and they hold more.** The area lists
 them with when each last reported — read off its newest sample, not written
-beside it — and creates, renames and removes one. Creating a host hands back the
-**finished command that starts its collector**, with this installation's address,
-the host's token and the mounts it needs already in it, exactly as an ingest
-token hands back a delivery snippet and an agent token hands back a client
-configuration ([Metrics](./metrics.md#the-collector)). The same command comes
-back whenever the token is read.
+beside it — and makes one. **A host is then a screen of its own**, an address
+inside the area like every other one, because it holds more than a group does:
+what the machine was doing, the token its collector reports with, its name and
+its end. Issuing that token hands back the **finished command that starts the
+collector**, with this installation's address, the token and the mounts it needs
+already in it, exactly as an ingest token hands back a delivery snippet and an
+agent token hands back a client configuration
+([Metrics](./metrics.md#the-collector)). The same command comes back whenever the
+token is read.
 
 **Removing a host is confirmed by typing its name**, unlike removing a group: a
 group holds nothing, a host holds its samples, and the guard is proportionate to
 what does not come back. The act says how many projects it will leave on no host,
 and those projects lose nothing but the band over their entries.
 
-A host's own screen draws its samples over a plain range, for the times the
-question is about the machine rather than about a project. The **retention window
-for samples** is here too rather than on a host, because it is one number for the
+That screen draws the host's samples over a plain range, for the times the
+question is about the machine rather than about a project — the same band, with
+a span to pick and nothing else to arrange. The **retention window for samples**
+is on the list rather than on a host, because it is one number for the
 installation ([Metrics](./metrics.md#retention)), and it carries the same warning
 about what lowering it removes that a project's does.
 
 ## The interface asks for nothing unasked
 
-The tail of the view being watched is the only repeating request the UI makes.
-Nothing prefetches another project, nothing counts on load, nothing polls a
-hidden tab, and closing the browser ends every request the operator was
-responsible for. `VISION.md` puts this as a principle about agents; it is a
-property of this interface for the same reason, which is that an installation
-running on two cores has better things to do than answer questions nobody asked.
+The view being watched is the only thing the UI asks for repeatedly, and it asks
+at the rate the thing it is watching changes: the entries every five seconds, and
+the band above them **once a minute**, because that is how often a sample is
+taken ([Metrics](./metrics.md#the-sample)) and a band redrawn twelve times per
+reading would be eleven requests for a picture that did not move. Both stop on a
+range with an end in the past, since a closed range cannot grow, and both stop
+when the tab is hidden.
+
+Nothing else repeats. Nothing prefetches another project, nothing counts on load,
+nothing polls a hidden tab, and closing the browser ends every request the
+operator was responsible for. `VISION.md` puts this as a principle about agents;
+it is a property of this interface for the same reason, which is that an
+installation running on two cores has better things to do than answer questions
+nobody asked.
 
 ## What is deliberately not here
 

@@ -3,6 +3,7 @@ import { AgentTokens } from "./AgentTokens";
 import { BackupCodes } from "./BackupCodes";
 import { ChangePassword } from "./ChangePassword";
 import { Groups } from "./Groups";
+import { Hosts } from "./Hosts";
 import { SecondFactor } from "./SecondFactor";
 import { Sessions } from "./Sessions";
 import { SettingsScreen } from "./SettingsScreen";
@@ -17,25 +18,36 @@ import { SettingsScreen } from "./SettingsScreen";
  * recovery, no export and no backup button, because those are verbs on the
  * binary and are never reachable over the network (ADR 0013).
  *
- * What is left is the four things that are the installation's rather than a
- * project's, and they are four areas because that is what they are: the browsers
- * signed in, the tokens agents read with, the operator's own credentials, and
- * the groups the projects are listed under. Three of them are lists of what
- * exists and the credentials are three acts on one account, which is why those
- * stay together on one area rather than becoming three.
+ * What is left is the five things that are the installation's rather than a
+ * project's, and they are five areas because that is what they are: the browsers
+ * signed in, the tokens agents read with, the operator's own credentials, the
+ * groups the projects are listed under, and the machines they run on. Four of
+ * them are lists of what exists and the credentials are three acts on one
+ * account, which is why those stay together on one area rather than becoming
+ * three.
  *
- * The groups are here for the same reason the agent tokens are: a group is a
- * fact about the projects taken together, and no single project's screen can
- * hold one (ADR 0039).
+ * The groups and the hosts are here for the same reason the agent tokens are: a
+ * group is a fact about the projects taken together and so is a host, and no
+ * single project's screen can hold one (ADR 0039). A project's own settings say
+ * which group it is in and which machine it runs on, which is all a project
+ * knows about either.
+ *
+ * **A host is the one area with an address inside it.** It carries more than a
+ * group does — a token, a collector command and a history of what the machine
+ * was doing — so opening one is a screen rather than a row that unfolds, and it
+ * is an address for the reason every area is one.
  */
 export function InstallationSettings() {
-  const { section } = useParams();
+  const { section, hostId } = useParams();
 
   return (
     <SettingsScreen
       heading="Installation settings"
       at="/settings"
-      section={section}
+      // A host's address matches a route of its own, which carries the host and
+      // not the area — so the area it is inside is named here rather than read
+      // off a segment that route never bound.
+      section={hostId === undefined ? section : "hosts"}
       groups={[
         { at: null, name: "Signed-in browsers", panel: <Sessions /> },
         { at: "agents", name: "Agent tokens", panel: <AgentTokens /> },
@@ -60,6 +72,7 @@ export function InstallationSettings() {
           ),
         },
         { at: "groups", name: "Groups", panel: <Groups /> },
+        { at: "hosts", name: "Hosts", panel: <Hosts hostId={hostId} /> },
       ]}
     />
   );

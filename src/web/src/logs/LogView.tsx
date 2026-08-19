@@ -6,6 +6,7 @@ import { EmptyProject } from "./EmptyProject";
 import { EntryDetail } from "./EntryDetail";
 import { EntryList } from "./EntryList";
 import { FilterBar } from "./FilterBar";
+import { HostBand } from "./HostBand";
 import { useEntries } from "./entries";
 import {
   addressOf,
@@ -142,6 +143,11 @@ export function LogView({ project }: { project: HeldProject }) {
           onClose={() => setCounting(false)}
         />
       )}
+
+      {/* Above the entries and below the filters that set its range, because
+          the two are read together: four minutes of errors next to the memory
+          that ran out three minutes before the first one. */}
+      <HostBand hostId={project.hostId} filters={filters} />
 
       <div className="logview-status">
         <span className="quiet">

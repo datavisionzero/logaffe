@@ -4,12 +4,18 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import type { HeldProject } from "../projects/projects";
 import { LogView } from "./LogView";
-import { anInstallationAnswering, type Answer } from "../shared/testing";
+import {
+  aSampleBucket,
+  aSampleWindow,
+  anInstallationAnswering,
+  type Answer,
+} from "../shared/testing";
 
 const PROJECT: HeldProject = {
   id: "p1",
   name: "checkout",
   groupId: null,
+  hostId: null,
   retentionDays: 30,
   createdAt: new Date("2026-08-01T09:00:00.000Z"),
   ingestTokens: 1,
@@ -18,6 +24,9 @@ const PROJECT: HeldProject = {
 
 /** A project nothing has ever delivered to, which is a different screen. */
 const UNTOUCHED: HeldProject = { ...PROJECT, lastReceivedAt: null };
+
+/** The same project, on a machine — which is what puts a band above its log. */
+const ON_A_HOST: HeldProject = { ...PROJECT, hostId: "h1" };
 
 function anEntry(entry: {
   id: number;
@@ -491,5 +500,104 @@ describe("the live tail", () => {
     // A closed range cannot grow, so there is nothing to follow.
     expect(installation.asked).toEqual(["GET /projects/p1/entries"]);
     expect(screen.getByText(/not following/i)).toBeInTheDocument();
+  });
+});
+
+describe("the band over the entries", () => {
+  it("is absent for a project on no host, and asks for nothing", async () => {
+    const installation = anInstallationAnswering({ "GET /projects/p1/entries": QUIET_TAIL });
+
+    open();
+
+    await screen.findByText(/Following/);
+
+    expect(screen.queryByRole("img")).toBeNull();
+
+    // A project on no host is ordinary — it is every project until the operator
+    // says otherwise — and it costs that project nothing but the band.
+    expect(installation.asked.some((route) => route.includes("/samples"))).toBe(false);
+  });
+
+  it("is drawn for the host the project sits on, over the range the filters state", async () => {
+    const installation = anInstallationAnswering({
+      "GET /projects/p1/entries": QUIET_TAIL,
+      "GET /hosts/h1/samples": aSampleWindow({
+        hostName: "web-01",
+        samples: [aSampleBucket({ start: "2026-08-08T11:00:00.000Z", cpuAverage: 0.91 })],
+      }),
+    });
+
+    open(ON_A_HOST);
+
+    // The name comes back with the samples: the project carries the host's
+    // identity and nothing that names it.
+    expect(await screen.findByText("web-01")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Processor: 91%" })).toBeInTheDocument();
+
+    const read = installation.asked.filter((route) => route === "GET /hosts/h1/samples");
+
+    // Once, not on the entries' five-second interval: a sample changes once a
+    // minute, and a band redrawn twelve times per reading would be eleven
+    // requests for a picture that did not move.
+    expect(read).toHaveLength(1);
+  });
+
+  it("moves when the range moves", async () => {
+    anInstallationAnswering({
+      "GET /projects/p1/entries": QUIET_TAIL,
+      "GET /hosts/h1/samples": [
+        aSampleWindow({ samples: [aSampleBucket({ start: "2026-08-08T11:00:00.000Z" })] }),
+        aSampleWindow({
+          samples: [aSampleBucket({ start: "2026-08-08T11:00:00.000Z", cpuAverage: 0.07 })],
+        }),
+      ],
+    });
+
+    open(ON_A_HOST);
+
+    await screen.findByRole("img", { name: "Processor: 42%" });
+
+    await userEvent.selectOptions(
+      screen.getByLabelText("Time range"),
+      "15m",
+    );
+
+    expect(
+      await screen.findByRole("img", { name: "Processor: 7%" }),
+    ).toBeInTheDocument();
+  });
+
+  it("says a read that used up its five seconds in the filters' own terms", async () => {
+    anInstallationAnswering({
+      "GET /projects/p1/entries": QUIET_TAIL,
+      "GET /hosts/h1/samples": { status: 408, body: { narrow: ["SmallerTimeRange"] } },
+    });
+
+    open(ON_A_HOST);
+
+    // Never a database error and never a failed request in a corner.
+    expect(
+      await screen.findByText("Make the time range a shorter one."),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the entries when the host was deleted from another browser", async () => {
+    anInstallationAnswering({
+      "GET /projects/p1/entries": {
+        body: {
+          entries: [anEntry({ id: 1, eventTime: "2026-08-08T11:59:07.318Z" })],
+          next: "arrived-at-1",
+          more: false,
+        },
+      },
+      "GET /hosts/h1/samples": { status: 404 },
+    });
+
+    open(ON_A_HOST);
+
+    expect(await screen.findByText(/host this project sat on is gone/)).toBeInTheDocument();
+
+    // A project on no host loses the band and nothing else.
+    expect(await lines()).toHaveLength(1);
   });
 });

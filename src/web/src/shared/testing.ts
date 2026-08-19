@@ -103,6 +103,7 @@ export function aProject(project: {
   id: string;
   name: string;
   groupId?: string | null;
+  hostId?: string | null;
   retentionDays?: number;
   createdAt?: string;
   ingestTokens?: number;
@@ -112,6 +113,7 @@ export function aProject(project: {
     id: project.id,
     name: project.name,
     groupId: project.groupId ?? null,
+    hostId: project.hostId ?? null,
     retentionDays: project.retentionDays ?? 30,
     createdAt: project.createdAt ?? "2026-08-01T09:00:00.000Z",
     ingestTokens: project.ingestTokens ?? 1,
@@ -139,3 +141,84 @@ export function aGroup(group: { id: string; name: string; createdAt?: string }) 
  * against: the feature is invisible until an operator makes one.
  */
 export const noGroups: Answer = { body: [] };
+
+/**
+ * A row of the host list.
+ *
+ * When it last reported is on it because that is read off its newest sample
+ * rather than written beside it (ADR 0039), and a host that never has is an
+ * ordinary state rather than a fault (`docs/metrics.md`) — so the default here
+ * is `null`.
+ */
+export function aHost(host: {
+  id: string;
+  name: string;
+  createdAt?: string;
+  hostTokens?: number;
+  lastReportedAt?: string | null;
+  projects?: number;
+}) {
+  return {
+    id: host.id,
+    name: host.name,
+    createdAt: host.createdAt ?? "2026-08-01T09:00:00.000Z",
+    hostTokens: host.hostTokens ?? 1,
+    lastReportedAt: host.lastReportedAt ?? null,
+    projects: host.projects ?? 0,
+  };
+}
+
+/** An installation holding no hosts, which is what every project starts on. */
+export const noHosts: Answer = { body: [] };
+
+/** One span of a read, with the peak beside the average. */
+export function aSampleBucket(bucket: {
+  start: string;
+  cpuAverage?: number;
+  cpuPeak?: number;
+  memoryUsedAverage?: number;
+  memoryUsedPeak?: number;
+  memoryTotal?: number;
+  loadAverage?: number;
+  loadPeak?: number;
+}) {
+  return {
+    start: bucket.start,
+    cpuAverage: bucket.cpuAverage ?? 0.42,
+    cpuPeak: bucket.cpuPeak ?? bucket.cpuAverage ?? 0.42,
+    memoryUsedAverage: bucket.memoryUsedAverage ?? 6115295232,
+    memoryUsedPeak: bucket.memoryUsedPeak ?? bucket.memoryUsedAverage ?? 6115295232,
+    memoryTotal: bucket.memoryTotal ?? 16769712128,
+    loadAverage: bucket.loadAverage ?? 0.52,
+    loadPeak: bucket.loadPeak ?? bucket.loadAverage ?? 0.52,
+  };
+}
+
+/**
+ * What a host reported over a range.
+ *
+ * The span is on it because nothing asks for one: a caller names a range and
+ * the installation says how it divided it, which is what lets a band tell a run
+ * from a gap.
+ */
+export function aSampleWindow(window: {
+  hostName?: string;
+  bucketSeconds?: number;
+  samples?: ReturnType<typeof aSampleBucket>[];
+  filesystems?: {
+    start: string;
+    mount: string;
+    usedAverage: number;
+    usedPeak: number;
+    total: number;
+  }[];
+}): Answer {
+  return {
+    body: {
+      hostName: window.hostName ?? "web-01",
+      bucketSeconds: window.bucketSeconds ?? 60,
+      samples: window.samples ?? [],
+      filesystems: window.filesystems ?? [],
+    },
+  };
+}

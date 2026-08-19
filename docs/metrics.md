@@ -149,12 +149,15 @@ what would need the PID namespace, and reading containers is what would need the
 socket, and this collects neither
 ([Deploying](./deployment.md#the-collector-on-a-machine)).
 
-So they are not told it. Creating a host hands back the **finished command with
-this installation's address, this host's token and those mounts already in it** —
+So they are not told it. **Issuing a host's token hands back the finished command
+with this installation's address, that token and those mounts already in it** —
 the same move the ingest token makes with its delivery snippet
 ([Setup](./setup.md)) and the agent token makes with its client configuration
-([MCP](./mcp.md)). The shortest path from a new host to a reporting one is a
-block the operator does not assemble.
+([MCP](./mcp.md)), and it arrives with the token for their reason: reading a
+token back and being able to use it are one errand. Making the host is the act
+before it and hands back nothing, exactly as making a project hands back no
+snippet. The shortest path from a new host to a reporting one is a block the
+operator does not assemble.
 
 **Delivery is fire-and-forget**, on the log path's terms and for the log path's
 reason: the collector does not wait, does not retry, and learns nothing about

@@ -3,6 +3,7 @@ import { NoSuchProject, useProjectAtHand, useProjects } from "../projects/projec
 import { DeleteProject } from "./DeleteProject";
 import { IngestTokens } from "./IngestTokens";
 import { ProjectGroup } from "./ProjectGroup";
+import { ProjectHost } from "./ProjectHost";
 import { ProjectName } from "./ProjectName";
 import { RetentionWindow } from "./RetentionWindow";
 import { SettingsScreen } from "./SettingsScreen";
@@ -15,8 +16,8 @@ import { SettingsScreen } from "./SettingsScreen";
  * not from somewhere a session starts.
  *
  * Three areas, in the order an operator is likely to want them: what the project
- * is — its name, the group it is listed under and how long it keeps entries —
- * what it is delivered to on, and its end. **The end is an area of its own
+ * is — its name, the group it is listed under, the machine it runs on and how
+ * long it keeps entries — what it is delivered to on, and its end. **The end is an area of its own
  * rather than the bottom of the first**, because an act that destroys data and
  * cannot be undone should be arrived at rather than scrolled past.
  *
@@ -52,6 +53,7 @@ export function ProjectSettings() {
             <>
               <ProjectName project={project} onRenamed={reload} />
               <ProjectGroup project={project} onMoved={reload} />
+              <ProjectHost project={project} onMoved={reload} />
               <RetentionWindow project={project} onChanged={reload} />
             </>
           ),

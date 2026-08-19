@@ -23,6 +23,15 @@ export interface HeldProject {
    * where a group holding nothing is found.
    */
   groupId: string | null;
+  /**
+   * The machine it runs on, and `null` for a project on none — which is every
+   * project until the operator says otherwise, and costs it nothing except that
+   * there is no band to draw over its entries (`docs/metrics.md`).
+   *
+   * It is the identity and not a name, for the group's reason and one more: the
+   * name comes back with the samples, which the band had to read anyway.
+   */
+  hostId: string | null;
   retentionDays: number;
   createdAt: Date;
   /**
@@ -170,6 +179,7 @@ function held(project: {
   id: string;
   name: string;
   groupId: string | null;
+  hostId: string | null;
   retentionDays: number | string;
   createdAt: string;
   ingestTokens: number | string;
@@ -179,6 +189,7 @@ function held(project: {
     id: project.id,
     name: project.name,
     groupId: project.groupId,
+    hostId: project.hostId,
     retentionDays: asNumber(project.retentionDays),
     createdAt: asInstant(project.createdAt),
     ingestTokens: asNumber(project.ingestTokens),

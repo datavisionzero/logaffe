@@ -108,6 +108,10 @@ export function Shell({
           <Route path="/project/:id/settings/:section" element={<ProjectSettings />} />
           <Route path="/settings" element={<InstallationSettings />} />
           <Route path="/settings/:section" element={<InstallationSettings />} />
+          {/* One area carries an address of its own inside it, because a host
+              is a screen rather than a row: what it reported, what it reports
+              on, and its end. */}
+          <Route path="/settings/hosts/:hostId" element={<InstallationSettings />} />
           <Route path="*" element={<ProjectList />} />
         </Routes>
       </main>

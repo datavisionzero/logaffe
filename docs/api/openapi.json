@@ -1591,18 +1591,6 @@
               "type": "string",
               "format": "date-time"
             }
-          },
-          {
-            "name": "buckets",
-            "in": "query",
-            "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32"
-            }
           }
         ],
         "responses": {
@@ -1628,16 +1616,6 @@
           },
           "404": {
             "description": "Not Found"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
-                }
-              }
-            }
           }
         }
       }
@@ -3477,11 +3455,24 @@
       },
       "SampleWindowResponse": {
         "required": [
+          "hostName",
+          "bucketSeconds",
           "samples",
           "filesystems"
         ],
         "type": "object",
         "properties": {
+          "hostName": {
+            "type": "string"
+          },
+          "bucketSeconds": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
           "samples": {
             "type": "array",
             "items": {
