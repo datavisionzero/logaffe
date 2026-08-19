@@ -210,6 +210,7 @@ public sealed class EntryDelivery : IDisposable, IAsyncDisposable
         }
 
         ReportDrops();
+        ReportAbandoned();
     }
 
     /// <summary>
@@ -455,11 +456,50 @@ public sealed class EntryDelivery : IDisposable, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Says how many entries the flush ran out of time on, which is the other
+    /// way this parts with entries nobody asked it to lose.
+    /// </summary>
+    /// <remarks>
+    /// What is said is that they were still queued, not what became of them: the
+    /// pump is not stopped here, so with a client of this delivery's own they
+    /// fail as it is disposed underneath them, and with a caller's they may yet
+    /// arrive after <see cref="Dispose"/> has returned. Either way the sender
+    /// asked to shut down and is owed the number.
+    /// </remarks>
+    private void ReportAbandoned()
+    {
+        if (_queued.Reader.CanCount && _queued.Reader.Count is var left and > 0)
+        {
+            Report(
+                $"{left} entries were still queued when the flush timeout of "
+                + $"{_options.FlushTimeout} ran out. Raise it, or accept that a shutdown "
+                + "costs what an unreachable installation has left in hand.",
+                null);
+        }
+    }
+
+    /// <summary>
+    /// Where a report goes when the sender named nowhere else.
+    /// </summary>
+    /// <remarks>
+    /// Standard error, which is where a container's own log is, and it asks
+    /// nothing of the application's logging stack — which is the reason
+    /// <see cref="EntryDeliveryOptions.OnFailure"/> is a delegate in the first
+    /// place. It is applied here rather than as a default on the options, so
+    /// that a package above this one can still tell "nowhere named" from "named
+    /// somewhere" and put its own channel under it: the Serilog sink decides
+    /// exactly that way.
+    /// </remarks>
+    private static void ToStandardError(string what, Exception? failure) =>
+        Console.Error.WriteLine(
+            failure is null ? $"logaffe: {what}" : $"logaffe: {what} {failure}");
+
     private void Report(string what, Exception? failure)
     {
         try
         {
-            _options.OnFailure?.Invoke(what, failure);
+            (_options.OnFailure ?? ToStandardError).Invoke(what, failure);
         }
         catch (Exception)
         {

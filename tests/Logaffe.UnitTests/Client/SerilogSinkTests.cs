@@ -18,7 +18,7 @@ namespace Logaffe.UnitTests.Client;
 /// logaffe, per entry rather than per delivery, so picking the rendered
 /// formatter would fail quietly and completely.
 /// </remarks>
-[Collection(nameof(SelfLogCollection))]
+[Collection(nameof(ProcessOutputCollection))]
 public sealed class SerilogSinkTests
 {
     [Fact]

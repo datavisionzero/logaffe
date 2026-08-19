@@ -16,6 +16,7 @@ namespace Logaffe.UnitTests.Client;
 /// in the application's own log — because logaffe is additive and that log is
 /// where the record already is.
 /// </remarks>
+[Collection(nameof(ProcessOutputCollection))]
 public sealed class EntryDeliveryTests
 {
     private static readonly Uri Installation = new("https://logs.example.com");
@@ -318,6 +319,94 @@ public sealed class EntryDeliveryTests
 
             Assert.Equal(setting.GetValue(written), setting.GetValue(copy));
         }
+    }
+
+    /// <summary>
+    /// A sender that named nowhere is told anyway.
+    /// </summary>
+    /// <remarks>
+    /// Standard error, because a report that goes nowhere is the failure this
+    /// callback exists to prevent — and because the package's own README opens
+    /// with an example that sets no callback at all. A sender who wants silence
+    /// writes one that says nothing.
+    /// </remarks>
+    [Fact]
+    public async Task A_report_with_nowhere_named_goes_to_standard_error()
+    {
+        _installation.Fails = new HttpRequestException("no route to host");
+
+        var written = new StringWriter();
+        var error = Console.Error;
+
+        Console.SetError(written);
+
+        try
+        {
+            await using (var delivery = new EntryDelivery(
+                new EntryDeliveryOptions
+                {
+                    Installation = Installation,
+                    IngestToken = Token,
+                    BatchInterval = TimeSpan.FromMilliseconds(20),
+                },
+                new HttpClient(_installation)))
+            {
+                delivery.Send(Entry("nobody is listening"));
+
+                await _installation.TakeAsync(1);
+            }
+        }
+        finally
+        {
+            Console.SetError(error);
+        }
+
+        Assert.Contains(
+            "logaffe: 1 entries were not delivered",
+            written.ToString(),
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// What the flush did not get out is counted rather than passed over.
+    /// </summary>
+    /// <remarks>
+    /// The queue's other way of losing entries is reported precisely because it
+    /// would otherwise be silent, and a shutdown that runs out of time is the
+    /// same thing at the other end. The gate holds one delivery open so that the
+    /// rest are still queued when the time runs out.
+    /// </remarks>
+    [Fact]
+    public async Task Entries_the_flush_ran_out_of_time_on_are_counted()
+    {
+        _installation.Gate = new TaskCompletionSource();
+
+        var delivery = new EntryDelivery(
+            new EntryDeliveryOptions
+            {
+                Installation = Installation,
+                IngestToken = Token,
+                BatchInterval = TimeSpan.FromMilliseconds(20),
+                FlushTimeout = TimeSpan.FromMilliseconds(200),
+                OnFailure = _reported.Add,
+            },
+            new HttpClient(_installation));
+
+        delivery.Send(Entry("the one that is in flight"));
+
+        await _installation.TakeAsync(1);
+
+        for (var entry = 0; entry < 5; entry++)
+        {
+            delivery.Send(Entry($"queued {entry}"));
+        }
+
+        delivery.Dispose();
+
+        Assert.Contains(
+            "5 entries were still queued",
+            await _reported.UntilAsync(said => said.Contains("still queued", StringComparison.Ordinal)),
+            StringComparison.Ordinal);
     }
 
     private EntryDelivery Delivery(

@@ -50,11 +50,13 @@ lost costs a convenience and never the record.
 rather than an `ILogger`, so this package asks nothing of the application's
 logging stack. An installation that could not be reached cannot be told that it
 could not be reached, so the report belongs in the local log that already
-exists.
+exists. Left unset it writes to `Console.Error`; silence is a callback that says
+nothing.
 
 **Disposal flushes, with a deadline.** `Dispose`/`DisposeAsync` spends up to
-`FlushTimeout` delivering what is still queued. What does not go in that time is
-lost — which is what fire-and-forget means.
+`FlushTimeout` delivering what is still queued, and reports how many entries were
+still waiting when the time ran out. What does not go in that time is lost —
+which is what fire-and-forget means.
 
 ## Settings
 
@@ -66,7 +68,7 @@ lost — which is what fire-and-forget means.
 | `BatchInterval` | `1s` | how long the first entry waits for company |
 | `FlushTimeout` | `5s` | how long disposal keeps trying |
 | `DeliveryTimeout` | `10s` | how long one request may take |
-| `OnFailure` | `null` | `(message, exception)` — where problems are reported |
+| `OnFailure` | `Console.Error` | `(message, exception)` — where problems are reported |
 
 The batch limits — a thousand entries, five mebibytes — are product values
 rather than sender settings, and are applied for you.
