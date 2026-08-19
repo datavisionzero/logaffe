@@ -152,10 +152,10 @@ Three things make that safe to promise:
 ### What a version is
 
 **A tag is the release, and the tag is the version.** Pushing `v1.4.0` publishes
-`ghcr.io/datavisionzero/logaffe:1.4.0`, the collector image beside it at
-`ghcr.io/datavisionzero/logaffe-collector:1.4.0`, and the three client packages,
-all under the same number, from the same commit, and writes the release entry
-that names them.
+`ghcr.io/datavisionzero/logaffe:1.4.0` and the three client packages under the
+same number, from the same commit, and writes the release entry that names them.
+The collector image joins them at `logaffe-collector:1.4.0` under the same
+number, once there is one to build ([Codebase](./codebase.md)).
 One version means one thing everywhere: it is the number a backup manifest
 records and the one a restore reads.
 

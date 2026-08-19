@@ -137,6 +137,14 @@ artifact in the release workflow and the one part of this product an operator
 upgrades separately from `docker compose pull`, which is the cost ADR 0043
 accepts.
 
+**None of it is built yet**, and it is last in the order rather than first. What
+a collector *is* is what it posts, so it cannot be written before the sample
+endpoint it posts to — which needs the host, its token and the two tables of
+[Storage](./storage.md#the-sample-tables) ahead of it. The image build in
+`ci.yml` and `release.yml` is therefore the closing step of this feature, and
+the documents that describe the image describe a design rather than a tag
+anybody can pull.
+
 Its tests are the unit project's, because there is nothing here a substitute
 cannot vouch for: reading `/proc` is behind a port like everything else, and what
 would need a real machine is the container's mounts, which are a `docker run`

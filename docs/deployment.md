@@ -197,6 +197,12 @@ A collector reports one machine, so one runs on each machine the operator wants
 numbers from — which is not the machine the installation is on, except by
 coincidence.
 
+**The collector image is not published yet** ([Codebase](./codebase.md)). What
+follows is the shape it is being built to, written down before it exists because
+the argument for that shape — what it may ask of a host, and what it may not — is
+the part worth settling first. Everything below is accurate about the design and
+premature about the registry.
+
 **It is handed over rather than assembled.** Creating a host in the settings
 gives back the command below with this installation's address, that host's token
 and the mounts already filled in ([Metrics](./metrics.md#the-collector)), and the

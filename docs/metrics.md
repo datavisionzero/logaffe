@@ -133,7 +133,8 @@ five processes that each see a different part of it
 ([ADR 0043](./adr/0043-metrics-come-from-the-host-not-from-the-application.md)).
 
 **It ships as a container image**, which is the shape of everything else an
-operator runs here. The awkward part is that a container sees the container, so
+operator runs here — though **it is not published yet**, and neither is the
+sample endpoint it delivers to ([Codebase](./codebase.md)). The awkward part is that a container sees the container, so
 the machine is read through two **read-only bind mounts** — the host's `/proc`
 and its root filesystem. That is what every collector of this kind does, and it
 is **not something the operator should have to know**.
