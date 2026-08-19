@@ -161,6 +161,32 @@ to move names a version instead:
 image: ghcr.io/datavisionzero/logaffe:1.4.0
 ```
 
+### Cutting one
+
+Only a maintainer can, and the whole of it is a tag:
+
+```sh
+git tag v1.4.0 && git push origin v1.4.0
+```
+
+**The commit being tagged has to be green first.** An image can be rebuilt and a
+registry tag moved, but a package pushed to nuget.org cannot be taken back — and
+a number that means one thing everywhere has no way to be made to mean nothing.
+
+The workflow then publishes the image, the three packages and the entry under
+that number, and **the entry it writes is not the release notes yet.** Generated
+notes are a list of what was committed, which is not what somebody deciding
+whether to pull came to find out: whether this is worth taking, whether there is
+anything to decide before taking it, and what does not change. Writing that over
+the draft is the last step of the release rather than a courtesy after it — the
+version is on the registry within two minutes, and the page beside it is what an
+operator reads.
+
+**A release is done when it can be seen from outside**, which a green workflow
+does not show. The latest release names the new tag, `:latest` and `:1.4.0` are
+the same digest — on a stable release, since a prerelease moves neither — and
+nuget.org lists the packages, which it does some minutes after the run ends.
+
 ## Housekeeping that runs on a timer
 
 Some of what the product does is a job on an interval rather than an answer to a
