@@ -55,6 +55,33 @@ An event that already carries its own `instance` property keeps it.
 
 `restrictedToMinimumLevel` and `levelSwitch` work as they do on any sink.
 
+### From `appsettings.json`
+
+```json
+{
+  "Serilog": {
+    "WriteTo": [
+      {
+        "Name": "Logaffe",
+        "Args": {
+          "installation": "https://logs.example.com",
+          "ingestToken": "logaffe_ingest_…",
+          "instance": "ops/example",
+          "queueCapacity": 50000,
+          "batchInterval": "00:00:01",
+          "flushTimeout": "00:00:05",
+          "deliveryTimeout": "00:00:10"
+        }
+      }
+    ]
+  }
+}
+```
+
+Every setting is a parameter of its own on this route, because a settings binder
+reads parameters and can construct nothing. Spell them as they are named above:
+an argument it cannot place is dropped rather than refused, and nothing says so.
+
 ## What it promises
 
 **Fire-and-forget.** A bounded in-memory queue, dropping the oldest entries when

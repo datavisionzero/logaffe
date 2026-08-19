@@ -57,6 +57,74 @@ public static class LogaffeSinkExtensions
             levelSwitch);
 
     /// <inheritdoc cref="Logaffe(LoggerSinkConfiguration, Uri, string, LogEventLevel, LoggingLevelSwitch)"/>
+    /// <param name="instance">
+    /// What names this instance among the replicas of one service — a hostname
+    /// or a container id. <see langword="null"/> leaves it off entirely, and an
+    /// event that already carries an <c>instance</c> property keeps its own.
+    /// </param>
+    /// <param name="queueCapacity">
+    /// How many entries may wait in memory before the oldest are dropped.
+    /// </param>
+    /// <param name="batchInterval">
+    /// How long the first entry of a batch waits for company before it is sent
+    /// on its own.
+    /// </param>
+    /// <param name="flushTimeout">
+    /// How long closing the logger spends trying to deliver what is queued.
+    /// </param>
+    /// <param name="deliveryTimeout">
+    /// How long one delivery may take before it is abandoned.
+    /// </param>
+    /// <remarks>
+    /// <para>
+    /// <b>Every setting as a parameter of its own, for the sake of
+    /// <c>appsettings.json</c>.</b> A settings binder reads the parameters of a
+    /// configuration method and can construct nothing, so
+    /// <see cref="EntryDeliveryOptions"/> is out of its reach — and an argument
+    /// it cannot place is dropped rather than refused. An application configured
+    /// from a file would have written <c>instance</c> and watched every entry
+    /// arrive carrying a machine name.
+    /// </para>
+    /// <para>
+    /// <see langword="null"/> means "not said", so each default is stated once,
+    /// on <see cref="EntryDeliveryOptions"/> where it already is, rather than a
+    /// second time here where the two could drift apart. The instance is not
+    /// optional, which is what keeps a two-argument call unambiguous between
+    /// this and the overload above it.
+    /// </para>
+    /// </remarks>
+    public static LoggerConfiguration Logaffe(
+        this LoggerSinkConfiguration to,
+        Uri installation,
+        string ingestToken,
+        string? instance,
+        int? queueCapacity = null,
+        TimeSpan? batchInterval = null,
+        TimeSpan? flushTimeout = null,
+        TimeSpan? deliveryTimeout = null,
+        LogEventLevel restrictedToMinimumLevel = LevelAlias.Minimum,
+        LoggingLevelSwitch? levelSwitch = null)
+    {
+        var defaults = new EntryDeliveryOptions
+        {
+            Installation = installation,
+            IngestToken = ingestToken,
+        };
+
+        return to.Logaffe(
+            new EntryDeliveryOptions(defaults)
+            {
+                QueueCapacity = queueCapacity ?? defaults.QueueCapacity,
+                BatchInterval = batchInterval ?? defaults.BatchInterval,
+                FlushTimeout = flushTimeout ?? defaults.FlushTimeout,
+                DeliveryTimeout = deliveryTimeout ?? defaults.DeliveryTimeout,
+            },
+            instance,
+            restrictedToMinimumLevel,
+            levelSwitch);
+    }
+
+    /// <inheritdoc cref="Logaffe(LoggerSinkConfiguration, Uri, string, LogEventLevel, LoggingLevelSwitch)"/>
     /// <param name="delivery">
     /// Everything about the delivery: the address and the token, and the queue,
     /// batching and flush settings a sender may want to move.
