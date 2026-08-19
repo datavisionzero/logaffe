@@ -1,0 +1,56 @@
+# The second image this product publishes, and the only one an operator runs on
+# a machine that is not the installation's (ADR 0043).
+#
+# Build context is the repository root:
+#   docker build -f deploy/Dockerfile.collector -t logaffe-collector .
+#
+# There is no Node stage and no runtime beyond the framework's: a collector
+# reads /proc and posts JSON, references none of the four layers and carries no
+# packages at all, which is what keeps this file short.
+
+# ------------------------------------------------------------ the program ----
+FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+WORKDIR /src
+
+# What this build calls itself, and which commit it is. Both are the
+# installation image's arguments and are passed by the same workflows, for the
+# same reasons — see `deploy/Dockerfile`. Here the version is also what the
+# collector puts in its `User-Agent`, which is the only thing an installation
+# ever learns about which build is reporting to it.
+ARG VERSION=0.0.0-dev
+ARG REVISION=
+
+# Restore against the manifests alone, so that a change to a source file does
+# not invalidate the package layer. There is one project and it names no
+# packages, so this is one small layer that almost never moves.
+COPY global.json Directory.Build.props Directory.Packages.props ./
+COPY src/Logaffe.Collector/Logaffe.Collector.csproj src/Logaffe.Collector/
+RUN dotnet restore src/Logaffe.Collector/Logaffe.Collector.csproj
+
+COPY src/Logaffe.Collector/ src/Logaffe.Collector/
+RUN dotnet publish src/Logaffe.Collector/Logaffe.Collector.csproj -c Release -o /app \
+    -p:Version=$VERSION -p:SourceRevisionId=$REVISION
+
+# ------------------------------------------------------------ the runtime ----
+# `runtime` and not `aspnet`: nothing here serves anything. The collector opens
+# an outgoing connection and is never connected to, so it publishes no port and
+# there is no web stack for it to carry.
+FROM mcr.microsoft.com/dotnet/runtime:10.0-alpine AS runtime
+WORKDIR /app
+
+COPY --from=build /app ./
+
+# The two read-only bind mounts the handed-over command makes, named here so
+# that the image says what it expects rather than only the command that starts
+# it. They are the whole of what it asks of a host: it is not privileged, it
+# joins no namespace of the host's and it never sees the Docker socket
+# (ADR 0044 collects neither processes nor containers).
+ENV LOGAFFE_PROC_PATH=/host/proc \
+    LOGAFFE_ROOT_PATH=/rootfs
+
+# It runs on machines this project does not administer, so it does not run as
+# root. Both mounts are read-only and world-readable — `/proc` is, and a
+# filesystem's size is not a file — so there is nothing here that needs more.
+USER $APP_UID
+
+ENTRYPOINT ["/app/logaffe-collector"]

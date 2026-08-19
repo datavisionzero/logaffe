@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+.git/
+.github/
+deploy/
+docs/
+src/clients/
+src/web/
+src/Logaffe.Api/
+src/Logaffe.Application/
+src/Logaffe.Domain/
+src/Logaffe.Infrastructure/
+tests/
+volume/
+*.md

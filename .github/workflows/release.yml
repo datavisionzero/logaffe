@@ -2,12 +2,13 @@
 #
 #   git tag v1.4.0 && git push origin v1.4.0
 #
-# One tag publishes the image and all three packages under the same number, and
+# One tag publishes both images and all three packages under the same number, and
 # writes the release entry that names it. For a project this size a single
 # version is far less to explain than two release trains, and a client package
 # carrying the server's number says something useful about what it was built
 # against. The accepted cost is that a package gets a version bump with nothing
-# changed in it.
+# changed in it — and that a collector is re-tagged for a release that changed
+# nothing in it either, which is the cheaper half of ADR 0043's second artifact.
 #
 # That number is load-bearing beyond the registry: `logaffe backup` writes it
 # into the manifest and a restore compares what it finds there, so one version
@@ -116,6 +117,26 @@ jobs:
             fi
 
             echo "TAGS"
+
+            # The collector, released on the same tag and under the same
+            # number. One version means one thing everywhere here, and a
+            # collector carrying the number of the installation it was built
+            # beside is what makes "which build is reporting" answerable — it
+            # is the only thing about itself a collector ever says, in its
+            # `User-Agent`.
+            #
+            # `:latest` moves for it under exactly the rule it moves for the
+            # installation, because that is the tag the handed-over `docker run`
+            # line names: a prerelease must not reach a machine whose operator
+            # never asked for one.
+            echo "collector<<TAGS"
+            echo "ghcr.io/datavisionzero/logaffe-collector:$VERSION"
+
+            if [ "$LATEST" = "true" ]; then
+              echo "ghcr.io/datavisionzero/logaffe-collector:latest"
+            fi
+
+            echo "TAGS"
           } >> "$GITHUB_OUTPUT"
 
       # Read off the checkout rather than from `github.sha`, which is the commit
@@ -138,6 +159,24 @@ jobs:
           tags: ${{ steps.tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # The second image ADR 0043 accepted the cost of. It is in this job rather
+      # than beside it so that a release cannot half happen across two runners:
+      # the entry below is written behind both pushes, and an entry announcing a
+      # version whose collector never reached the registry would send every
+      # machine's `docker compose pull` at a tag that is not there.
+      - name: Build and push the collector
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/Dockerfile.collector
+          push: true
+          build-args: |
+            VERSION=${{ needs.version.outputs.version }}
+            REVISION=${{ steps.commit.outputs.revision }}
+          tags: ${{ steps.tags.outputs.collector }}
+          cache-from: type=gha,scope=collector
+          cache-to: type=gha,mode=max,scope=collector
 
   packages:
     name: Packages

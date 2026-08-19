@@ -137,20 +137,27 @@ artifact in the release workflow and the one part of this product an operator
 upgrades separately from `docker compose pull`, which is the cost ADR 0043
 accepts.
 
-**None of it is built yet**, and it is last in the order rather than first. What
-a collector *is* is what it posts, so it could not be written before the sample
+**It was built last rather than first**, and the order was the argument: what a
+collector *is* is what it posts, so it could not be written before the sample
 endpoint it posts to — which needed the host, its token and the two tables of
-[Storage](./storage.md#the-sample-tables) ahead of it. Those exist now: the
-endpoint takes a reading, the operator's routes make a host and mint its token,
-and the finished `docker run` line comes back with it. What is left is the
-program that runs on the other end of it, and the image build in `ci.yml` and
-`release.yml` that publishes one — so the documents describing the image still
-describe a design rather than a tag anybody can pull.
+[Storage](./storage.md#the-sample-tables) ahead of it.
 
-Its tests are the unit project's, because there is nothing here a substitute
-cannot vouch for: reading `/proc` is behind a port like everything else, and what
-would need a real machine is the container's mounts, which are a `docker run`
-line rather than code.
+**It carries no project references and no packages**, and both are load-bearing.
+It references none of the four layers because it is not one of them; it carries
+no packages because it runs on every machine the operator wants numbers from,
+which makes its dependency list a surface on hosts nobody here administers.
+HTTP and JSON are in the framework, and the whole of its logging is a timestamp
+and a sentence on standard output.
+
+What holds it to the installation is therefore the wire format alone, with no
+compiler between them — so the test that they agree is a real one: a reading is
+written by the collector and parsed by the installation's own parser, in one
+process, and a member renamed on either side fails.
+
+Its tests are the unit project's, because what a test of it needs is a directory
+of files that look like `/proc` — not a machine and not a database. What would
+need a real machine is the container's two mounts, which are a `docker run` line
+rather than code.
 
 ## The client packages are three
 

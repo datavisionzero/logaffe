@@ -26,13 +26,10 @@ namespace Logaffe.Api.Http;
 /// host and the scheme along with the caller.
 /// </para>
 /// <para>
-/// <b>It names an image that is not published yet</b> (<c>docs/codebase.md</c>).
-/// That is unlike <see cref="DeliverySnippet"/>, which deliberately avoids
-/// naming an unpublished package and falls back to a plain request — and the
-/// difference is that there is no fallback here. A collector is a program that
-/// reads <c>/proc</c>; there is no <c>curl</c> line that does its job, so the
-/// command is the shape it will have and the registry is the part that is
-/// premature.
+/// <b>It names an image and nothing else can stand in for it.</b> That is
+/// unlike <see cref="DeliverySnippet"/>, which falls back to a plain request
+/// while its packages are unpublished: a collector is a program that reads
+/// <c>/proc</c>, and there is no <c>curl</c> line that does its job.
 /// </para>
 /// </remarks>
 public static class CollectorCommand

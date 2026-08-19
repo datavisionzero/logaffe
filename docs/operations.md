@@ -155,9 +155,10 @@ Three things make that safe to promise:
 `ghcr.io/datavisionzero/logaffe:1.4.0` and the three client packages under the
 same number, from the same commit, and writes the release entry that names them.
 The collector image joins them at `logaffe-collector:1.4.0` under the same
-number, once there is one to build ([Codebase](./codebase.md)).
-One version means one thing everywhere: it is the number a backup manifest
-records and the one a restore reads.
+number, from the same commit and in the same job — so a release cannot half
+happen, with an entry naming a version whose collector never reached the
+registry. One version means one thing everywhere: it is the number a backup
+manifest records and the one a restore reads.
 
 The entry is written from the tag with generated notes, and it is written only
 where there is none — so notes edited afterwards survive a release that has to be

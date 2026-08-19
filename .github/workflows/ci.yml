@@ -40,7 +40,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Seconds, and no Docker. Domain rules and use cases against substituted ports.
+  # Seconds, and no Docker. Domain rules and use cases against substituted
+  # ports, and the collector against a directory of files that look like /proc.
   unit:
     name: Unit tests
     runs-on: ubuntu-latest
@@ -156,11 +157,12 @@ jobs:
       - name: The checked-in contract is the one being served
         run: git diff --exit-code -- docs/api/openapi.json
 
-  # The image a staging installation follows. `release.yml` publishes one for
-  # every tag; this publishes one for every trunk commit that passed, which is
-  # the only thing an environment tracking `main` can pull.
+  # The two images a staging installation follows — the installation's and the
+  # collector's. `release.yml` publishes both for every tag; this publishes both
+  # for every trunk commit that passed, which is the only thing an environment
+  # tracking `main` can pull.
   image:
-    name: Image
+    name: Images
     # This is the whole of the deployment gate. A red trunk does not move
     # `:main`, so staging stays on the last commit that passed — and expressing
     # it here costs nothing beyond building an image nobody will pull, which is
@@ -196,6 +198,21 @@ jobs:
               # And a name for this one build, so a staging installation can be
               # pinned away from a bad trunk without waiting for the next commit.
               echo "ghcr.io/datavisionzero/logaffe:sha-${SHA:0:7}"
+            fi
+
+            echo "TAGS"
+
+            # The collector is a second image on the same two names, built from
+            # the same commit by the same job (ADR 0043). It is not a second job
+            # because it is not a second gate: what decides whether either is
+            # published is the tests above, and splitting them would mean a
+            # trunk where the installation moved and the machines reporting to
+            # it did not.
+            echo "collector<<TAGS"
+
+            if [ "$PUBLISH" = "true" ]; then
+              echo "ghcr.io/datavisionzero/logaffe-collector:main"
+              echo "ghcr.io/datavisionzero/logaffe-collector:sha-${SHA:0:7}"
             fi
 
             echo "TAGS"
@@ -237,3 +254,19 @@ jobs:
           tags: ${{ steps.what.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # The collector, on the same terms. It carries no packages and one
+      # project, so this is seconds rather than a second build worth arranging
+      # around — and its own cache scope, because the two share no layer beyond
+      # the SDK image.
+      - name: Build the collector, and push from the trunk
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/Dockerfile.collector
+          push: ${{ steps.what.outputs.publish == 'true' }}
+          build-args: |
+            REVISION=${{ github.sha }}
+          tags: ${{ steps.what.outputs.collector }}
+          cache-from: type=gha,scope=collector
+          cache-to: type=gha,mode=max,scope=collector

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- `deploy/Dockerfile.collector` runs this by name, and the name is the
+         one in the `docker run` line an operator is handed. -->
+    <AssemblyName>logaffe-collector</AssemblyName>
+    <RootNamespace>Logaffe.Collector</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Everything here is internal: this is an executable and nothing consumes
+       it as a library, so a public type would be a claim about an audience that
+       does not exist. The unit project tests the parsing, which is where a
+       reading of /proc can be wrong. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Logaffe.UnitTests" />
+  </ItemGroup>
+
+  <!-- No project references and no packages, and both are the point.
+
+       It references none of the four layers because it is not part of them
+       (`docs/codebase.md`): it reads a machine and posts numbers over HTTP, the
+       same relationship to the installation a sending application has, so what
+       it depends on is the wire format and nothing else.
+
+       It carries no packages because it runs on every machine the operator
+       wants numbers from, which makes its dependency list a surface on
+       somebody else's hosts rather than only on the installation's. HTTP and
+       JSON are in the framework; a logger that writes a line to standard output
+       is nine lines here and a package everywhere else. ADR 0043 asks for this
+       to be small enough to be boring, and this is what that costs and buys. -->
+
+</Project>

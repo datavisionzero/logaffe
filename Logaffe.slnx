@@ -4,6 +4,7 @@
     <Project Path="src/Logaffe.Application/Logaffe.Application.csproj" />
     <Project Path="src/Logaffe.Domain/Logaffe.Domain.csproj" />
     <Project Path="src/Logaffe.Infrastructure/Logaffe.Infrastructure.csproj" />
+    <Project Path="src/Logaffe.Collector/Logaffe.Collector.csproj" />
   </Folder>
   <Folder Name="/src/clients/">
     <Project Path="src/clients/Logaffe.Client/Logaffe.Client.csproj" />
