@@ -321,6 +321,23 @@ and **bounded**: it rotates by size and keeps a fixed number of files. An
 unbounded log on the same volume as the secrets is the most embarrassing possible
 way for a logging product to take its own installation down.
 
+**A volume it cannot be written to is said out loud at every start**, on the
+container's own output:
+
+```
+logaffe's own log cannot be written under /var/lib/logaffe: … The installation
+is starting anyway.
+```
+
+A read-only mount and a full disk both end here, and neither announces itself any
+other way — a file that cannot be opened costs the log and nothing else, so the
+installation would go on serving while everything it has to say about itself went
+nowhere. It starts anyway, because an installation that cannot write its diary
+can still take deliveries, still answer its operator and still be repaired from
+the screen the complaint is on; what it must not do is keep quiet about it. The
+same is true of the command line: a backup or a Host Recovery that fails tells
+the operator the whole of it is in that log, and the sentence has to be true.
+
 ## What is deliberately not here
 
 - **No scheduled or automated backups**, no destinations, no retention policy for

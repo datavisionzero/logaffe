@@ -7,6 +7,14 @@ using Logaffe.Infrastructure;
 using Microsoft.AspNetCore.DataProtection;
 using Serilog;
 
+// Serilog says what is wrong with Serilog here and nowhere else: a file sink
+// that cannot open its file writes to SelfLog and carries on, so a volume that
+// is read-only or full would cost the log ADR 0002 puts everything in without a
+// word anywhere. Standard error, which is the container's own log and where the
+// command line already speaks — and before the verbs, because they write to that
+// same file and are the ones that promise the operator it holds the detail.
+Serilog.Debugging.SelfLog.Enable(Console.Error);
+
 // One binary, two jobs. A recognized verb runs host-locally and exits; no
 // arguments is the server.
 if (Verbs.TryRead(args, out var verb))
@@ -172,8 +180,12 @@ builder.Services.AddScoped<ReadTokenBack>();
 // a mismatch costs (ADR 0031).
 builder.Services.AddSingleton<DummySecret>();
 
-// Order is start order: the schema first, because the check below reads tables a
-// migration may be about to create.
+// Order is start order. This one is first because what it has to say is about
+// where everything after it is written.
+builder.Services.AddHostedService<FileLogService>();
+
+// Then the schema, because the check below reads tables a migration may be about
+// to create.
 builder.Services.AddHostedService<SchemaMigrationService>();
 builder.Services.AddHostedService<KeyFitsService>();
 
