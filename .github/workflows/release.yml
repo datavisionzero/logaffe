@@ -2,11 +2,12 @@
 #
 #   git tag v1.4.0 && git push origin v1.4.0
 #
-# One tag publishes the image and all three packages under the same number. For
-# a project this size a single version is far less to explain than two release
-# trains, and a client package carrying the server's number says something
-# useful about what it was built against. The accepted cost is that a package
-# gets a version bump with nothing changed in it.
+# One tag publishes the image and all three packages under the same number, and
+# writes the release entry that names it. For a project this size a single
+# version is far less to explain than two release trains, and a client package
+# carrying the server's number says something useful about what it was built
+# against. The accepted cost is that a package gets a version bump with nothing
+# changed in it.
 #
 # That number is load-bearing beyond the registry: `logaffe backup` writes it
 # into the manifest and a restore compares what it finds there, so one version
@@ -213,3 +214,63 @@ jobs:
             --source https://api.nuget.org/v3/index.json \
             --api-key "$NUGET_API_KEY" \
             --skip-duplicate
+
+  entry:
+    name: Entry
+    needs: [version, image, packages]
+    runs-on: ubuntu-latest
+    permissions:
+      # The one job here that writes to the repository rather than to a
+      # registry, and it writes exactly one thing: the release the tag names.
+      # `packages: write` is not inherited, for the same reason it is not
+      # inherited by the job above — this one has no business with either
+      # registry.
+      contents: write
+    steps:
+      # The tag is the release everywhere else in this file. This is the one
+      # place it is also a page, and without it a released version sits on the
+      # registry and on nuget.org and nowhere a reader looks first: GitHub goes
+      # on showing the release before it as "Latest", so the page built for
+      # telling an operator which version to take tells them the wrong one.
+      #
+      # It runs behind both publishing jobs on purpose. An entry announcing an
+      # image that failed to push is worse than no entry at all.
+      - name: Write the release the tag names
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ needs.version.outputs.ref }}
+          LATEST: ${{ needs.version.outputs.latest }}
+        run: |
+          set -euo pipefail
+
+          # Never over an entry that is already there. Re-running a release
+          # against an existing tag is the recovery path this workflow is built
+          # for, and by then the entry may carry notes somebody wrote by hand.
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            echo "$TAG already has a release entry, which is left as it is."
+            exit 0
+          fi
+
+          # `latest` is decided once, up in the version job, and means the same
+          # thing here as it does for the image: a prerelease moves neither the
+          # tag an ordinary `docker compose pull` follows nor the entry an
+          # operator lands on.
+          if [ "$LATEST" = "true" ]; then
+            marker=--latest
+          else
+            marker=--prerelease
+          fi
+
+          # The notes are generated from what is between this tag and the one
+          # before it, and they are a starting draft rather than the release
+          # notes: what changed for the operator, and whether they have to
+          # decide anything before pulling, is prose no workflow can write. What
+          # it can do is make sure the page exists and names the right version
+          # the minute the artifacts do — an entry written by hand three days
+          # later is three days of the wrong number.
+          gh release create "$TAG" \
+            --repo "$REPO" \
+            --verify-tag \
+            --generate-notes \
+            "$marker"

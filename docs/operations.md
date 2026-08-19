@@ -142,8 +142,15 @@ Three things make that safe to promise:
 
 **A tag is the release, and the tag is the version.** Pushing `v1.4.0` publishes
 `ghcr.io/datavisionzero/logaffe:1.4.0` and the three client packages under the
-same number, from the same commit. One version means one thing everywhere: it is
-the number a backup manifest records and the one a restore reads.
+same number, from the same commit, and writes the release entry that names them.
+One version means one thing everywhere: it is the number a backup manifest
+records and the one a restore reads.
+
+The entry is written from the tag with generated notes, and it is written only
+where there is none — so notes edited afterwards survive a release that has to be
+re-run. What the release *says* is still somebody's to write; what the workflow
+guarantees is that the page exists and names the right version the minute the
+image does.
 
 `deploy/docker-compose.yml` pulls `:latest`, which is what makes an upgrade a
 pull and an up. A prerelease tag does not move it — an installation that never
