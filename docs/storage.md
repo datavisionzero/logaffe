@@ -266,7 +266,7 @@ create table host_sample (
     host_id      uuid        not null,
     receipt_time timestamptz not null,
 
-    cpu_busy     real        not null,   -- the share of the interval, 0 to 1
+    cpu          real        not null,   -- the share of the interval, 0 to 1
     memory_used  bigint      not null,
     memory_total bigint      not null,
     load_1       real        not null,
@@ -291,6 +291,11 @@ create table filesystem_reading (
 **The clock is ours and there is only one**, which is the whole of why these
 tables carry a `receipt_time` and no second column beside it
 ([Metrics](./metrics.md#it-carries-one-clock-and-it-is-the-installations)).
+
+**`real` rather than `double precision`.** A share of an interval and a load
+average are reported to two decimal places by the machine itself, so four bytes
+against eight over every row of the largest of these tables buys nothing back
+except precision nobody has.
 
 ### The key is natural, and that is what makes a repeat harmless
 

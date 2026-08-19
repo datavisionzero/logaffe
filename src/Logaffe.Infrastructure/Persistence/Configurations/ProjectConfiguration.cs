@@ -1,3 +1,4 @@
+using Logaffe.Domain.Hosts;
 using Logaffe.Domain.Projects;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -48,6 +49,23 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .HasForeignKey(p => p.GroupId)
             .OnDelete(DeleteBehavior.SetNull)
             .HasConstraintName("fk_project_project_group");
+
+        builder.Property(p => p.HostId).HasColumnName("host_id");
+
+        // The host goes and its projects stay, sitting on none — the group's
+        // behaviour, for the group's reason: a host is where a project runs, and
+        // forgetting where it runs destroys nothing that belongs to the project.
+        builder.HasOne<Host>()
+            .WithMany()
+            .HasForeignKey(p => p.HostId)
+            .OnDelete(DeleteBehavior.SetNull)
+            .HasConstraintName("fk_project_host");
+
+        // Deliberately not unique and deliberately not part of the name rule
+        // above: a host is not a group, so two projects called `api` may run on
+        // one machine. The index is for the count on the host list and for the
+        // set-null above.
+        builder.HasIndex(p => p.HostId).HasDatabaseName("ix_project_host");
 
         builder.Property(p => p.Retention)
             .HasColumnName("retention_days")

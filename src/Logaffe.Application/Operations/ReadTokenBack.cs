@@ -55,4 +55,21 @@ public sealed class ReadTokenBack(ITokens tokens, ISecretCipher cipher)
             : TokenText.From(
                 TokenKind.Agent, token.Identifier, cipher.Decrypt(token.EncryptedSecret));
     }
+
+    /// <inheritdoc cref="IngestTokenAsync"/>
+    /// <remarks>
+    /// This one is read back more than the others are. What the operator wants
+    /// is rarely the token on its own but the command that starts a collector
+    /// with it in place, and that is assembled from this every time it is asked
+    /// for (<c>docs/metrics.md</c>).
+    /// </remarks>
+    public async Task<TokenText?> HostTokenAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var token = await tokens.FindHostTokenAsync(id, cancellationToken);
+
+        return token is null
+            ? null
+            : TokenText.From(
+                TokenKind.Host, token.Identifier, cipher.Decrypt(token.EncryptedSecret));
+    }
 }

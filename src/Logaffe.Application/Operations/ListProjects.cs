@@ -22,10 +22,18 @@ namespace Logaffe.Application.Operations;
 /// The name of that group is on the group list rather than repeated here, which
 /// is also what lets a group with no projects in it be shown at all.
 /// </param>
+/// <param name="HostId">
+/// The machine the project runs on, or <c>null</c> for one whose machine is not
+/// tracked. It rides on the project for the reason the group does: a tool
+/// listing hosts would be a second read path for a fact this one already carries
+/// (<c>docs/mcp.md</c>), and it is what lets an agent go from the errors in a
+/// project to the machine behind them.
+/// </param>
 public sealed record ListedProject(
     Guid Id,
     string Name,
     Guid? GroupId,
+    Guid? HostId,
     RetentionWindow Retention,
     DateTimeOffset CreatedAt,
     int IngestTokens,
@@ -70,6 +78,7 @@ public sealed class ListProjects(IProjects projects, ITokens tokens, IEntryReade
                 project.Id,
                 project.Name,
                 project.GroupId,
+                project.HostId,
                 project.Retention,
                 project.CreatedAt,
                 counts.TryGetValue(project.Id, out var count) ? count : 0,

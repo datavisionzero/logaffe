@@ -10,9 +10,9 @@ namespace Logaffe.Application.Ports;
 /// <para>
 /// One lookup on a unique index and nothing else: a token names its own row, so
 /// how many tokens an installation holds is not a question the ingest path asks
-/// (ADR 0031). The two kinds are two methods rather than one with a kind
-/// parameter, because they are two tables and the prefix has already said which
-/// one is meant before anything gets here.
+/// (ADR 0031). The three kinds are three methods rather than one with a kind
+/// parameter, because they are three tables and the prefix has already said
+/// which one is meant before anything gets here.
 /// </para>
 /// <para>
 /// Recording a use is separate and deliberate. The rule about which uses are
@@ -36,6 +36,9 @@ public interface ITokens
     Task<AgentToken?> FindAgentTokenAsync(
         TokenIdentifier identifier, CancellationToken cancellationToken);
 
+    Task<HostToken?> FindHostTokenAsync(
+        TokenIdentifier identifier, CancellationToken cancellationToken);
+
     /// <summary>
     /// The row the operator named, or <c>null</c> when there is none — which is
     /// what a token revoked in another browser tab looks like.
@@ -44,6 +47,9 @@ public interface ITokens
 
     /// <inheritdoc cref="FindIngestTokenAsync(Guid, CancellationToken)"/>
     Task<AgentToken?> FindAgentTokenAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <inheritdoc cref="FindIngestTokenAsync(Guid, CancellationToken)"/>
+    Task<HostToken?> FindHostTokenAsync(Guid id, CancellationToken cancellationToken);
 
     /// <summary>
     /// What one project holds — one token, or two while it is being rotated —
@@ -66,6 +72,25 @@ public interface ITokens
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// What one host holds — one token, or two while it is being rotated —
+    /// oldest first, so that the one being rotated away is the one at the top.
+    /// </summary>
+    Task<IReadOnlyList<HostToken>> ListHostTokensAsync(
+        Guid hostId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// How many host tokens each host holds, hosts holding none left out.
+    /// </summary>
+    /// <remarks>
+    /// One statement for the whole host list rather than one per row, for the
+    /// reason the ingest counts are: a host holding no token at all is one no
+    /// collector can report to, which is what the operator is reading the list
+    /// for.
+    /// </remarks>
+    Task<IReadOnlyDictionary<Guid, int>> CountHostTokensAsync(
+        CancellationToken cancellationToken);
+
+    /// <summary>
     /// Every agent token in the installation, oldest first. There is no project
     /// to scope this by: an agent token reads all of them (ADR 0021).
     /// </summary>
@@ -76,10 +101,16 @@ public interface ITokens
     /// <inheritdoc cref="AddAsync(IngestToken, CancellationToken)"/>
     Task AddAsync(AgentToken token, CancellationToken cancellationToken);
 
+    /// <inheritdoc cref="AddAsync(IngestToken, CancellationToken)"/>
+    Task AddAsync(HostToken token, CancellationToken cancellationToken);
+
     Task RemoveAsync(IngestToken token, CancellationToken cancellationToken);
 
     /// <inheritdoc cref="RemoveAsync(IngestToken, CancellationToken)"/>
     Task RemoveAsync(AgentToken token, CancellationToken cancellationToken);
+
+    /// <inheritdoc cref="RemoveAsync(IngestToken, CancellationToken)"/>
+    Task RemoveAsync(HostToken token, CancellationToken cancellationToken);
 
     /// <summary>
     /// Writes back the name just given to <paramref name="token"/>.
@@ -93,4 +124,7 @@ public interface ITokens
 
     /// <inheritdoc cref="RecordUseAsync(IngestToken, CancellationToken)"/>
     Task RecordUseAsync(AgentToken token, CancellationToken cancellationToken);
+
+    /// <inheritdoc cref="RecordUseAsync(IngestToken, CancellationToken)"/>
+    Task RecordUseAsync(HostToken token, CancellationToken cancellationToken);
 }

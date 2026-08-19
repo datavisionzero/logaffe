@@ -235,6 +235,8 @@ public sealed class AuthenticateTokenTests
 
         public AgentToken? AgentToken { get; set; }
 
+        public HostToken? HostToken { get; set; }
+
         public int Lookups { get; private set; }
 
         public int Writes { get; private set; }
@@ -255,6 +257,13 @@ public sealed class AuthenticateTokenTests
                 AgentToken?.Identifier == identifier ? AgentToken : null);
         }
 
+        public Task<HostToken?> FindHostTokenAsync(
+            TokenIdentifier identifier, CancellationToken cancellationToken)
+        {
+            Lookups++;
+            return Task.FromResult(HostToken?.Identifier == identifier ? HostToken : null);
+        }
+
         public Task RecordUseAsync(IngestToken token, CancellationToken cancellationToken)
         {
             Writes++;
@@ -262,6 +271,12 @@ public sealed class AuthenticateTokenTests
         }
 
         public Task RecordUseAsync(AgentToken token, CancellationToken cancellationToken)
+        {
+            Writes++;
+            return Task.CompletedTask;
+        }
+
+        public Task RecordUseAsync(HostToken token, CancellationToken cancellationToken)
         {
             Writes++;
             return Task.CompletedTask;
@@ -279,11 +294,23 @@ public sealed class AuthenticateTokenTests
             Guid id, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
+        public Task<HostToken?> FindHostTokenAsync(
+            Guid id, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task<IReadOnlyList<IngestToken>> ListIngestTokensAsync(
             Guid projectId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
         public Task<IReadOnlyDictionary<Guid, int>> CountIngestTokensAsync(
+            CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<HostToken>> ListHostTokensAsync(
+            Guid hostId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyDictionary<Guid, int>> CountHostTokensAsync(
             CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
@@ -297,10 +324,16 @@ public sealed class AuthenticateTokenTests
         public Task AddAsync(AgentToken token, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
+        public Task AddAsync(HostToken token, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task RemoveAsync(IngestToken token, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
         public Task RemoveAsync(AgentToken token, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task RemoveAsync(HostToken token, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
         public Task RecordRenameAsync(AgentToken token, CancellationToken cancellationToken) =>

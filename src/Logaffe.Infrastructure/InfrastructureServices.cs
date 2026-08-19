@@ -29,6 +29,7 @@ public static class InfrastructureServices
         services.AddScoped<ISealedSecrets, SealedSecrets>();
         services.AddScoped<IProjects, Projects>();
         services.AddScoped<IGroups, Groups>();
+        services.AddScoped<IHosts, Hosts>();
         services.AddScoped<ITokens, Tokens>();
         services.AddScoped<IInstallation, Installation>();
         services.AddScoped<IOperators, Operators>();
@@ -43,11 +44,13 @@ public static class InfrastructureServices
         // The one table EF Core declares and does not serve (ADR 0003). It is
         // registered beside the stores because the layer above asks for it the
         // same way; what is different is on the other side of the interface.
+        services.AddScoped<ISamples, Samples>();
         services.AddScoped<IEntries, Entries>();
 
         // The other half of it, and the one this layer takes Dapper for: the
         // write and the sweep had nothing to map, and a filtered page does.
         services.AddScoped<IEntryReader, EntryReader>();
+        services.AddScoped<ISampleReader, SampleReader>();
 
         // The counter that gives entries their identities, and the one thing in
         // this layer that has to outlive a request: an installation is a single

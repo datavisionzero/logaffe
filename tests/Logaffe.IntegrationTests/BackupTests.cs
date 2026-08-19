@@ -49,16 +49,27 @@ public sealed class BackupTests(PostgresFixture postgres)
         // has and the artifact does not is a table an operator loses.
         Assert.Equal(
             [
-                "agent_token", "backup_code", "claim_guard", "ingest_token",
-                "log_entry", "operator", "project", "project_group", "session",
+                "agent_token", "backup_code", "claim_guard", "filesystem_reading",
+                "host", "host_sample", "host_token", "ingest_token",
+                "installation_settings", "log_entry", "operator", "project",
+                "project_group", "session",
             ],
             names.Order(StringComparer.Ordinal));
 
-        // The four foreign keys in the schema, each read as "after".
+        // Every foreign key in the schema, each read as "after".
         Assert.True(Array.IndexOf(names, "project") < Array.IndexOf(names, "ingest_token"));
         Assert.True(Array.IndexOf(names, "project_group") < Array.IndexOf(names, "project"));
         Assert.True(Array.IndexOf(names, "operator") < Array.IndexOf(names, "session"));
         Assert.True(Array.IndexOf(names, "operator") < Array.IndexOf(names, "backup_code"));
+
+        // The host is pointed at by four things, one of them the project — which
+        // is why it has to be restored before a table that was already in this
+        // list before hosts existed.
+        Assert.True(Array.IndexOf(names, "host") < Array.IndexOf(names, "project"));
+        Assert.True(Array.IndexOf(names, "host") < Array.IndexOf(names, "host_token"));
+        Assert.True(Array.IndexOf(names, "host") < Array.IndexOf(names, "host_sample"));
+        Assert.True(
+            Array.IndexOf(names, "host") < Array.IndexOf(names, "filesystem_reading"));
     }
 
     [Fact]

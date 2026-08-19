@@ -1,5 +1,7 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Hosts;
 using Logaffe.Domain.Operators;
+using Logaffe.Domain.Projects;
 
 namespace Logaffe.UnitTests.Application;
 
@@ -102,6 +104,8 @@ internal sealed class InMemoryOperators : IOperators
 internal sealed class InMemoryInstallation : IInstallation
 {
     private ClaimGuard? _guard;
+    private RetentionWindow _sampleRetention =
+        RetentionWindow.OfDays(Sampling.RetentionDaysByDefault);
 
     /// <summary>How many statements the store was asked to write.</summary>
     public int Writes { get; private set; }
@@ -143,6 +147,19 @@ internal sealed class InMemoryInstallation : IInstallation
     public Task RecordClaimAsync(ClaimGuard guard, CancellationToken cancellationToken)
     {
         _guard = guard;
+        Writes++;
+
+        return Task.CompletedTask;
+    }
+
+    public Task<RetentionWindow> ReadSampleRetentionAsync(
+        CancellationToken cancellationToken) =>
+        Task.FromResult(_sampleRetention);
+
+    public Task RecordSampleRetentionAsync(
+        RetentionWindow window, CancellationToken cancellationToken)
+    {
+        _sampleRetention = window;
         Writes++;
 
         return Task.CompletedTask;

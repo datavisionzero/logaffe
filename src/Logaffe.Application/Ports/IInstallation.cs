@@ -1,10 +1,11 @@
 using Logaffe.Domain.Operators;
+using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Ports;
 
 /// <summary>
-/// What an installation knows about itself: when it last became claimable, and
-/// the hash of the claim secret it drew.
+/// What an installation knows about itself: when it last became claimable, the
+/// hash of the claim secret it drew, and how long it keeps samples.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -57,4 +58,21 @@ public interface IInstallation
     /// handed.
     /// </remarks>
     Task RecordClaimAsync(ClaimGuard guard, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// How long samples are kept, which is one window for the installation
+    /// rather than one per host.
+    /// </summary>
+    /// <remarks>
+    /// It sits here rather than on a host because there is no reason to keep one
+    /// machine's numbers longer than another's, and it is one field fewer on
+    /// every host that is ever created (<c>docs/metrics.md</c>). An installation
+    /// that has never been told answers
+    /// <see cref="Domain.Hosts.Sampling.RetentionDaysByDefault"/>.
+    /// </remarks>
+    Task<RetentionWindow> ReadSampleRetentionAsync(CancellationToken cancellationToken);
+
+    /// <summary>Writes back the window the operator just set.</summary>
+    Task RecordSampleRetentionAsync(
+        RetentionWindow window, CancellationToken cancellationToken);
 }

@@ -4,15 +4,16 @@ using Logaffe.Domain.Tokens;
 namespace Logaffe.Application.Operations;
 
 /// <summary>
-/// What a presented token admits: for a delivery, the project it goes to; for an
-/// agent, the permission to read; and for anything else, nothing.
+/// What a presented token admits: for a delivery of entries, the project it goes
+/// to; for a delivery of samples, the host they were read off; for an agent, the
+/// permission to read; and for anything else, nothing.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This is the first thing both public endpoints do, and the only place either
-/// of them learns who is calling. It is one shape for two doors deliberately —
-/// ADR 0021 keeps one credential model pointing in two directions, and the
-/// prefix is what refuses each at the other's endpoint, before the database is
+/// This is the first thing every public endpoint does, and the only place any of
+/// them learns who is calling. It is one shape for three doors deliberately —
+/// ADR 0021 keeps one credential model pointing in three directions, and the
+/// prefix is what refuses each at the others' endpoints, before the database is
 /// asked anything at all.
 /// </para>
 /// <para>
@@ -70,6 +71,41 @@ public sealed class AuthenticateToken(
         }
 
         return token.ProjectId;
+    }
+
+    /// <summary>
+    /// The host a delivery of samples presenting <paramref name="authorization"/>
+    /// is admitted to, or <c>null</c> when it is admitted to none — the same
+    /// silent <c>401</c> a delivery of entries gets.
+    /// </summary>
+    public async Task<Guid?> AdmittedHostAsync(
+        string? authorization, CancellationToken cancellationToken)
+    {
+        if (!TryReadPresented(authorization, TokenKind.Host, out var presented))
+        {
+            return null;
+        }
+
+        var token = await tokens.FindHostTokenAsync(presented.Identifier, cancellationToken);
+        if (token is null)
+        {
+            RefuseAtTheSamePrice(presented);
+            return null;
+        }
+
+        if (!Matches(presented, token.EncryptedSecret))
+        {
+            return null;
+        }
+
+        var now = clock.GetUtcNow();
+        if (IsWorthWriting(token.LastUsedAt, now))
+        {
+            token.WasUsedAt(now);
+            await tokens.RecordUseAsync(token, cancellationToken);
+        }
+
+        return token.HostId;
     }
 
     /// <summary>

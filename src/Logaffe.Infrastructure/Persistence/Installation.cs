@@ -1,5 +1,7 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Hosts;
 using Logaffe.Domain.Operators;
+using Logaffe.Domain.Projects;
 using Microsoft.EntityFrameworkCore;
 
 namespace Logaffe.Infrastructure.Persistence;
@@ -74,6 +76,39 @@ public sealed class Installation(LogaffeDbContext context) : IInstallation
         await context.SaveChangesAsync(cancellationToken);
 
         return guard;
+    }
+
+    public async Task<RetentionWindow> ReadSampleRetentionAsync(
+        CancellationToken cancellationToken)
+    {
+        var settings = await context.InstallationSettings
+            .AsNoTracking()
+            .SingleOrDefaultAsync(cancellationToken);
+
+        // An installation that has never been told keeps the default, and the
+        // row is not written to say so: a setting nobody has set is the absence
+        // of a row, not a row repeating what the product already says.
+        return RetentionWindow.OfDays(
+            settings?.SampleRetentionDays ?? Sampling.RetentionDaysByDefault);
+    }
+
+    public async Task RecordSampleRetentionAsync(
+        RetentionWindow window, CancellationToken cancellationToken)
+    {
+        var settings = await context.InstallationSettings.SingleOrDefaultAsync(
+            cancellationToken);
+
+        if (settings is null)
+        {
+            context.InstallationSettings.Add(
+                new InstallationSettings { SampleRetentionDays = window.Days });
+        }
+        else
+        {
+            settings.SampleRetentionDays = window.Days;
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public Task RecordClaimAsync(ClaimGuard guard, CancellationToken cancellationToken)

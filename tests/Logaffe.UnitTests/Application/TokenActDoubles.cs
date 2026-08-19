@@ -5,7 +5,7 @@ using Logaffe.Domain.Tokens;
 namespace Logaffe.UnitTests.Application;
 
 /// <summary>
-/// The two token tables, in memory. It behaves as the real store does in the
+/// The three token tables, in memory. It behaves as the real store does in the
 /// two ways the acts turn on — a row is found by the identity that named it,
 /// and a removed row is not there any more — and in no other way.
 /// </summary>
@@ -13,10 +13,13 @@ internal sealed class InMemoryTokens : ITokens
 {
     private readonly List<IngestToken> _ingestTokens = [];
     private readonly List<AgentToken> _agentTokens = [];
+    private readonly List<HostToken> _hostTokens = [];
 
     public IReadOnlyList<IngestToken> Stored => _ingestTokens;
 
     public IReadOnlyList<AgentToken> StoredAgentTokens => _agentTokens;
+
+    public IReadOnlyList<HostToken> StoredHostTokens => _hostTokens;
 
     /// <summary>How many statements the store was asked to write.</summary>
     public int Writes { get; private set; }
@@ -29,11 +32,18 @@ internal sealed class InMemoryTokens : ITokens
         TokenIdentifier identifier, CancellationToken cancellationToken) =>
         Task.FromResult(_agentTokens.SingleOrDefault(t => t.Identifier == identifier));
 
+    public Task<HostToken?> FindHostTokenAsync(
+        TokenIdentifier identifier, CancellationToken cancellationToken) =>
+        Task.FromResult(_hostTokens.SingleOrDefault(t => t.Identifier == identifier));
+
     public Task<IngestToken?> FindIngestTokenAsync(Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(_ingestTokens.SingleOrDefault(t => t.Id == id));
 
     public Task<AgentToken?> FindAgentTokenAsync(Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(_agentTokens.SingleOrDefault(t => t.Id == id));
+
+    public Task<HostToken?> FindHostTokenAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(_hostTokens.SingleOrDefault(t => t.Id == id));
 
     public Task<IReadOnlyList<IngestToken>> ListIngestTokensAsync(
         Guid projectId, CancellationToken cancellationToken) =>
@@ -47,6 +57,18 @@ internal sealed class InMemoryTokens : ITokens
                 .GroupBy(t => t.ProjectId)
                 .ToDictionary(project => project.Key, project => project.Count()));
 
+    public Task<IReadOnlyList<HostToken>> ListHostTokensAsync(
+        Guid hostId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<HostToken>>(
+            [.. _hostTokens.Where(t => t.HostId == hostId).OrderBy(t => t.IssuedAt)]);
+
+    public Task<IReadOnlyDictionary<Guid, int>> CountHostTokensAsync(
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, int>>(
+            _hostTokens
+                .GroupBy(t => t.HostId)
+                .ToDictionary(host => host.Key, host => host.Count()));
+
     public Task<IReadOnlyList<AgentToken>> ListAgentTokensAsync(
         CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<AgentToken>>([.. _agentTokens.OrderBy(t => t.IssuedAt)]);
@@ -57,11 +79,17 @@ internal sealed class InMemoryTokens : ITokens
     public Task AddAsync(AgentToken token, CancellationToken cancellationToken) =>
         Write(() => _agentTokens.Add(token));
 
+    public Task AddAsync(HostToken token, CancellationToken cancellationToken) =>
+        Write(() => _hostTokens.Add(token));
+
     public Task RemoveAsync(IngestToken token, CancellationToken cancellationToken) =>
         Write(() => _ingestTokens.Remove(token));
 
     public Task RemoveAsync(AgentToken token, CancellationToken cancellationToken) =>
         Write(() => _agentTokens.Remove(token));
+
+    public Task RemoveAsync(HostToken token, CancellationToken cancellationToken) =>
+        Write(() => _hostTokens.Remove(token));
 
     public Task RecordRenameAsync(AgentToken token, CancellationToken cancellationToken) =>
         Write(() => { });
@@ -70,6 +98,9 @@ internal sealed class InMemoryTokens : ITokens
         Write(() => { });
 
     public Task RecordUseAsync(AgentToken token, CancellationToken cancellationToken) =>
+        Write(() => { });
+
+    public Task RecordUseAsync(HostToken token, CancellationToken cancellationToken) =>
         Write(() => { });
 
     private Task Write(Action write)

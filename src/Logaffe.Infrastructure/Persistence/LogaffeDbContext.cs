@@ -1,4 +1,5 @@
 using Logaffe.Domain.Entries;
+using Logaffe.Domain.Hosts;
 using Logaffe.Domain.Operators;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
@@ -29,9 +30,24 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
     /// </summary>
     public DbSet<Group> Groups => Set<Group>();
 
+    /// <summary>
+    /// The machines the operator runs projects on. Unlike the log entry table,
+    /// the sample tables below are both declared and served here: the log path
+    /// goes around EF Core because eleven thousand entries a second earn it
+    /// (ADR 0003), and a handful of hosts writing a few rows a minute earn
+    /// nothing of the sort.
+    /// </summary>
+    public DbSet<Host> Hosts => Set<Host>();
+
+    public DbSet<Sample> Samples => Set<Sample>();
+
+    public DbSet<FilesystemReading> FilesystemReadings => Set<FilesystemReading>();
+
     public DbSet<IngestToken> IngestTokens => Set<IngestToken>();
 
     public DbSet<AgentToken> AgentTokens => Set<AgentToken>();
+
+    public DbSet<HostToken> HostTokens => Set<HostToken>();
 
     /// <summary>
     /// The one account, and a set with no row in it while the installation is
@@ -50,6 +66,12 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
     /// Host Recovery, and by nothing else (ADR 0034).
     /// </summary>
     public DbSet<ClaimGuard> ClaimGuards => Set<ClaimGuard>();
+
+    /// <summary>
+    /// The one row of what the operator has set for the whole installation, and
+    /// a set with no row in it until something has been set or read.
+    /// </summary>
+    public DbSet<InstallationSettings> InstallationSettings => Set<InstallationSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -63,4 +63,22 @@ public sealed class RevokeToken(ITokens tokens)
         await tokens.RemoveAsync(token, cancellationToken);
         return true;
     }
+
+    /// <inheritdoc cref="IngestTokenAsync"/>
+    /// <remarks>
+    /// A collector still holding a revoked token neither retries nor notices. It
+    /// drops each reading and takes the next one a minute later, so a rotation
+    /// done carelessly costs a gap in the band and nothing else.
+    /// </remarks>
+    public async Task<bool> HostTokenAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var token = await tokens.FindHostTokenAsync(id, cancellationToken);
+        if (token is null)
+        {
+            return false;
+        }
+
+        await tokens.RemoveAsync(token, cancellationToken);
+        return true;
+    }
 }
