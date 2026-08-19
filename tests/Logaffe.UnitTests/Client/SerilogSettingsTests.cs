@@ -26,6 +26,7 @@ namespace Logaffe.UnitTests.Client;
 /// is ten thousand entries deep and nothing is dropped at all.
 /// </para>
 /// </remarks>
+[Collection(nameof(SelfLogCollection))]
 public sealed class SerilogSettingsTests
 {
     private const string Settings = """
