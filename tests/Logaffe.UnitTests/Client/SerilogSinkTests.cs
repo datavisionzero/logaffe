@@ -1,7 +1,9 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Logaffe.Client;
 using Serilog;
+using Serilog.Debugging;
 using Serilog.Events;
 
 namespace Logaffe.UnitTests.Client;
@@ -154,6 +156,96 @@ public sealed class SerilogSinkTests
         Assert.DoesNotContain(
             global::Logaffe.Serilog.LogaffeSink.InstanceProperty,
             Assert.Single(seen).Properties.Keys);
+    }
+
+    /// <summary>
+    /// What the package promises, and it holds however the sink was configured
+    /// rather than only for the shortest way of doing it.
+    /// </summary>
+    /// <remarks>
+    /// The sender who hands over <see cref="EntryDeliveryOptions"/> is the one
+    /// naming an instance among replicas, or bringing an <c>HttpClient</c> —
+    /// which is to say the one running the installation that most needs to hear
+    /// that nothing is arriving. There is nowhere else for this sink to say it:
+    /// through Serilog it would be handed straight back here, and to the
+    /// installation it cannot be said at all.
+    /// </remarks>
+    [Fact]
+    public async Task A_delivery_that_failed_is_reported_even_when_the_sender_named_nowhere()
+    {
+        var selfLog = new ConcurrentQueue<string>();
+
+        SelfLog.Enable(selfLog.Enqueue);
+
+        try
+        {
+            await IntoTheDarkAsync(onFailure: null);
+        }
+        finally
+        {
+            SelfLog.Disable();
+        }
+
+        Assert.Contains(selfLog, said => said.Contains("were not delivered", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// A default is only added under what the sender left unset: reporting they
+    /// brought themselves is reporting they want.
+    /// </summary>
+    [Fact]
+    public async Task A_senders_own_reporting_is_what_is_used()
+    {
+        var selfLog = new ConcurrentQueue<string>();
+        var mine = new ConcurrentQueue<string>();
+
+        SelfLog.Enable(selfLog.Enqueue);
+
+        try
+        {
+            await IntoTheDarkAsync((what, _) => mine.Enqueue(what));
+        }
+        finally
+        {
+            SelfLog.Disable();
+        }
+
+        Assert.Contains(mine, said => said.Contains("were not delivered", StringComparison.Ordinal));
+        Assert.Empty(selfLog);
+    }
+
+    /// <summary>
+    /// One entry logged at an installation that answers nothing, flushed on the
+    /// way out — so that whatever there is to report has been reported by the
+    /// time this returns.
+    /// </summary>
+    private static async Task IntoTheDarkAsync(Action<string, Exception?>? onFailure)
+    {
+        using var installation = new TakingDeliveries
+        {
+            Fails = new HttpRequestException("no route to host"),
+        };
+
+        using var http = new HttpClient(installation);
+
+        using (var logger = new LoggerConfiguration()
+            .MinimumLevel.Verbose()
+            .WriteTo.Sink(new global::Logaffe.Serilog.LogaffeSink(
+                new EntryDeliveryOptions
+                {
+                    Installation = new Uri("https://logs.example.com"),
+                    IngestToken = "lgf_i_test",
+                    BatchInterval = TimeSpan.FromMilliseconds(50),
+                    OnFailure = onFailure,
+                },
+                instance: null,
+                http))
+            .CreateLogger())
+        {
+            logger.Information("nobody is listening");
+        }
+
+        await installation.TakeAsync(1);
     }
 
     private static async Task<JsonNode> LoggedAsync(

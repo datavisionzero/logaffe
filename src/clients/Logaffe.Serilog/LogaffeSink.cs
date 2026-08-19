@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Logaffe.Client;
 using Serilog.Core;
+using Serilog.Debugging;
 using Serilog.Events;
 using Serilog.Formatting;
 using Serilog.Formatting.Compact;
@@ -57,7 +58,7 @@ public sealed class LogaffeSink : ILogEventSink, IDisposable
 
     public LogaffeSink(EntryDeliveryOptions delivery, string? instance)
     {
-        _delivery = new EntryDelivery(delivery);
+        _delivery = new EntryDelivery(Reporting(delivery));
         _instance = instance;
     }
 
@@ -67,7 +68,7 @@ public sealed class LogaffeSink : ILogEventSink, IDisposable
     /// </summary>
     public LogaffeSink(EntryDeliveryOptions delivery, string? instance, HttpClient http)
     {
-        _delivery = new EntryDelivery(delivery, http);
+        _delivery = new EntryDelivery(Reporting(delivery), http);
         _instance = instance;
     }
 
@@ -86,6 +87,39 @@ public sealed class LogaffeSink : ILogEventSink, IDisposable
     }
 
     public void Dispose() => _delivery.Dispose();
+
+    /// <summary>
+    /// The same delivery, saying what went wrong to <see cref="SelfLog"/> where
+    /// the sender has not said where else.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="SelfLog"/> is Serilog's own channel for what a sink cannot
+    /// report through the logger it is part of — reporting a failed delivery
+    /// through Serilog would hand it straight back to this sink. Wiring it is
+    /// this package's job and not <see cref="EntryDelivery"/>'s, which asks
+    /// nothing of the application's logging stack and knows no Serilog to ask
+    /// it of.
+    /// </para>
+    /// <para>
+    /// <b>Here rather than in the configuration methods</b>, so that no way of
+    /// reaching this sink is the quiet one: a sender who hands over
+    /// <see cref="EntryDeliveryOptions"/> — which is what naming the instance or
+    /// bringing an <see cref="HttpClient"/> takes — is the sender most likely to
+    /// need the report, and would otherwise have lost every one of them by being
+    /// careful. A sender who brought their own reporting keeps it.
+    /// </para>
+    /// </remarks>
+    private static EntryDeliveryOptions Reporting(EntryDeliveryOptions delivery) =>
+        delivery.OnFailure is not null
+            ? delivery
+            : new EntryDeliveryOptions(delivery)
+            {
+                OnFailure = (message, exception) => SelfLog.WriteLine(
+                    "logaffe: {0}{1}",
+                    message,
+                    exception is null ? string.Empty : $" {exception}"),
+            };
 
     /// <summary>
     /// The same event with the properties logaffe promotes, where the event does

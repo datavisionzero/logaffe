@@ -1,7 +1,6 @@
 using Logaffe.Client;
 using Serilog.Configuration;
 using Serilog.Core;
-using Serilog.Debugging;
 using Serilog.Events;
 
 namespace Serilog;
@@ -35,6 +34,13 @@ public static class LogaffeSinkExtensions
     /// here.
     /// </param>
     /// <param name="levelSwitch">A floor that can be moved while running.</param>
+    /// <remarks>
+    /// What could not be delivered is reported to <c>SelfLog</c>, whichever of
+    /// these methods configured the sink, unless the caller named somewhere else
+    /// in <see cref="EntryDeliveryOptions.OnFailure"/>. The wiring is
+    /// <see cref="global::Logaffe.Serilog.LogaffeSink"/>'s, so that it is not a
+    /// thing one overload has and another quietly lacks.
+    /// </remarks>
     public static LoggerConfiguration Logaffe(
         this LoggerSinkConfiguration to,
         Uri installation,
@@ -46,14 +52,6 @@ public static class LogaffeSinkExtensions
             {
                 Installation = installation,
                 IngestToken = ingestToken,
-
-                // Serilog's own channel for what a sink cannot report through
-                // the logger it is part of. Reporting a failed delivery through
-                // Serilog would hand it back to this sink.
-                OnFailure = (message, exception) => SelfLog.WriteLine(
-                    "logaffe: {0}{1}",
-                    message,
-                    exception is null ? string.Empty : $" {exception}"),
             },
             restrictedToMinimumLevel,
             levelSwitch);

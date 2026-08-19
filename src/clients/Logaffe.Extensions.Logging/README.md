@@ -46,7 +46,7 @@ builder.Logging.AddLogaffe(options =>
 | `BatchInterval` | `1s` | how long the first entry waits for company |
 | `FlushTimeout` | `5s` | how long shutdown keeps trying |
 | `DeliveryTimeout` | `10s` | how long one request may take |
-| `OnFailure` | `null` | `(message, exception)` — where problems are reported |
+| `OnFailure` | `Console.Error` | `(message, exception)` — where problems are reported |
 
 **The application's own filters apply first.** This is a provider like any
 other, so `LogLevel` configuration and category filters decide what reaches it;
