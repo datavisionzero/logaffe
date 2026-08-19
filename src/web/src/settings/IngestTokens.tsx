@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, asInstant } from "../api/client";
+import { copyToClipboard, whyNotCopied, type Copying } from "../shared/clipboard";
 import { formatTimestamp } from "../shared/time";
 import { LastUse } from "./LastUse";
 
@@ -56,7 +57,7 @@ export function IngestTokens({
   const [revoking, setRevoking] = useState<string>();
   const [refusal, setRefusal] = useState<string>();
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copying, setCopying] = useState<Copying>();
 
   const read = useCallback(async () => {
     try {
@@ -124,7 +125,7 @@ export function IngestTokens({
       // Straight to the delivery, because issuing a token is something an
       // operator does on the way to pasting it somewhere.
       setShown({ id: data.id, token: data.token, snippet: data.deliverySnippet });
-      setCopied(false);
+      setCopying(undefined);
 
       return undefined;
     });
@@ -150,7 +151,7 @@ export function IngestTokens({
 
   async function show(id: string) {
     setRefusal(undefined);
-    setCopied(false);
+    setCopying(undefined);
 
     try {
       const { data } = await api.GET("/ingest-tokens/{id}/token", {
@@ -288,13 +289,13 @@ export function IngestTokens({
           </p>
           <button
             type="button"
-            onClick={() => {
-              void navigator.clipboard.writeText(shown.snippet);
-              setCopied(true);
-            }}
+            onClick={() => void copyToClipboard(shown.snippet).then(setCopying)}
           >
-            {copied ? "Copied" : "Copy the delivery"}
+            {copying === "copied" ? "Copied" : "Copy the delivery"}
           </button>
+          {whyNotCopied(copying) !== undefined && (
+            <p className="refusal">{whyNotCopied(copying)}</p>
+          )}
           <button type="button" className="plain" onClick={() => setShown(undefined)}>
             Hide it
           </button>

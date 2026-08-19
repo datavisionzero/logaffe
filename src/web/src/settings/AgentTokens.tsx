@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, asInstant, problemWith } from "../api/client";
+import { copyToClipboard, whyNotCopied, type Copying } from "../shared/clipboard";
 import { formatTimestamp } from "../shared/time";
 import { LastUse } from "./LastUse";
 
@@ -46,7 +47,7 @@ export function AgentTokens() {
   const [problem, setProblem] = useState<string>();
   const [refusal, setRefusal] = useState<string>();
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copying, setCopying] = useState<Copying>();
 
   const read = useCallback(async () => {
     try {
@@ -110,7 +111,7 @@ export function AgentTokens() {
       // Straight to the block, because issuing one is something an operator
       // does on the way to pasting it into an agent.
       setShown({ id: data.id, token: data.token, configuration: data.clientConfiguration });
-      setCopied(false);
+      setCopying(undefined);
       setName("");
 
       return undefined;
@@ -154,7 +155,7 @@ export function AgentTokens() {
 
   async function show(id: string) {
     setRefusal(undefined);
-    setCopied(false);
+    setCopying(undefined);
 
     try {
       const { data } = await api.GET("/agent-tokens/{id}/token", {
@@ -309,13 +310,13 @@ export function AgentTokens() {
           </p>
           <button
             type="button"
-            onClick={() => {
-              void navigator.clipboard.writeText(shown.configuration);
-              setCopied(true);
-            }}
+            onClick={() => void copyToClipboard(shown.configuration).then(setCopying)}
           >
-            {copied ? "Copied" : "Copy the configuration"}
+            {copying === "copied" ? "Copied" : "Copy the configuration"}
           </button>
+          {whyNotCopied(copying) !== undefined && (
+            <p className="refusal">{whyNotCopied(copying)}</p>
+          )}
           <button type="button" className="plain" onClick={() => setShown(undefined)}>
             Hide it
           </button>

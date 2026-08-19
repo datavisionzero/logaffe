@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { api, problemWith } from "../api/client";
 import { RETENTION_MAXIMUM, RETENTION_MINIMUM, RETENTION_OFFERED } from "../projects/retention";
+import { copyToClipboard, whyNotCopied, type Copying } from "../shared/clipboard";
 import { EnrolSecondFactor } from "../session/EnrolSecondFactor";
 
 type Step =
@@ -329,7 +330,7 @@ function TheDelivery({
   snippet: string;
   onDone: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
+  const [copying, setCopying] = useState<Copying>();
 
   return (
     <section>
@@ -341,13 +342,13 @@ function TheDelivery({
       <pre>{snippet}</pre>
       <button
         type="button"
-        onClick={() => {
-          void navigator.clipboard.writeText(snippet);
-          setCopied(true);
-        }}
+        onClick={() => void copyToClipboard(snippet).then(setCopying)}
       >
-        {copied ? "Copied" : "Copy the delivery"}
+        {copying === "copied" ? "Copied" : "Copy the delivery"}
       </button>
+      {whyNotCopied(copying) !== undefined && (
+        <p className="refusal">{whyNotCopied(copying)}</p>
+      )}
       <p className="quiet">
         The token can be read back at any time from the project's settings, so there is
         nothing here to write down.
