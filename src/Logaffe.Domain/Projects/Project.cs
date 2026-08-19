@@ -10,7 +10,10 @@ namespace Logaffe.Domain.Projects;
 /// else. It is identified by an <see cref="Id"/> that survives every rename, and
 /// that identity is what entries, tokens and queries attach to — never the name.
 /// The <see cref="GroupId"/> it may carry belongs to the group rather than to
-/// it: it changes where the project is listed and nothing about what it is.
+/// it: it changes where the project is listed and nothing about what it is. The
+/// <see cref="HostId"/> is the same shape again — it says which machine the
+/// project runs on, so that its entries can be read beside what that machine was
+/// doing, and it is no kind of scope.
 /// </remarks>
 public sealed class Project
 {
@@ -47,6 +50,20 @@ public sealed class Project
     /// </summary>
     public Guid? GroupId { get; private set; }
 
+    /// <summary>
+    /// The host this project runs on, or <c>null</c> for one whose machine is
+    /// not tracked. It is an identity rather than a name, so renaming a host
+    /// moves no project.
+    /// </summary>
+    /// <remarks>
+    /// At most one, which is the group's shape and the group's sentence. A
+    /// project replicated across two machines names one of them or neither: the
+    /// truthful owner of a host is the instance, which is a property a sender
+    /// writes rather than something the installation manages, and making it
+    /// manageable is a larger product than this one (<c>docs/metrics.md</c>).
+    /// </remarks>
+    public Guid? HostId { get; private set; }
+
     public RetentionWindow Retention { get; private set; } = null!;
 
     public DateTimeOffset CreatedAt { get; private init; }
@@ -62,6 +79,14 @@ public sealed class Project
     /// tokens and queries are attached to the identity, so no sender notices.
     /// </summary>
     public void MoveTo(Guid? groupId) => GroupId = groupId;
+
+    /// <summary>
+    /// Says which machine this project runs on, or none when
+    /// <paramref name="hostId"/> is <c>null</c>. It moves nothing else and no
+    /// sender notices: what it changes is whether there is a band to draw over
+    /// this project's entries.
+    /// </summary>
+    public void RunsOn(Guid? hostId) => HostId = hostId;
 
     public void KeepFor(RetentionWindow retention) => Retention = retention;
 

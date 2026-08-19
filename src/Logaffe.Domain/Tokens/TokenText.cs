@@ -26,6 +26,7 @@ public sealed class TokenText
 {
     public const string IngestPrefix = "logaffe_ingest";
     public const string AgentPrefix = "logaffe_agent";
+    public const string HostPrefix = "logaffe_host";
 
     /// <summary>
     /// Fifty-two symbols of <see cref="TokenAlphabet"/> — two hundred and sixty
@@ -87,7 +88,7 @@ public sealed class TokenText
             return false;
         }
 
-        // Four parts, because both prefixes carry one separator of their own.
+        // Four parts, because every prefix carries one separator of its own.
         var parts = value.Split(Separator);
         if (parts.Length != 4)
         {
@@ -125,6 +126,7 @@ public sealed class TokenText
     {
         TokenKind.Ingest => IngestPrefix,
         TokenKind.Agent => AgentPrefix,
+        TokenKind.Host => HostPrefix,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown token kind."),
     };
 
@@ -137,6 +139,9 @@ public sealed class TokenText
                 return true;
             case AgentPrefix:
                 kind = TokenKind.Agent;
+                return true;
+            case HostPrefix:
+                kind = TokenKind.Host;
                 return true;
             default:
                 kind = default;

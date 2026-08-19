@@ -7,6 +7,7 @@ public sealed class TokenTextTests
     [Theory]
     [InlineData(TokenKind.Ingest, "logaffe_ingest")]
     [InlineData(TokenKind.Agent, "logaffe_agent")]
+    [InlineData(TokenKind.Host, "logaffe_host")]
     public void A_minted_token_is_its_prefix_its_identifier_and_its_secret(
         TokenKind kind, string prefix)
     {

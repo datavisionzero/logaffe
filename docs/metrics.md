@@ -164,6 +164,58 @@ sample and takes the next one a minute later.
 the most interesting thing a missing minute can mean is that the machine was too
 busy to report, and a line drawn through it says the opposite.
 
+## What a collector delivers
+
+**One reading per delivery, and never a batch.** A collector takes a sample and
+posts it; it does not buffer, does not retry and has nothing to catch up on, so
+there is no second reading for a delivery to carry. This is where samples part
+company with entries, whose batching exists because an application produces them
+faster than it should open connections.
+
+It is a `POST` of one JSON object, with the host token as a bearer credential:
+
+```
+POST /samples
+Authorization: Bearer logaffe_host_…
+Content-Type: application/json
+
+{
+  "cpu": 0.42,
+  "memoryUsed": 6115295232,
+  "memoryTotal": 16769712128,
+  "load1": 0.52,
+  "load5": 0.61,
+  "load15": 0.58,
+  "filesystems": [
+    { "mount": "/", "used": 41234567890, "total": 107374182400 }
+  ]
+}
+```
+
+**There is no timestamp on the wire**, which is the single clock made visible: the
+installation stamps the sample when it arrives and there is nothing for a
+collector's clock to be wrong about. A field for it would be a field somebody
+eventually trusts.
+
+**The shape is the schema and nothing else is read.** A member the installation
+does not know is ignored rather than stored, because there is nowhere to store it
+([ADR 0044](./adr/0044-a-sample-has-a-closed-schema.md)) — which is also what
+makes the format additive: an older collector omitting a number added later
+delivers a sample that lacks it, and a newer one sending a number an older
+installation has never heard of is read by the part it does know.
+
+**A delivery is refused whole or taken whole**, unlike a batch of entries
+([ADR 0006](./adr/0006-a-batch-is-accepted-in-part.md)). Partial acceptance
+exists because one broken line must not cost the other nine hundred and
+ninety-nine; one reading has no other lines to protect, and half a sample —
+memory without processor — is a band with a hole in it that looks like data. A
+delivery that is not a reading is `400`, and the next one is a minute away.
+
+The answers are otherwise the ingest endpoint's: `401` for a token that admits
+nothing, saying no more than that; `429` over the throttle every public surface
+carries; `503` when the store cannot be reached, with the sample gone and the
+collector none the wiser.
+
 ## The project sits on at most one host
 
 A project names **the host it runs on, or none** — the shape a project's group

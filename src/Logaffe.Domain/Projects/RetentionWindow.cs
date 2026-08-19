@@ -1,10 +1,17 @@
 namespace Logaffe.Domain.Projects;
 
 /// <summary>
-/// The period a project keeps its entries, counted from receipt time, after
+/// The period entries or samples are kept for, counted from receipt time, after
 /// which they are removed.
 /// </summary>
 /// <remarks>
+/// <para>
+/// A project owns one of these for its entries. Samples have one too, set once
+/// for the installation rather than per host, because they belong to a host and
+/// there is no reason to keep one machine's numbers longer than another's
+/// (<c>docs/metrics.md</c>). It is one type because it is one rule: the same
+/// floor, and the same ceiling no installation can raise.
+/// </para>
 /// Time is the only limit a project has — no size cap, no row quota, and no
 /// interaction between limits. The number is the operator's up to a ceiling no
 /// installation can raise (ADR 0020): without one, a settings box quietly turns

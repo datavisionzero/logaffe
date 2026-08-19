@@ -44,6 +44,40 @@ public sealed class ProjectTests
         Assert.Null(project.GroupId);
     }
 
+    [Fact]
+    public void A_project_sits_on_no_host_until_it_is_put_on_one()
+    {
+        var project = Project.Create("api", RetentionWindow.OfDays(14), Now);
+        Assert.Null(project.HostId);
+
+        var host = Guid.CreateVersion7();
+        project.RunsOn(host);
+        Assert.Equal(host, project.HostId);
+
+        // And back off again, which costs the project nothing but its band.
+        project.RunsOn(null);
+        Assert.Null(project.HostId);
+    }
+
+    /// <summary>
+    /// Two separate facts about where a project is: one is where it is listed,
+    /// the other is which machine it runs on, and neither moves the other.
+    /// </summary>
+    [Fact]
+    public void The_group_and_the_host_do_not_disturb_each_other()
+    {
+        var project = Project.Create("api", RetentionWindow.OfDays(14), Now);
+        var group = Guid.CreateVersion7();
+        var host = Guid.CreateVersion7();
+
+        project.MoveTo(group);
+        project.RunsOn(host);
+        Assert.Equal(group, project.GroupId);
+
+        project.MoveTo(null);
+        Assert.Equal(host, project.HostId);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
