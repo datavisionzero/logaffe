@@ -10,7 +10,8 @@ being simple to do and clearly documented.
 
 Two stores, and both are needed.
 
-- **The database** holds projects, tokens, entries and the operator's account.
+- **The database** holds projects, hosts, tokens, entries, samples and the
+  operator's account.
 - **The host volume** holds the configuration and the secrets — including the
   **encryption key** at `keys/token.key` that makes the stored tokens readable
   ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)),
@@ -75,14 +76,24 @@ restore.
 
 **Not everything is equally worth saving.** Entries are expendable: they are
 short-lived by design, they are additive to the applications' own local files,
-and losing them costs little. The operator's account, the configuration and the
-tokens are not — losing those means losing the installation. An operator who
-backs up only the small, slow-changing part is making a legitimate choice, and
-the command supports it:
+and losing them costs little. **Samples are expendable for the same reason** —
+they age out inside ninety days, they describe a machine that is still there to
+be asked, and a gap in a band costs an operator nothing they cannot get by
+looking now. The operator's account, the configuration, the projects, the hosts
+and the tokens are not — losing those means losing the installation. An operator
+who backs up only the small, slow-changing part is making a legitimate choice,
+and the command supports it:
 
 ```
 docker compose exec logaffe logaffe backup --without-entries > logaffe-backup.tar
 ```
+
+**It leaves out the samples too**, and keeps the name it has. The flag names the
+distinction it makes — the bulk that ages out against the small part that does
+not — rather than listing what falls on each side, and a second flag would offer
+a choice between two expendable things that nobody has a reason to make
+differently. A host comes back from such an artifact with its name and its token
+and no history, which is the same shape a project comes back in.
 
 The artifact says which of the two it is, so a restore does not have to guess
 whether an installation's log is missing or was never taken.
@@ -141,8 +152,10 @@ Three things make that safe to promise:
 ### What a version is
 
 **A tag is the release, and the tag is the version.** Pushing `v1.4.0` publishes
-`ghcr.io/datavisionzero/logaffe:1.4.0` and the three client packages under the
-same number, from the same commit, and writes the release entry that names them.
+`ghcr.io/datavisionzero/logaffe:1.4.0`, the collector image beside it at
+`ghcr.io/datavisionzero/logaffe-collector:1.4.0`, and the three client packages,
+all under the same number, from the same commit, and writes the release entry
+that names them.
 One version means one thing everywhere: it is the number a backup manifest
 records and the one a restore reads.
 
@@ -222,12 +235,24 @@ likely to need attention
 an hourly pass takes a twenty-fourth of that, and a pass with nothing to do —
 which is most of them — costs one index probe per project.
 
+**The same job sweeps the samples**, on the same hourly pass and after the
+entries, rather than on a timer of its own. It is the same concern on the same
+clock, and what it costs is one statement per host against a table three orders
+of magnitude smaller than the entries ([Storage](./storage.md#the-sample-tables))
+— a third timer would be a third thing to reason about for a pass that is over
+before the hour's entry work has warmed up. The window it counts against is the
+installation's single one rather than a project's
+([Metrics](./metrics.md#retention)), which is also why this part of the pass asks
+nothing about projects at all.
+
 **The same job takes what a deleted project left behind.** A project goes at
 once and its entries follow in the background
 ([ADR 0019](./adr/0019-a-project-is-deleted-at-once-and-its-entries-follow.md)),
 and this is that background: there is no window left to read, so they are removed
 whole. Nothing can reach them in the meantime — every query runs inside a
-project, and that project is gone.
+project, and that project is gone. **A deleted host's samples go the same way**,
+for the same reason: the host is gone from the moment the act completes, and
+nothing on either surface can name one that no longer exists.
 
 Deleting rows rather than dropping time partitions is the deliberate choice, and
 the reason is that **retention is per project**. A partition can only be dropped
@@ -310,6 +335,11 @@ index of [ADR 0010](./adr/0010-search-is-a-substring-match-not-a-full-text-query
 is the second-largest thing in the database and leaving it out of the estimate
 would understate it badly.
 
+**Samples do not enter that arithmetic in any meaningful way.** A handful of hosts
+at ninety days is a couple of hundred megabytes against a log store measured in
+gigabytes ([Storage](./storage.md#what-the-samples-cost)), so an operator sizing a disk
+counts entries and adds nothing for the bands.
+
 logaffe does not enforce a disk limit and does not stop ingesting to protect one.
 There are no size quotas anywhere in this product, and adding one here would be
 the "drop oldest when full" interaction that `VISION.md` refuses.
@@ -351,7 +381,14 @@ the operator the whole of it is in that log, and the sentence has to be true.
 - **No metrics endpoint, and no OpenTelemetry export.** `VISION.md` refuses OTLP
   as an ingestion path and this product does not turn around and require it of
   its own operator. The file log and the health endpoint are the whole of what
-  logaffe says about itself.
+  logaffe says about itself — and that is unchanged by
+  [Metrics](./metrics.md), which is what the operator's *machines* report to this
+  installation, pushed by their collectors, and never anything this installation
+  exposes about itself for somebody else to scrape.
+- **No sweep of a machine that stopped reporting.** A host with no recent samples
+  is left exactly as it is. Nothing removes it, renames it, marks it stale or
+  says anything about it, because deciding that a quiet machine is a problem is
+  alerting and `VISION.md` refuses it.
 - **No self-update.** logaffe does not check for versions, announce them, or
   update itself. `docker compose pull` is the operator's to run — on a schedule
   if they want one, since a timer they wrote is still them running it. What is

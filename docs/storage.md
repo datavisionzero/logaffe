@@ -8,9 +8,11 @@ entries, which are written with Npgsql's binary `COPY` and read with hand-writte
 SQL through Dapper.
 
 This document is the log entry table — what each column is for, which indexes
-exist and why, and what the whole thing costs. The operator account, the
-projects, the tokens and the settings are ordinary relational rows and need no
-document of their own.
+exist and why, and what the whole thing costs — and, at the end, the two small
+tables that hold samples ([Metrics](./metrics.md)), which are here because their
+shape was decided rather than because their size demands it. The operator
+account, the projects, the tokens and the settings are ordinary relational rows
+and need no document of their own.
 
 The numbers quoted below were measured on a containerised Postgres capped at two
 cores and 4 GB, holding ten million entries across twenty projects — the shape of
@@ -250,10 +252,124 @@ a one-off shrink — a project deleted, or a retention window lowered — leaves
 file that ordinary traffic will not refill, and `docs/operations.md` names that as
 an occasional operator act rather than something the product attempts.
 
+## The sample tables
+
+Everything above is the log path, which goes around EF Core because ADR 0003 says
+the volume justifies it. **Samples do not, and so they do not.** Twenty hosts
+watching three filesystems each deliver eighty rows a minute — 1.3 a second,
+against the 11 051 an ingestion sustained — so EF Core declares these tables,
+applies their migrations *and* writes them, which is ADR 0003's rule read the way
+it was written rather than an exception to it.
+
+```sql
+create table host_sample (
+    host_id      uuid        not null,
+    receipt_time timestamptz not null,
+
+    cpu_busy     real        not null,   -- the share of the interval, 0 to 1
+    memory_used  bigint      not null,
+    memory_total bigint      not null,
+    load_1       real        not null,
+    load_5       real        not null,
+    load_15      real        not null,
+
+    primary key (host_id, receipt_time)
+);
+
+create table filesystem_reading (
+    host_id      uuid        not null,
+    receipt_time timestamptz not null,
+    mount_path   text        not null,
+
+    used         bigint      not null,
+    total        bigint      not null,
+
+    primary key (host_id, receipt_time, mount_path)
+);
+```
+
+**The clock is ours and there is only one**, which is the whole of why these
+tables carry a `receipt_time` and no second column beside it
+([Metrics](./metrics.md#it-carries-one-clock-and-it-is-the-installations)).
+
+### The key is natural, and that is what makes a repeat harmless
+
+`log_entry` carries a `bigint` the installation hands out, for two reasons that
+are both absent here: binary `COPY` has to carry the value with the row, and the
+cursor of [Querying](./querying.md) needs a unique tie-break. Samples are written
+through EF and are never paged with a cursor, so there is nothing for a synthetic
+identity to do.
+
+`(host_id, receipt_time)` is unique because a host reports once a minute, so the
+rule is **enforced by the primary key rather than trusted of the collector**. A
+delivery that arrives twice for the same minute — a collector restarted mid-minute,
+a duplicated container — is a conflict the write resolves by keeping what is
+there, not a second row that quietly doubles a machine's memory on the band. That
+is the property the natural key was chosen for.
+
+### One index, because there is one read
+
+The primary key is the only index on either table, and it serves everything asked
+of them:
+
+- **The band and `get_host_samples`** — one host over a time range, which is the
+  key's leading column and then a range on the second.
+- **When a host last reported** — `max(receipt_time)` for one host, a backwards
+  scan of one key, which is what lets [Metrics](./metrics.md#the-host) read that
+  fact off the newest sample instead of storing it a second time.
+
+**The retention sweep walks the hosts** rather than deleting by time across all of
+them. Leading with `host_id` means a sweep over the whole table would scan it, and
+the alternative — an index on `receipt_time` alone — is a whole index maintained on
+every write to serve a background job. An installation has a handful of hosts, so
+the sweep asks each of them in turn and the loop is cheaper than the index.
+
+### The buckets are computed when they are read
+
+A host's ninety days are 129 600 rows. Aggregating that into two hundred buckets
+is one grouped scan of a fraction of one key, so there are **no rollup tables and
+no downsampling on write** — a second write path and a backfill story bought for
+a saving that does not exist at this size.
+
+That grouped statement is the one part of samples that is **hand-written SQL** and
+it lives with the log path's, in the folder `docs/codebase.md` keeps them in.
+`date_bin` with an average and a maximum per bucket is awkward to express through
+EF and is shaped by the key it scans, which is the same reason the other queries
+in that folder are there. The maximum rides beside the average because
+[MCP](./mcp.md) hands both to the agent, an average being exactly what hides the
+spike worth finding.
+
+### What the samples cost
+
+**Not measured — this is arithmetic from the row widths**, unlike the table above,
+and it is written down because the conclusion is that the question does not need
+measuring.
+
+Five hosts watching three filesystems each, at ninety days:
+
+| | |
+| --- | --- |
+| `host_sample`, heap and key | about 78 MiB |
+| `filesystem_reading`, heap and key | about 175 MiB |
+| **Total** | **about 250 MiB** |
+
+Against 11.84 GiB of entries that is two per cent, and it is the reason samples
+get a retention window without an argument about what it costs. Twenty hosts
+would be four times that and still under a twentieth of the log store.
+
+**Autovacuum is left at its defaults here**, unlike `log_entry`. The tuning above
+exists because a fifth of a six-gigabyte table is a great deal of dead space to
+wait for; a fifth of a table this size is not, and a vacuum over it is cheap
+enough that the default cadence never becomes the problem ADR 0023 describes.
+
 ## What is deliberately not here
 
 - **No partitioning.** Settled in ADR 0023: per-project retention means a
   partition has no single moment at which it is expired.
+- **No synthetic identity on a sample, and no cursor over samples.** A host and a
+  range is the whole of what can be asked ([Metrics](./metrics.md)), so there is
+  nothing for a page to resume from.
+- **No rollups, and no index on a sample beyond its key.** Covered above.
 - **No dictionary tables.** Settled in ADR 0027: the repeated text stays in the
   row, and the ingestion path stays stateless.
 - **No index on properties.** Covered above, and settled in ADR 0010.

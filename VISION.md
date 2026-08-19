@@ -46,11 +46,12 @@ stay simple.
 ## Publicly reachable by design
 
 A logaffe installation is meant to be put on the open internet and be safe there.
-Three surfaces are publicly exposed:
+Four surfaces are publicly exposed:
 
 - the **web UI**,
 - the **MCP endpoint** for AI-agent access,
-- the **ingestion endpoint** for applications shipping logs.
+- the **ingestion endpoint** for applications shipping logs,
+- the **sample endpoint** for the collectors reporting on their machines.
 
 Requiring a VPN, Tailscale, an SSH tunnel, or a reverse-proxy auth layer in front
 of logaffe is explicitly *not* an acceptable answer to security questions. The
@@ -259,6 +260,34 @@ deliberately not used: with a single operator there is at most one open view at
 a time, so polling is cheap and avoids a whole class of connection-lifecycle,
 proxy, and reconnect problems on a publicly exposed deployment.
 
+### 5. What the machine was doing
+
+Logs say what an application did; they do not say that the machine it ran on had
+been out of memory for twenty minutes. That is the question an operator asks
+immediately after reading an error, and it is the one the log store cannot
+answer.
+
+logaffe therefore keeps **the numbers a machine reports about itself** — the
+processor, the memory, the load, and how full its filesystems are — sampled once
+a minute by a small **collector** the operator runs on each machine. A project
+names the **host** it runs on, and that is the whole of the relation: the log
+view draws a band over the entries showing what the machine was doing across
+exactly the range the filters already state, and the agent can ask a host what it
+reported over a range.
+
+This is deliberately **not a metrics system**. The set of numbers is closed:
+there is no metric to define, no label to choose, no query language, and no
+dashboard to arrange. Custom counters, latency histograms and request rates are
+the shape this was designed against rather than a later phase of it, because a
+labelled series moves the limit on how much data exists out of the installation
+and into the discipline of whoever writes the labels — and everything else here
+is bounded by the installation. See [`docs/metrics.md`](./docs/metrics.md).
+
+The collector is a second thing to deploy, on every machine that reports, and
+that is the real cost of this capability. It is paid because an application
+cannot see the machine it shares with four others, and a number that is wrong in
+a way nobody notices is worse than no number.
+
 ## Non-goals
 
 - **No content filtering or scrubbing before ingestion.** logaffe does not
@@ -284,7 +313,20 @@ proxy, and reconnect problems on a publicly exposed deployment.
 - **No alerting.** logaffe does not send notifications, evaluate alert rules, or
   page anyone, and no agent watches the logs in the background to do it either.
   Looking into the logs always starts with the operator. Alerting may be
-  revisited later; it is not part of the initial product.
+  revisited later; it is not part of the initial product. The samples of
+  capability 5 do not reopen this — they only mean that the day it is revisited,
+  there is something to evaluate.
+- **No metrics system, and no metric an operator defines.** The set of numbers a
+  host reports is closed: no custom counters, gauges or histograms, no labels, no
+  query language, and no dashboard. Wanting those is a reason to run a tool that
+  does them well beside logaffe.
+- **No application or runtime metrics.** Request rates, latency percentiles, GC
+  pauses and heap sizes are not collected, and the client packages do not sample
+  the process they live in. Metrics are about the machine.
+- **No pull-based collection.** No OTLP endpoint, no Prometheus scrape, no
+  `/metrics` for anyone to poll. Collectors push, for the reason senders push:
+  an installation on the open internet that reaches back into the operator's
+  machines is a different security posture than one that only ever receives.
 - **No push-based live streaming.** Following logs live is polling, not SSE or
   WebSockets.
 - **No OTLP as the primary ingestion path.** Applications are not expected to
@@ -313,6 +355,9 @@ in [`docs/adr/`](./docs/adr/), and how the repository is laid out around them is
 - **logaffe's own logs:** Serilog to rolling files on the mounted host volume.
   logaffe does not log into itself — the failures worth diagnosing are the ones
   in which it could not record anything
+- **Metrics:** a closed set of host readings, pushed once a minute by a separate
+  containerized collector against a write-only host token. See
+  [`docs/metrics.md`](./docs/metrics.md)
 - **Agent interface:** MCP, exposed publicly and authenticated
 - **Live updates:** polling on the order of five seconds, no push streaming
 - **Deployment:** containerized, runnable with Docker Compose as the standard
@@ -369,8 +414,8 @@ documentation should say so.
    god-mode account; anything that would only make sense with multiple users is
    out of scope by definition.
 6. **Safe on the open internet.** Every publicly exposed surface — UI, MCP,
-   ingestion — is designed to withstand being reachable by anyone, without a
-   network-level safety net in front of it.
+   ingestion, samples — is designed to withstand being reachable by anyone,
+   without a network-level safety net in front of it.
 7. **Additive, not authoritative.** logaffe sits on top of the applications'
    existing local logging instead of replacing it. That keeps delivery
    fire-and-forget and keeps the cost of losing log data low.

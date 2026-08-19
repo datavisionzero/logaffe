@@ -1,4 +1,10 @@
-# Deploying an Installation
+# Deploying
+
+Two things get deployed. **The installation** goes on the open internet on
+purpose, and most of this page is about the shape that puts in front of it,
+because that shape has parts which are easy to assemble wrongly and quiet about
+it. **A collector** goes on each machine the operator wants numbers from
+([Metrics](./metrics.md)), and is at the end, because it is one command.
 
 `VISION.md` puts an installation on the open internet on purpose, and refuses a
 VPN, a tunnel or an authenticating proxy as the answer to a security question.
@@ -185,6 +191,104 @@ There is no other way to tell. Nothing fails, nothing is logged, and the two
 places the address matters are both places nobody looks until the day they
 matter.
 
+## The collector on a machine
+
+A collector reports one machine, so one runs on each machine the operator wants
+numbers from — which is not the machine the installation is on, except by
+coincidence.
+
+**It is handed over rather than assembled.** Creating a host in the settings
+gives back the command below with this installation's address, that host's token
+and the mounts already filled in ([Metrics](./metrics.md#the-collector)), and the
+same command comes back whenever the token is read. What follows is what is in
+it, so that an operator can see what they are running:
+
+```
+docker run -d --name logaffe-collector --restart unless-stopped \
+  -v /proc:/host/proc:ro \
+  -v /:/rootfs:ro,rslave \
+  -e LOGAFFE_ENDPOINT=https://logs.example.com \
+  -e LOGAFFE_HOST_TOKEN=logaffe_host_… \
+  -e LOGAFFE_MOUNTS=/ \
+  ghcr.io/datavisionzero/logaffe-collector:latest
+```
+
+**The two mounts are what a container needs to see its host.** `/proc` is where
+the processor, the memory and the load are read; the root filesystem is how the
+mounts named in `LOGAFFE_MOUNTS` are measured. `rslave` on the second is what
+makes a filesystem mounted after the collector started visible to it — without
+it, a disk added next month is a disk the collector never reports.
+
+**That is the whole of what it asks for.** It is not `--privileged`, it does not
+join the host's PID namespace, and it never sees the Docker socket. Reading
+processes is what would need the first and reading containers the second, and the
+closed schema collects neither
+([ADR 0044](./adr/0044-a-sample-has-a-closed-schema.md)) — so the smallest ask is
+available, and it is the one taken.
+
+**It publishes no port and takes no inbound connection.** The collector opens an
+outgoing HTTPS connection to the installation and nothing ever connects to it, so
+a machine that reports needs no firewall rule, no proxy in front of it and no
+address anyone has to be able to reach. That is a deliberate consequence of
+collectors pushing rather than the installation scraping (`VISION.md`), and on a
+fleet of machines it is the difference between one exposed surface and one per
+machine.
+
+**On a machine that already runs a Compose stack**, the same thing is a service in
+it, which is worth preferring when there is a stack to put it in — it is then
+pulled and restarted by whatever already pulls and restarts that stack:
+
+```yaml
+  logaffe-collector:
+    image: ghcr.io/datavisionzero/logaffe-collector:latest
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /:/rootfs:ro,rslave
+    environment:
+      LOGAFFE_ENDPOINT: https://logs.example.com
+      LOGAFFE_HOST_TOKEN: ${LOGAFFE_HOST_TOKEN}
+      LOGAFFE_MOUNTS: /
+```
+
+### Upgrading it is the installation's arrangement, one machine at a time
+
+The collector image is built and tagged by the same workflows as the
+installation, so `:latest` moves when a release tag is pushed and `:main` follows
+the trunk — the arrangement of
+[ADR 0038](./adr/0038-both-installations-pull-on-a-timer-and-the-tag-is-the-deliberate-act.md),
+with the pulling timer on each reporting machine rather than only on the
+installation's host.
+
+**A collector is upgraded on its own schedule, and may be older than the
+installation it reports to.** There is no coordinated upgrade and no version
+handshake, because the alternative is an operator who has to walk a fleet before
+they can upgrade the one thing that matters. What that requires of the product
+instead is that **the sample format only ever grows**: a number may be added, and
+an installation reads a delivery that lacks it as a delivery that lacks it. A
+change that made an old collector's delivery invalid would be a change that turns
+`docker compose pull` on the installation into a silent stop of every machine's
+reporting, which is precisely the failure nobody would look for.
+
+**No backup goes before this one.** ADR 0038 puts an artifact before an
+unattended upgrade because there is no downgrade; a collector holds no state at
+all, so the rollback is the previous tag and the cost of getting it wrong is a
+gap in a band.
+
+### The check that says the collector worked
+
+Open *hosts* in the installation's settings. **The host reports within a minute of
+the collector starting, or something in the command is wrong.** A host that has
+never reported and a host that stopped reporting look different there — the first
+has no last-reported at all — and that distinction is the one worth having while
+setting one up.
+
+A collector that cannot reach the installation, or holds a revoked token, says so
+in its own container log and does nothing else: it drops the sample and takes the
+next one a minute later ([Metrics](./metrics.md#the-collector)). Nothing retries,
+nothing accumulates, and a machine that was unreachable for an hour has an hour
+of gap rather than an hour of samples arriving at once.
+
 ## What is deliberately not here
 
 - **No TLS in the product.** logaffe holds no certificate and terminates
@@ -201,3 +305,14 @@ matter.
 - **No orchestrator but Compose.** `VISION.md` makes Docker Compose the standard
   way an installation is run, and it is the only one this documentation
   describes or tests.
+- **No collector that is not a container.** There is no package, no systemd unit
+  and no binary to place on a machine. A second way to run it is a second thing
+  to release, document and answer questions about, for a machine that in this
+  product is already running containers — it is what the projects on it are.
+- **No inbound path to a collector.** It is never scraped, never polled and never
+  told anything; the installation does not know where its collectors are and
+  could not reach one if it did.
+- **No collector without a host.** A token is issued for a host the operator
+  created, exactly as an ingest token is issued for a project they created
+  ([Projects and tokens](./projects.md)), and there is no delivery that brings a
+  host into existence.

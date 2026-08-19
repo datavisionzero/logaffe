@@ -8,7 +8,8 @@ rather than retrofitting it, and this is what a project actually is.
 ## What a project is
 
 A **name**, a **retention window**, and its **ingest token**. Nothing else — the
-group it may sit in belongs to the group rather than to it.
+group it may sit in belongs to the group rather than to it, and so does the host
+it may sit on.
 
 The name is unique **within its group** and can be changed at any time. Two
 projects called `api` is a trap for the operator who reaches for one of them at
@@ -42,7 +43,9 @@ rather than hashed, so mislaying it means looking it up rather than rotating and
 redeploying
 ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)).
 It carries a recognizable prefix — `logaffe_ingest`, against the agent token's
-`logaffe_agent` — which costs nothing and means an accidental
+`logaffe_agent` and the host token's `logaffe_host`
+([Metrics](./metrics.md#the-host-token)) — which costs nothing and means an
+accidental
 appearance in a repository or a log is something a scanner can find. That second case is not
 hypothetical: applications log the configuration they started with, and a token
 that ends up in a log entry ends up here. The prefix is written down here rather
@@ -173,6 +176,29 @@ installation of ten to thirty projects has a use for, and a second one is a tree
 in the interface, a path in every place a project is named, and a question about
 what a nested group would inherit from the one above it.
 
+## The host
+
+A project sits on **at most one host** — the machine it runs on — which is the
+same shape the group has and, deliberately, the same sentence
+([Metrics](./metrics.md)). It exists so that the errors on this project's screen
+can be read next to what the machine was doing at the time, and it exists for
+nothing else.
+
+**It is not a scope.** No query takes a host, no filter narrows by one, and two
+projects named onto one machine are as separate as they were before — the rule
+the group already carries, for the reason the group already carries it.
+
+**A project on no host is the ordinary case** until the operator says otherwise.
+It costs nothing except that there is no band to draw over its entries.
+
+A project sitting on one host while running on two machines is a limitation this
+accepts rather than solves, and [Metrics](./metrics.md#the-project-sits-on-at-most-one-host)
+says what was traded for it.
+
+The host is set in the project's own settings, beside the group, and the host
+itself — its name, its token, its samples — is managed where it is true of every
+project at once, in the installation's settings ([The web UI](./ui.md)).
+
 ## Deleting a project
 
 Deleting is **immediate and irreversible**, and it is confirmed by typing the
@@ -197,9 +223,10 @@ and everything there is to do to a group, are **operator acts that are not
 reachable over MCP at all**
 ([ADR 0018](./adr/0018-projects-and-tokens-are-never-reachable-over-mcp.md)). The
 agent reads entries and counts them; it cannot bring a project into existence,
-end one, mint a credential, or move a project from one group to another. It is
-told which group a project is in, because that is a fact about the project it is
-reading ([MCP](./mcp.md)).
+end one, mint a credential, or move a project from one group to another — and
+the same is true of every act on a host. It is told which group a project is in
+and which host it sits on, because both are facts about the project it is reading
+([MCP](./mcp.md)).
 
 ## What is deliberately not here
 
@@ -219,3 +246,6 @@ reading ([MCP](./mcp.md)).
 - **No group to query.** A search names one project, and putting two projects
   under one word does not make them one ([Querying](./querying.md)).
 - **No nested groups, and no project in two of them.** Covered above.
+- **No host to query, and no project on two of them.** A host is where a
+  project's samples come from, never a way of asking about its entries
+  ([Metrics](./metrics.md)).

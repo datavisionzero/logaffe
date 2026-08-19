@@ -66,3 +66,6 @@ material value to understanding the decision.
 - [0040 – The claim is guarded by a secret or by a window, and whoever installs chooses](./0040-the-claim-is-guarded-by-a-secret-or-by-a-window.md)
 - [0041 – The second factor is offered, not required](./0041-the-second-factor-is-offered-not-required.md)
 - [0042 – The password carries more, so it gets longer](./0042-the-password-carries-more-so-it-gets-longer.md)
+- [0043 – Metrics come from the host, not from the application](./0043-metrics-come-from-the-host-not-from-the-application.md)
+- [0044 – A sample has a closed schema](./0044-a-sample-has-a-closed-schema.md)
+- [0045 – A sample is not an entry, and may be read across projects](./0045-a-sample-is-not-an-entry-and-may-be-read-across-projects.md)

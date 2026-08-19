@@ -20,8 +20,9 @@ operator, **readable again whenever it is wanted**
 ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)),
 **named** so that a list of them is readable, recording **when it was last
 used**, and **revocable individually and immediately**. The product has one model
-for a machine credential, pointing in two directions — an ingest token writes to
-one project, an agent token reads everything
+for a machine credential, pointing in three directions — an ingest token writes
+to one project, a host token writes to one host
+([Metrics](./metrics.md#the-host-token)), and an agent token reads everything
 ([ADR 0021](./adr/0021-an-agent-token-is-a-copied-secret.md)).
 
 The name is the operator's own, and naming a token after the client it was issued
@@ -79,8 +80,8 @@ place that fact is visible. The last use is accurate to within five minutes and
 is not shown as though it were finer
 ([ADR 0033](./adr/0033-the-last-use-of-a-token-is-written-coarsely.md)).
 
-**The two token kinds carry different prefixes**, and neither is accepted at the
-other's endpoint. Pasting an ingest token into an agent configuration is a
+**The three token kinds carry different prefixes**, and none is accepted at
+another's endpoint. Pasting an ingest token into an agent configuration is a
 mistake that will happen, and it should fail immediately and legibly rather than
 send someone looking in the wrong place. The prefix is read before the token is
 looked up at all, so the wrong kind is turned away without the database being
@@ -100,22 +101,25 @@ changes their password less often.
 
 ## The tools
 
-Four, and no others.
+Five, and no others.
 
 **`list_projects`** — the projects in the installation, each with its name, the
-group it sits in when it sits in one, its retention window, and when it last
-received an entry. An agent has to know what exists before it can ask about it,
+group it sits in when it sits in one, the host it sits on when it sits on one,
+its retention window, and when it last received an entry. An agent has to know what exists before it can ask about it,
 and "has this project received anything lately" is the cheapest possible health
 question.
 
-**The group rides on the project rather than being a tool of its own.** It is
-what lets *the production one of shop* reach an identity, and it is also what
-keeps the operator's own word for two projects from being a thing the agent has
-to guess at. A fifth tool listing groups would be a second read path for a fact
-the first one already carries, and there is nothing further to ask: no filter, no
-scope and no query takes a group ([Projects and tokens](./projects.md)). A
-project's name is unique only within its group, which costs the agent nothing —
-every tool names a project by identity, as the next paragraph says.
+**The group and the host both ride on the project rather than being tools of
+their own.** The group is what lets *the production one of shop* reach an
+identity, and it is also what keeps the operator's own word for two projects from
+being a thing the agent has to guess at. The host is what lets an agent go from
+the errors in a project to the machine behind them without this adapter holding a
+query that resolves one into the other. A tool listing either would be a second
+read path for a fact this one already carries, and there is nothing further to
+ask of a group at all: no filter, no scope and no query takes one
+([Projects and tokens](./projects.md)). A project's name is unique only within
+its group, which costs the agent nothing — every tool names a project by
+identity, as the next paragraph says.
 
 **`search_entries`** — a project, the filters from [Querying](./querying.md), a
 verbosity, and a cursor. The filters are exactly the operator's: a time range on
@@ -151,6 +155,29 @@ there says which question was asked.
 **`get_entry`** — one entry by its identity, always in full. It exists for the
 follow-up after a compact search: the agent sees a promising line and wants the
 exception and the properties behind it.
+
+**`get_host_samples`** — a host identity and a time range, answered with what the
+machine reported about itself over it ([Metrics](./metrics.md)). This is the tool
+for the question the entries cannot answer: the errors started at 03:14, and the
+memory on that machine had been at the ceiling since 02:50.
+
+The host is named by the identity `list_projects` gives, exactly as a project is,
+and for the same reason — resolving a project into its host is a query this
+adapter is not allowed to have.
+
+**The answer is bucketed, and each bucket carries its average and its peak.** A
+week of one-minute samples is ten thousand readings and would spend an agent's
+context on the shape of a line, so the bucket is chosen from the range to keep an
+answer inside a cap. The peak rides along because an average is precisely what
+hides the spike that was worth finding, and a missing minute is **absent rather
+than interpolated** — that the machine was too busy to report is a fact, and a
+line drawn through the gap states its opposite.
+
+**This is the one tool whose answer is not confined to a single project**, since
+a host may carry several. Samples are numbers the installation's own collector
+read off a machine and carry no text from anywhere, so the boundary that holds
+untrusted content inside one project has nothing here to hold apart
+([ADR 0045](./adr/0045-a-sample-is-not-an-entry-and-may-be-read-across-projects.md)).
 
 ## Compact and full
 
@@ -243,8 +270,16 @@ sentence from these values, and the agent is handed the fact
   of the product. A client that opens a stream on the endpoint expecting to be
   told something is answered that there is no such stream, rather than being left
   holding one that will never carry anything.
-- **It cannot read across projects.** Every tool names one, exactly as the UI
-  does.
+- **It cannot read log content across projects.** Every tool that returns an
+  entry names one project, exactly as the UI does. The rule is stated by what a
+  tool returns rather than by counting tools, because `get_host_samples` answers
+  for a machine that may carry several and carries no entry in its answer
+  ([ADR 0045](./adr/0045-a-sample-is-not-an-entry-and-may-be-read-across-projects.md)).
+- **It cannot manage hosts.** Creating a host, naming one, deleting one, minting
+  its token, or saying which host a project sits on are operator acts and absent
+  from this interface for ADR 0018's reason.
+- **It cannot ask for a sample to be taken.** It reads what the collectors have
+  already delivered; nothing on this surface reaches out to a machine.
 
 ## What is deliberately not here
 

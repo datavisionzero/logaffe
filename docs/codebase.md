@@ -19,12 +19,13 @@ logaffe/
 │  ├─ adr/
 │  ├─ agents/
 │  └─ api/openapi.json        the HTTP contract, checked in
-├─ deploy/                    Dockerfile, Compose, and nothing else
+├─ deploy/                    the two Dockerfiles, Compose, and nothing else
 ├─ src/
 │  ├─ Logaffe.Domain/         the rules
 │  ├─ Logaffe.Application/    the use cases and their ports
 │  ├─ Logaffe.Infrastructure/ Postgres, secrets, the file log
 │  ├─ Logaffe.Api/            HTTP, MCP, CLI, and the composition root
+│  ├─ Logaffe.Collector/      the host collector, its own deployable
 │  ├─ clients/                the three NuGet packages
 │  └─ web/                    the single-page application
 ├─ tests/
@@ -120,6 +121,26 @@ Postgres, starts the installation, fetches the document it serves, and fails if
 it differs from the one in the repository. The web client's API layer is
 generated from the same file, which is what makes the contract load-bearing
 rather than descriptive.
+
+## The collector is a deployable, not a layer
+
+`Logaffe.Collector` sits beside the four layers rather than inside them, and
+references none of them. It reads a machine and posts numbers over HTTP
+([ADR 0043](./adr/0043-metrics-come-from-the-host-not-from-the-application.md)),
+which is the same relationship to the installation that a sending application
+has — so it depends on the wire format and on nothing else, exactly as the client
+packages do.
+
+It ships as **its own container image**, built from a second `Dockerfile` under
+`deploy/` and released on the same tag as the installation. That is a second
+artifact in the release workflow and the one part of this product an operator
+upgrades separately from `docker compose pull`, which is the cost ADR 0043
+accepts.
+
+Its tests are the unit project's, because there is nothing here a substitute
+cannot vouch for: reading `/proc` is behind a port like everything else, and what
+would need a real machine is the container's mounts, which are a `docker run`
+line rather than code.
 
 ## The client packages are three
 

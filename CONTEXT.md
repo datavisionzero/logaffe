@@ -98,6 +98,20 @@ project. A project sits in at most one, a group never holds another group, and a
 group with no projects in it is an ordinary state rather than an error.
 _Avoid_: Folder, tag, label, namespace, team, workspace, environment, category
 
+**Host**:
+The machine an operator runs projects on, created and named by them, holding its
+samples and its token. A project sits on at most one, a host holds any number of
+projects, and it is where samples come from rather than a way of asking about
+entries — no query takes one.
+_Avoid_: Server, node, machine, environment, instance, installation
+
+**Collector**:
+The small program an operator runs on a **Host** that reads the machine once a
+minute and delivers a **Sample**. It is separate from the client packages
+because an application cannot see the machine it shares, it holds no state, and
+it does nothing besides read and post.
+_Avoid_: Agent, exporter, daemon, probe, monitor, scraper
+
 **Ingest Token**:
 The write-only secret that admits a delivery to one project. It permits writing
 and grants no read access of any kind, it is what identifies the project, it
@@ -120,11 +134,19 @@ own. Several exist at once, and it reads every project while granting no write o
 any kind.
 _Avoid_: API key, session, connected agent, read token, credential
 
+**Host Token**:
+The write-only secret that admits a delivery of samples to one **Host**. It
+permits writing and grants no read access of any kind, it is what identifies the
+host, it records when it was last used, and a host holds one of them — or two
+while it is being rotated. It is the **Ingest Token**'s model pointed at a host
+instead of a project.
+_Avoid_: API key, collector key, agent token, machine id, credential
+
 **Token Identifier**:
 The non-secret part a token carries between its prefix and its secret, naming the
 row that holds it so that a presented token is found by one lookup rather than by
 trying every token in turn. It admits nothing on its own, it is not what tells
-the two token kinds apart — the prefix is — and it is not the name an agent
+the three token kinds apart — the prefix is — and it is not the name an agent
 token carries for the operator's list.
 _Avoid_: Key id, token name, project id, prefix, handle, public key
 
@@ -254,9 +276,20 @@ logger name, instance or time bucket, and answered without returning the entries
 themselves. It is always asked for deliberately and never accompanies a page.
 _Avoid_: Total, hits, results, statistics, metric
 
+**Sample**:
+One reading a **Collector** took of its **Host**, once a minute, carrying a
+closed set of numbers — the processor, the memory, the load, and a filesystem's
+used and total — and no text besides the mount path the operator named. It is
+never edited after it arrives and leaves only by ageing out, as a **Log Entry**
+does, and it belongs to a host rather than to a project. It carries one clock,
+stamped when it arrives, and the collector's own is not stored.
+_Avoid_: Metric, measurement, data point, gauge, series, reading
+
 **Retention Window**:
 The period a project keeps its entries, counted from receipt time, after which
 they are removed. The operator sets it up to a ceiling no installation can raise,
 and time is the only limit a project has — there is no size cap, no row quota,
-and no interaction between limits.
+and no interaction between limits. Samples have a window of their own, set once
+for the installation and under the same ceiling, because they belong to a
+**Host** rather than to a project.
 _Avoid_: Retention policy, TTL, expiry, archive, quota

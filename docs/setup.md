@@ -13,8 +13,10 @@ is always a way back in from the host**, which is what makes the rest affordable
 
 An unclaimed installation exposes the claim and nothing else. There is no
 ingestion, because ingestion needs a token and a token needs a project and a
-project needs an operator; there is no MCP; there is nothing to read and nothing
-to configure. The whole reachable surface is one flow.
+project needs an operator; no samples, for the same reason one step over — a
+host is something an operator creates ([Metrics](./metrics.md)); there is no
+MCP; there is nothing to read and nothing to configure. The whole reachable
+surface is one flow.
 
 ## The claim secret
 
@@ -192,6 +194,14 @@ arrives with the package it needs.** The .NET packages are not published yet
 ([Codebase](./codebase.md)), and a snippet whose first line is a package nobody
 can install is worse than one that is honestly the plain path.
 
+**The guide does not offer a host**, and that is a decision rather than an
+omission. Its whole job is the shortest path from a claimed installation to a log
+arriving, which is the barrier `VISION.md` names; a step that asks the operator to
+name a machine and go paste a second command on it lengthens exactly the flow that
+exists to be short, in service of a screen that has nothing to draw until logs are
+coming in anyway. A host is created from the settings when the operator wants the
+numbers ([The web UI](./ui.md)), which is the moment they have a reason to.
+
 ## Host Recovery
 
 **Host Recovery** is a command run inside the running container, reached the way
@@ -216,10 +226,16 @@ asks it to — an operator who forgot their password, one who lost their second
 factor and their backup codes with it, and an installation whose door closed
 before anyone came through it.
 
-**Projects, ingest tokens and log entries are untouched.** Recovery replaces who
-the installation belongs to, not what it holds, and an application shipping logs
-through it does not notice. Existing sessions end, since the account they belong
-to no longer exists.
+**Projects, hosts, ingest tokens, host tokens, log entries and samples are
+untouched.** Recovery replaces who the installation belongs to, not what it
+holds, and neither an application shipping logs through it nor a collector
+reporting to it notices. Existing sessions end, since the account they belong to
+no longer exists.
+
+A host token survives for the reason an ingest token does: it writes and reads
+nothing ([Metrics](./metrics.md#the-host-token)), so it is not a credential that
+carries anything out of the installation it no longer belongs to. That is the
+whole of the distinction being drawn in the paragraph below.
 
 **The agent tokens end with it**, and the command says how many went, because
 each one is a client configuration somewhere that has just stopped reading. An

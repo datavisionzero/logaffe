@@ -98,6 +98,14 @@ entry beside them. There is no separate search page, no "advanced" mode, and
 nothing that opens in a new place — every narrowing happens in front of the list
 it narrows.
 
+**A band above the entries shows what the machine was doing**, drawn for the host
+the open project sits on, over exactly the range the filters already state
+([Metrics](./metrics.md)). It moves when the range moves, it is absent for a
+project that sits on no host, and it is the only place in the interface a sample
+is drawn. It is a band and not a dashboard: nothing on it is configured, picked
+or saved, and it is there so that four minutes of errors are read next to the
+memory that ran out three minutes before the first one.
+
 **Switching project keeps the time range and the level threshold, and drops
 everything else.** Those two are questions about the world — *the last fifteen
 minutes*, *warnings and worse* — and carrying them over is what makes "the same
@@ -299,7 +307,7 @@ true of every project at once.
 Both screens are their **areas**, listed beside what is being read and marked
 while it is: a project's are *the project*, *ingest tokens* and *delete this
 project*; the installation's are *signed-in browsers*, *agent tokens*, *your
-credentials* and *groups*. One is on the screen at a time. Stacked, the answer to
+credentials*, *groups* and *hosts*. One is on the screen at a time. Stacked, the answer to
 *where is the retention window* was to read the page.
 
 **An area is an address**, so a reload comes back to it and the back button walks
@@ -353,6 +361,26 @@ leave in no group and asks for nothing to be typed, because nothing here is
 destroyed and the typed name on a project's deletion is proportionate to entries
 that do not come back
 ([ADR 0039](./adr/0039-a-group-has-an-identity-and-holds-nothing.md)).
+
+**The hosts are here for the same reason, and they hold more.** The area lists
+them with when each last reported — read off its newest sample, not written
+beside it — and creates, renames and removes one. Creating a host hands back the
+**finished command that starts its collector**, with this installation's address,
+the host's token and the mounts it needs already in it, exactly as an ingest
+token hands back a delivery snippet and an agent token hands back a client
+configuration ([Metrics](./metrics.md#the-collector)). The same command comes
+back whenever the token is read.
+
+**Removing a host is confirmed by typing its name**, unlike removing a group: a
+group holds nothing, a host holds its samples, and the guard is proportionate to
+what does not come back. The act says how many projects it will leave on no host,
+and those projects lose nothing but the band over their entries.
+
+A host's own screen draws its samples over a plain range, for the times the
+question is about the machine rather than about a project. The **retention window
+for samples** is here too rather than on a host, because it is one number for the
+installation ([Metrics](./metrics.md#retention)), and it carries the same warning
+about what lowering it removes that a project's does.
 
 ## The interface asks for nothing unasked
 
