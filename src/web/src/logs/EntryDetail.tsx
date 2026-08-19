@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, asNumber } from "../api/client";
+import { copyToClipboard, whyNotCopied, type Copying } from "../shared/clipboard";
 import { formatTimestampWithOffset } from "../shared/time";
 import type { Filters, Level } from "./filters";
 
@@ -42,13 +43,13 @@ export function EntryDetail({
   onClose: () => void;
 }) {
   const [entry, setEntry] = useState<WholeEntry | "asking" | "gone">("asking");
-  const [copied, setCopied] = useState(false);
+  const [copying, setCopying] = useState<Copying>();
 
   useEffect(() => {
     let current = true;
 
     setEntry("asking");
-    setCopied(false);
+    setCopying(undefined);
 
     void (async () => {
       try {
@@ -83,15 +84,16 @@ export function EntryDetail({
           <button
             type="button"
             className="plain"
-            onClick={() => {
-              void navigator.clipboard.writeText(asJson(entry));
-              setCopied(true);
-            }}
+            onClick={() => void copyToClipboard(asJson(entry)).then(setCopying)}
           >
-            {copied ? "Copied" : "Copy as JSON"}
+            {copying === "copied" ? "Copied" : "Copy as JSON"}
           </button>
         )}
       </div>
+
+      {whyNotCopied(copying) !== undefined && (
+        <p className="refusal">{whyNotCopied(copying)}</p>
+      )}
 
       {entry === "asking" && <p className="quiet">Reading the entry…</p>}
 
