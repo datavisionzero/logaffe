@@ -17,6 +17,76 @@ namespace Logaffe.IntegrationTests;
 /// </remarks>
 public sealed class FileLogTests
 {
+    /// <summary>
+    /// A volume that takes the log is not complained about.
+    /// </summary>
+    [Fact]
+    public void A_volume_that_can_be_written_has_nothing_said_about_it()
+    {
+        var volume = Directory.CreateTempSubdirectory("logaffe-writable");
+
+        try
+        {
+            Assert.Null(FileLog.WhyItCannotBeWritten(volume.FullName));
+        }
+        finally
+        {
+            volume.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// One that does not is, and with the reason on it.
+    /// </summary>
+    /// <remarks>
+    /// A file where the log directory belongs, rather than a permission taken
+    /// away: it is the same answer on every operating system and to a process
+    /// running as root, which a mode of 500 is not. What is being asked is
+    /// whether the check writes to find out, and it is — a directory that cannot
+    /// be made is exactly what a read-only volume gives it.
+    /// </remarks>
+    [Fact]
+    public void A_volume_that_cannot_be_written_is_said_out_loud()
+    {
+        var volume = Directory.CreateTempSubdirectory("logaffe-unwritable");
+
+        try
+        {
+            // The constant is the prefix a backup filters on, so it carries the
+            // separator a directory name does not.
+            File.WriteAllText(
+                Path.Combine(volume.FullName, TakeABackup.LogDirectory.TrimEnd('/')),
+                string.Empty);
+
+            Assert.NotNull(FileLog.WhyItCannotBeWritten(volume.FullName));
+        }
+        finally
+        {
+            volume.Delete(recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Asking leaves nothing behind on the volume it asked about.
+    /// </summary>
+    [Fact]
+    public void The_question_takes_its_own_file_back()
+    {
+        var volume = Directory.CreateTempSubdirectory("logaffe-probe");
+
+        try
+        {
+            FileLog.WhyItCannotBeWritten(volume.FullName);
+
+            Assert.Empty(Directory.EnumerateFiles(
+                volume.FullName, "*", SearchOption.AllDirectories));
+        }
+        finally
+        {
+            volume.Delete(recursive: true);
+        }
+    }
+
     [Fact]
     public void The_log_lands_in_the_directory_a_backup_leaves_behind()
     {
