@@ -92,6 +92,12 @@ builder.Services.AddScoped<AuthenticateToken>();
 // authentication stands in front of, and the only one that writes entries.
 builder.Services.AddScoped<IngestBatch>();
 
+// The other public write, and a far quieter one: a handful of machines posting
+// one reading a minute each. It is registered beside the deliveries because it
+// is the same shape of act behind the same shape of door — a token that names
+// what it may write to, and nothing that reads.
+builder.Services.AddScoped<IngestSample>();
+
 // The claim, which is the whole reachable surface of an installation nobody
 // owns. `Recover` is the other half of the same guard and is registered by the
 // command line rather than here, because it is host-local and never reachable
@@ -146,12 +152,29 @@ builder.Services.AddScoped<RenameGroup>();
 builder.Services.AddScoped<DeleteGroup>();
 builder.Services.AddScoped<MoveProjectToGroup>();
 
+// The machine a project runs on, which is the group's shape pointed at
+// hardware: a row with an identity that survives its rename, and a relation that
+// hangs off that identity. Nothing here is a scope — no query takes a host, and
+// naming two projects onto one machine does not make them askable together.
+builder.Services.AddScoped<CreateHost>();
+builder.Services.AddScoped<ListHosts>();
+builder.Services.AddScoped<RenameHost>();
+builder.Services.AddScoped<DeleteHost>();
+builder.Services.AddScoped<PutProjectOnHost>();
+builder.Services.AddScoped<ChangeSampleRetention>();
+
 // The read the ingestion path exists for, and the one surface both consumers
-// meet: the four MCP tools call exactly these and add no query behaviour of
+// meet: the MCP tools call exactly these and add no query behaviour of
 // their own (`docs/querying.md`).
 builder.Services.AddScoped<SearchEntries>();
 builder.Services.AddScoped<CountEntries>();
 builder.Services.AddScoped<ReadEntry>();
+
+// The fifth read, and the one that is not inside a single project: what a
+// machine reported about itself. The band above the operator's entries and the
+// agent's tool are this one act, which is what keeps them from becoming two
+// views of the same machine (`docs/querying.md`).
+builder.Services.AddScoped<ReadSamples>();
 
 // The same filters, watched: the one request the interface repeats on its own,
 // asking what has arrived on the receipt clock while the view it feeds keeps the
@@ -164,11 +187,17 @@ builder.Services.AddScoped<TailEntries>();
 // triggers.
 builder.Services.AddScoped<SweepExpiredEntries>();
 
+// The same concern over the sample tables, on the same timer: one window for the
+// whole installation, and the samples a deleted host left behind.
+builder.Services.AddScoped<SweepExpiredSamples>();
+
 // The operator's token acts. They are registered here and reachable from HTTP
 // and the command line; what makes them unreachable over MCP is that the MCP
-// adapter offers four read tools and nothing else (ADR 0018).
+// adapter offers five read tools and nothing else (ADR 0018).
 builder.Services.AddScoped<IssueIngestToken>();
 builder.Services.AddScoped<ListIngestTokens>();
+builder.Services.AddScoped<IssueHostToken>();
+builder.Services.AddScoped<ListHostTokens>();
 builder.Services.AddScoped<IssueAgentToken>();
 builder.Services.AddScoped<RenameAgentToken>();
 builder.Services.AddScoped<ListAgentTokens>();
@@ -208,7 +237,7 @@ builder.Services.AddLogaffeOpenApi();
 
 // The second adapter over the reads above. It is registered beside them rather
 // than inside them: what an agent may call is a fact about this composition
-// root, and the four tools are the whole of it (ADR 0018).
+// root, and the five tools are the whole of it (ADR 0018).
 builder.Services.AddLogaffeAgentTools();
 
 var app = builder.Build();
@@ -232,8 +261,10 @@ app.MapOperator();
 app.MapProjects();
 app.MapGroups();
 app.MapEntries();
+app.MapHosts();
 app.MapTokens();
 app.MapIngest();
+app.MapSamples();
 app.MapAgentTools();
 
 // The single-page application is built by its own toolchain and copied into

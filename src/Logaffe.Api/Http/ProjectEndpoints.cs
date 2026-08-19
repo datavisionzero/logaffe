@@ -46,9 +46,25 @@ public sealed record EntriesOutsideWindowResponse(int RetentionDays, long Entrie
 /// </summary>
 public sealed record ProjectGroupRequest(Guid? GroupId);
 
+/// <summary>
+/// Where a project runs: the identity of one of the installation's hosts, or
+/// <c>null</c> for a machine this installation does not track.
+/// </summary>
+public sealed record ProjectHostRequest(Guid? HostId);
+
 /// <summary>One project, by itself.</summary>
+/// <param name="HostId">
+/// The machine it runs on, or <c>null</c> for none — which is every project
+/// until the operator says otherwise, and which costs nothing except that there
+/// is no band to draw over its entries.
+/// </param>
 public sealed record ProjectResponse(
-    Guid Id, string Name, Guid? GroupId, int RetentionDays, DateTimeOffset CreatedAt);
+    Guid Id,
+    string Name,
+    Guid? GroupId,
+    Guid? HostId,
+    int RetentionDays,
+    DateTimeOffset CreatedAt);
 
 /// <summary>
 /// One project on the list a session starts at.
@@ -68,10 +84,16 @@ public sealed record ProjectResponse(
 /// The group's name is on the group list rather than repeated on every row,
 /// which is also what lets a group holding no projects be shown at all.
 /// </param>
+/// <param name="HostId">
+/// The machine the project runs on, or <c>null</c> for one on no host. The
+/// host's name is on the host list for the group's reason, and this is what says
+/// whether there is a band to draw above this project's entries.
+/// </param>
 public sealed record ListedProjectResponse(
     Guid Id,
     string Name,
     Guid? GroupId,
+    Guid? HostId,
     int RetentionDays,
     DateTimeOffset CreatedAt,
     int IngestTokens,
@@ -84,9 +106,17 @@ public sealed record ListedProjectResponse(
 /// <para>
 /// Every one of these is behind the operator's session and none of them is
 /// reachable over MCP — not as a permission but as an absence from that
-/// interface, which offers four read tools and nothing else (ADR 0018). An
+/// interface, which offers five read tools and nothing else (ADR 0018). An
 /// agent reads entries and counts them; it cannot bring a project into
 /// existence or end one.
+/// </para>
+/// <para>
+/// <b>Creating a project says which group it is listed under and not which host
+/// it runs on</b>, though the two relations have the same shape
+/// (<c>docs/metrics.md</c>). The group is the heading the operator is already
+/// choosing while they type the name; the machine is a fact about a deployment
+/// that does not exist yet when the project is made, so it arrives afterwards
+/// through a route of its own.
 /// </para>
 /// <para>
 /// <b>Deletion is not confirmed here.</b> It is confirmed by typing the
@@ -160,6 +190,7 @@ public static class ProjectEndpoints
                     project.Id,
                     project.Name,
                     project.GroupId,
+                    project.HostId,
                     project.Retention.Days,
                     project.CreatedAt,
                     project.IngestTokens,
@@ -233,6 +264,31 @@ public static class ProjectEndpoints
             .Produces(StatusCodes.Status404NotFound)
             .Produces(StatusCodes.Status409Conflict);
 
+        operatorSurface.MapPut("/{id:guid}/host", async (
+                Guid id,
+                ProjectHostRequest request,
+                PutProjectOnHost put,
+                CancellationToken cancellationToken) =>
+                // It moves nothing: entries, tokens and queries are attached to
+                // the identity, so no sender notices and nothing is redeployed.
+                // What it changes is whether there is a band to draw over this
+                // project's entries.
+                //
+                // Unlike the group above there is no name to be taken. A
+                // project's name is unique within its group and a host is not a
+                // group — two projects called `api` may perfectly well run on one
+                // machine, because the host is not where they are listed and not
+                // a scope they are found in (`docs/metrics.md`).
+                await put.ExecuteAsync(id, request.HostId, cancellationToken) switch
+                {
+                    PutProjectOnHostOutcome.PutOn => Results.NoContent(),
+                    _ => Results.NotFound(),
+                })
+            .WithName("PutProjectOnHost")
+            .WithSummary("Says which machine a project runs on, or that none is tracked.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+
         operatorSurface.MapGet("/{id:guid}/retention/outside", async (
                 Guid id,
                 int retentionDays,
@@ -304,8 +360,13 @@ public static class ProjectEndpoints
         return endpoints;
     }
 
-    private static ProjectResponse Shown(Project project) =>
-        new(project.Id, project.Name, project.GroupId, project.Retention.Days, project.CreatedAt);
+    private static ProjectResponse Shown(Project project) => new(
+        project.Id,
+        project.Name,
+        project.GroupId,
+        project.HostId,
+        project.Retention.Days,
+        project.CreatedAt);
 
     /// <summary>
     /// The domain refuses a name that is not one as a backstop; a caller taking

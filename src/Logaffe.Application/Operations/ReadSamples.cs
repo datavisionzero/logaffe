@@ -1,7 +1,19 @@
 using Logaffe.Application.Ports;
 using Logaffe.Domain.Hosts;
+using Logaffe.Domain.Queries;
 
 namespace Logaffe.Application.Operations;
+
+/// <summary>
+/// What one host reported over a range, and which host it was.
+/// </summary>
+/// <remarks>
+/// The name rides along because the read had to find the host anyway to answer
+/// at all, and because the agent is given a host as an identity and nothing else
+/// (<c>docs/mcp.md</c>) — so this is where it learns what the machine is called,
+/// at the one moment it has a reason to say so.
+/// </remarks>
+public sealed record HostSamples(Guid HostId, string Name, SampleWindow Window);
 
 /// <summary>
 /// What one host reported over a range, for the band above the entries and for
@@ -29,7 +41,10 @@ namespace Logaffe.Application.Operations;
 /// </remarks>
 public sealed class ReadSamples(IHosts hosts, ISampleReader samples)
 {
-    public async Task<SampleWindow?> ExecuteAsync(
+    /// <summary>
+    /// What the host reported, or <c>null</c> when there is no such host.
+    /// </summary>
+    public async Task<Read<HostSamples>?> ExecuteAsync(
         Guid hostId,
         DateTimeOffset from,
         DateTimeOffset to,
@@ -38,7 +53,8 @@ public sealed class ReadSamples(IHosts hosts, ISampleReader samples)
     {
         // Asked first so that a host deleted in another tab is an answer rather
         // than an empty window that reads as a quiet machine.
-        if (await hosts.FindAsync(hostId, cancellationToken) is null)
+        var host = await hosts.FindAsync(hostId, cancellationToken);
+        if (host is null)
         {
             return null;
         }
@@ -49,6 +65,20 @@ public sealed class ReadSamples(IHosts hosts, ISampleReader samples)
         // one.
         var (start, end) = from <= to ? (from, to) : (to, from);
 
-        return await samples.ReadAsync(hostId, start, end, buckets, cancellationToken);
+        SampleWindow window;
+        try
+        {
+            window = await samples.ReadAsync(hostId, start, end, buckets, cancellationToken);
+        }
+        catch (ReadExpiredException)
+        {
+            // The five seconds, on a read that has one thing to narrow: the
+            // range is always set here — there is no asking a host for
+            // everything it ever reported — so the only adjustment is a shorter
+            // one (ADR 0026).
+            return new Read<HostSamples>(null, [Narrowing.SmallerTimeRange]);
+        }
+
+        return Read<HostSamples>.Of(new HostSamples(host.Id, host.Name, window));
     }
 }

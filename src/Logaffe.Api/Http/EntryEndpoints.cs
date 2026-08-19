@@ -146,7 +146,21 @@ public sealed record CountResponse(IEnumerable<CountedGroupResponse> Groups);
 /// because the operator's screen writes the sentence and an agent gets the fact
 /// (ADR 0012).
 /// </param>
-public sealed record ReadExpiredResponse(IEnumerable<string> Narrow);
+public sealed record ReadExpiredResponse(IEnumerable<string> Narrow)
+{
+    /// <summary>
+    /// The answer itself, with the status that says the read did not finish.
+    /// </summary>
+    /// <remarks>
+    /// It is here rather than on one of the endpoint classes because more than
+    /// one of them answers this way: the entries and a host's samples meet the
+    /// same five seconds, and an operator's screen that had to tell them apart
+    /// would be telling apart two things ADR 0026 says are one.
+    /// </remarks>
+    internal static IResult Of(IReadOnlyList<Narrowing> narrow) => Results.Json(
+        new ReadExpiredResponse(narrow.Select(one => one.ToString())),
+        statusCode: StatusCodes.Status408RequestTimeout);
+}
 
 /// <summary>
 /// Reading one project's entries, over HTTP.
@@ -419,9 +433,8 @@ public static class EntryEndpoints
     /// Not a database error and not a failure: the filters are what has to
     /// change, and these are the ones to change (ADR 0026).
     /// </summary>
-    private static IResult Expired(IReadOnlyList<Narrowing> narrow) => Results.Json(
-        new ReadExpiredResponse(narrow.Select(one => one.ToString())),
-        statusCode: StatusCodes.Status408RequestTimeout);
+    private static IResult Expired(IReadOnlyList<Narrowing> narrow) =>
+        ReadExpiredResponse.Of(narrow);
 
     private static IResult Problem(string parameter, string message) =>
         Results.ValidationProblem(new Dictionary<string, string[]> { [parameter] = [message] });

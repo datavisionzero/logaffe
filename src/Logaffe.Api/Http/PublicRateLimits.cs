@@ -52,7 +52,16 @@ public static class PublicRateLimits
     public const string Ingest = "ingest";
 
     /// <summary>
-    /// The throttle in front of the four MCP tools, which are publicly reachable
+    /// The throttle in front of the samples. It is a bucket of its own rather
+    /// than the deliveries', for the reason the claim has one beside the
+    /// sign-in: the two never compete for anything, so sharing a partition would
+    /// only mean a fleet's collectors spending an application's delivery budget
+    /// on the day they sit behind one address.
+    /// </summary>
+    public const string Sample = "sample";
+
+    /// <summary>
+    /// The throttle in front of the five MCP tools, which are publicly reachable
     /// like everything else this product exposes. An agent calls because the
     /// operator asked — there is no poll and no subscription behind this door
     /// (<c>docs/mcp.md</c>) — so what it stands in front of is a loop that got
@@ -72,6 +81,13 @@ public static class PublicRateLimits
     /// limit sits where the store does rather than below it.
     /// </summary>
     private const int IngestPerMinute = 600;
+
+    /// <summary>
+    /// How many readings one source gets per minute. A machine reports once a
+    /// minute, so this is a hundred of them behind one address — and anything
+    /// above it is not a collector, whatever it says in its header.
+    /// </summary>
+    private const int SamplePerMinute = 120;
 
     /// <summary>How many requests a signed-in browser gets per minute.</summary>
     private const int OperatorPerMinute = 300;
@@ -183,6 +199,23 @@ public static class PublicRateLimits
                     // Nothing waits. A tool call held open to smooth a burst
                     // spends the agent's own timeout on a request that has not
                     // started, and being told to come back is the better answer.
+                    QueueLimit = 0,
+                }));
+
+            // By source, for the reason the deliveries are: the limiter runs
+            // before anything is authenticated. What a shared bucket costs here
+            // is smaller still — a collector spends one permit a minute, so a
+            // fleet behind one address is nowhere near the limit and a flood is
+            // nowhere near a fleet.
+            limiter.AddPolicy(Sample, context => RateLimitPartition.GetFixedWindowLimiter(
+                context.SeenFrom() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = SamplePerMinute,
+                    Window = TimeSpan.FromMinutes(1),
+
+                    // Nothing waits, for the deliveries' reason: a collector does
+                    // not look at the answer and will not retry.
                     QueueLimit = 0,
                 }));
 

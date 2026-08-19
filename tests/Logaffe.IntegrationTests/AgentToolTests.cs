@@ -21,7 +21,7 @@ namespace Logaffe.IntegrationTests;
 /// composition root for. What is asked here is what only the endpoint can
 /// answer: that <c>/mcp</c> is where <c>docs/mcp.md</c> promised every agent
 /// configuration it would be, that an agent token is what opens it and neither
-/// of the other two credentials is, that the tool list is four names long, and
+/// of the other three credentials is, that the tool list is five names long, and
 /// that the caps and the total are what an answer actually carries.
 /// </para>
 /// <para>
@@ -132,7 +132,7 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task There_are_four_tools_and_no_others()
+    public async Task There_are_five_tools_and_no_others()
     {
         await using var agent = await ConnectAsync();
 
@@ -140,10 +140,16 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
             cancellationToken: TestContext.Current.CancellationToken);
 
         // Not a subset check. The claim is that there is nothing here that
-        // writes, nothing that reaches a project or a token, and nothing that
-        // follows the logs — which is a statement about the whole list.
+        // writes, nothing that reaches a project, a token or a host, and nothing
+        // that follows the logs — which is a statement about the whole list.
         Assert.Equal(
-            ["count_entries", "get_entry", "list_projects", "search_entries"],
+            [
+                "count_entries",
+                "get_entry",
+                "get_host_samples",
+                "list_projects",
+                "search_entries",
+            ],
             tools.Select(tool => tool.Name).Order());
 
         Assert.All(tools, tool => Assert.NotEmpty(tool.Description ?? string.Empty));
@@ -160,7 +166,7 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
         // JSON Schema allows `true` and `false` where a schema goes, and a field
         // typed as any JSON at all exports as exactly that. It is legal and it is
         // refused by clients that hold a tool schema to being an object — and
-        // what they refuse is the list, so one such field costs all four tools
+        // what they refuse is the list, so one such field costs every tool
         // rather than the one that carries it.
         foreach (var tool in tools)
         {
@@ -650,7 +656,7 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Every_tool_reads_one_project_and_never_across_them()
+    public async Task Every_tool_that_answers_with_an_entry_reads_one_project()
     {
         using var client = await SignedInAsync();
         var orders = await CreateAsync(client, "orders");
@@ -660,20 +666,55 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
 
         await using var agent = await ConnectAsync();
 
-        // The three reads take a project and there is no argument that widens
-        // them. What that leaves is a tool that cannot be asked a question
-        // spanning two, which is the same rule the UI keeps.
+        // The three entry reads take a project and there is no argument that
+        // widens them. What that leaves is a tool that cannot be asked a
+        // question spanning two, which is the same rule the UI keeps.
         var tools = await agent.ListToolsAsync(
             cancellationToken: TestContext.Current.CancellationToken);
 
-        foreach (var tool in tools.Where(tool => tool.Name is not "list_projects"))
+        // The rule is stated by what a tool answers with rather than by counting
+        // tools. `get_host_samples` reads a machine that may carry several
+        // projects and is checked below on what that permits instead
+        // (ADR 0045).
+        foreach (var tool in tools.Where(
+            tool => tool.Name is not "list_projects" and not "get_host_samples"))
         {
-            var required = tool.JsonSchema.GetProperty("required").EnumerateArray()
-                .Select(value => value.GetString());
-
-            Assert.Contains("projectId", required);
+            Assert.Contains("projectId", Required(tool));
         }
     }
+
+    [Fact]
+    public async Task The_tool_that_is_not_confined_to_a_project_answers_with_no_entry()
+    {
+        await using var agent = await ConnectAsync();
+
+        var tools = await agent.ListToolsAsync(
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        var samples = tools.Single(tool => tool.Name is "get_host_samples");
+
+        // What makes reading across projects allowable here is not a permission
+        // but the answer: a machine, a range, and numbers a collector read off
+        // that machine. It takes no project and there is nothing in what comes
+        // back for log content to arrive in (ADR 0045).
+        Assert.Contains("hostId", Required(samples));
+        Assert.DoesNotContain("projectId", Required(samples));
+
+        var answered = samples.ProtocolTool.OutputSchema!.Value
+            .GetProperty("properties")
+            .EnumerateObject()
+            .Select(property => property.Name)
+            .ToList();
+
+        Assert.DoesNotContain("entries", answered);
+        Assert.Equal(
+            ["bucketSeconds", "filesystems", "host", "narrow", "samples"],
+            answered.Order());
+    }
+
+    private static IEnumerable<string?> Required(McpClientTool tool) =>
+        tool.JsonSchema.GetProperty("required").EnumerateArray()
+            .Select(value => value.GetString());
 
     [Theory]
 
@@ -729,6 +770,135 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
     /// <summary>
     /// One connected agent, holding the token the operator issued it.
     /// </summary>
+    [Fact]
+    public async Task A_machine_is_reached_from_the_project_that_runs_on_it()
+    {
+        using var client = await SignedInAsync();
+
+        var project = await CreateAsync(client, "api");
+        var host = await CreateHostAsync(client, "web-01");
+
+        await PutOnHostAsync(client, project.Id, host.Id);
+        await DeliverSampleAsync(await IssueHostTokenAsync(client, host.Id));
+
+        await using var agent = await ConnectAsync();
+
+        // The host arrives on the project, exactly as the group does, and it is
+        // what lets the agent go from "the errors in api" to the machine behind
+        // them without a tool that resolves one into the other.
+        var projects = await CallAsync<ProjectsBody>(agent, "list_projects", []);
+
+        Assert.Equal(host.Id, Assert.Single(projects.Projects).HostId);
+
+        var now = DateTimeOffset.UtcNow;
+
+        var samples = await CallAsync<HostSamplesBody>(
+            agent,
+            "get_host_samples",
+            new Dictionary<string, object?>
+            {
+                ["hostId"] = host.Id,
+                ["from"] = now.AddHours(-1),
+                ["to"] = now.AddHours(1),
+            });
+
+        // The name comes back here rather than on the project, which is the one
+        // moment there is a reason to say it.
+        Assert.Equal("web-01", samples.Host);
+        Assert.Null(samples.Narrow);
+
+        var bucket = Assert.Single(samples.Samples);
+
+        Assert.Equal(0.42, bucket.CpuAverage, 3);
+        Assert.Equal(0.42, bucket.CpuPeak, 3);
+
+        var filesystem = Assert.Single(samples.Filesystems);
+
+        Assert.Equal("/", filesystem.Mount);
+
+        // Two hours at the cap of two hundred spans would be thirty-six seconds
+        // each, so the range gives a hundred and twenty of a minute: a span is
+        // never finer than the interval that fills it, and the agent has no say
+        // in how many it gets.
+        Assert.Equal(60, samples.BucketSeconds);
+    }
+
+    [Fact]
+    public async Task A_project_on_no_host_names_none_and_a_host_that_is_gone_is_an_error()
+    {
+        using var client = await SignedInAsync();
+
+        await CreateAsync(client, "api");
+
+        await using var agent = await ConnectAsync();
+
+        var projects = await CallAsync<ProjectsBody>(agent, "list_projects", []);
+
+        // Absent rather than null: every project is on no host until the
+        // operator says otherwise, and it costs nothing except that there is no
+        // machine to ask about.
+        Assert.Null(Assert.Single(projects.Projects).HostId);
+
+        var refused = await agent.CallToolAsync(
+            "get_host_samples",
+            new Dictionary<string, object?>
+            {
+                ["hostId"] = Guid.CreateVersion7(),
+                ["from"] = DateTimeOffset.UtcNow.AddHours(-1),
+                ["to"] = DateTimeOffset.UtcNow,
+            },
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // An empty window would read as a quiet machine, and the machine is not
+        // quiet — it is not there.
+        Assert.True(refused.IsError is true);
+    }
+
+    private async Task<HostBody> CreateHostAsync(HttpClient client, string name) =>
+        await ReadAsync<HostBody>(await client.PostAsJsonAsync(
+            "/hosts", new { name }, TestContext.Current.CancellationToken));
+
+    private async Task<string> IssueHostTokenAsync(HttpClient client, Guid hostId) =>
+        (await ReadAsync<IssuedHostTokenBody>(await client.PostAsync(
+            $"/hosts/{hostId}/host-tokens", null, TestContext.Current.CancellationToken))).Token;
+
+    private async Task PutOnHostAsync(HttpClient client, Guid projectId, Guid hostId)
+    {
+        using var response = await client.PutAsJsonAsync(
+            $"/projects/{projectId}/host",
+            new { hostId },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
+    /// <summary>
+    /// One reading, through the door a collector uses — because that is what put
+    /// it there in production.
+    /// </summary>
+    private async Task DeliverSampleAsync(string token)
+    {
+        using var client = _installation.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/samples")
+        {
+            Content = new StringContent(
+                """
+                {"cpu":0.42,"memoryUsed":6115295232,"memoryTotal":16769712128,
+                 "load1":0.52,"load5":0.61,"load15":0.58,
+                 "filesystems":[{"mount":"/","used":41234567890,"total":107374182400}]}
+                """,
+                System.Text.Encoding.UTF8,
+                "application/json"),
+        };
+
+        request.Headers.Add("Authorization", $"Bearer {token}");
+
+        using var response = await client.SendAsync(
+            request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+    }
+
     private async Task<McpClient> ConnectAsync()
     {
         var transport = new HttpClientTransport(
@@ -944,9 +1114,34 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
         Guid Id,
         string Name,
         string? Group,
+        Guid? HostId,
         int RetentionDays,
         DateTimeOffset CreatedAt,
         DateTimeOffset? LastReceivedAt);
+
+    private sealed record HostSamplesBody(
+        string? Host,
+        double BucketSeconds,
+        IReadOnlyList<SampleBucketBody> Samples,
+        IReadOnlyList<FilesystemBucketBody> Filesystems,
+        IReadOnlyList<string>? Narrow);
+
+    private sealed record SampleBucketBody(
+        DateTimeOffset Start,
+        double CpuAverage,
+        double CpuPeak,
+        long MemoryUsedAverage,
+        long MemoryUsedPeak,
+        long MemoryTotal,
+        double LoadAverage,
+        double LoadPeak);
+
+    private sealed record FilesystemBucketBody(
+        DateTimeOffset Start, string Mount, long UsedAverage, long UsedPeak, long Total);
+
+    private sealed record HostBody(Guid Id, string Name);
+
+    private sealed record IssuedHostTokenBody(Guid Id, string Token);
 
     private sealed record SearchBody(
         string Verbosity,

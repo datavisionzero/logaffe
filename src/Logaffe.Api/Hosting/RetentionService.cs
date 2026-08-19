@@ -3,7 +3,8 @@ using Logaffe.Application.Operations;
 namespace Logaffe.Api.Hosting;
 
 /// <summary>
-/// Removes the entries that have outlived their project's window.
+/// Removes the entries that have outlived their project's window, and the
+/// samples that have outlived the installation's.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -22,6 +23,19 @@ namespace Logaffe.Api.Hosting;
 /// failure.
 /// </para>
 /// <para>
+/// <b>The samples ride on this pass rather than a timer of their own</b>, which
+/// is the opposite of the paragraph above and for a reason that does not
+/// contradict it: the session sweep is a different shape of work, while this is
+/// the same concern — a window, counted from receipt, swept in bounded portions.
+/// The sample tables are three orders of magnitude smaller than the entries, so
+/// their part of the pass is over before the entries' has warmed up, and a third
+/// timer would be a third thing to reason about for it.
+/// </para>
+/// <para>
+/// The samples go second because the entries are the pass that matters: an hour
+/// that ran late has already spent its time where the rows are.
+/// </para>
+/// <para>
 /// Registered after the migrations, whose hosted service has finished before
 /// this one is started: the first pass reads a table a migration may have been
 /// about to create.
@@ -36,7 +50,13 @@ public sealed class RetentionService(
 
     protected override string Name => "retention";
 
-    protected override Task RunOnceAsync(
-        IServiceProvider services, CancellationToken cancellationToken) =>
-        services.GetRequiredService<SweepExpiredEntries>().ExecuteAsync(cancellationToken);
+    protected override async Task RunOnceAsync(
+        IServiceProvider services, CancellationToken cancellationToken)
+    {
+        await services.GetRequiredService<SweepExpiredEntries>()
+            .ExecuteAsync(cancellationToken);
+
+        await services.GetRequiredService<SweepExpiredSamples>()
+            .ExecuteAsync(cancellationToken);
+    }
 }

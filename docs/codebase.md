@@ -82,7 +82,7 @@ token readable ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rathe
 and the rolling file log ([ADR 0002](./adr/0002-logaffe-logs-to-files-not-into-itself.md)).
 
 **`Logaffe.Api` is the adapters and the composition root.** One binary that is
-the server and the CLI both: the HTTP endpoints, the four MCP tools
+the server and the CLI both: the HTTP endpoints, the five MCP tools
 ([MCP](./mcp.md)), the `backup`, `restore` and `recover` verbs that
 [Operations](./operations.md) and [Setup](./setup.md) document, the
 authentication of three different credentials, the rate limits every public
@@ -138,12 +138,14 @@ upgrades separately from `docker compose pull`, which is the cost ADR 0043
 accepts.
 
 **None of it is built yet**, and it is last in the order rather than first. What
-a collector *is* is what it posts, so it cannot be written before the sample
-endpoint it posts to — which needs the host, its token and the two tables of
-[Storage](./storage.md#the-sample-tables) ahead of it. The image build in
-`ci.yml` and `release.yml` is therefore the closing step of this feature, and
-the documents that describe the image describe a design rather than a tag
-anybody can pull.
+a collector *is* is what it posts, so it could not be written before the sample
+endpoint it posts to — which needed the host, its token and the two tables of
+[Storage](./storage.md#the-sample-tables) ahead of it. Those exist now: the
+endpoint takes a reading, the operator's routes make a host and mint its token,
+and the finished `docker run` line comes back with it. What is left is the
+program that runs on the other end of it, and the image build in `ci.yml` and
+`release.yml` that publishes one — so the documents describing the image still
+describe a design rather than a tag anybody can pull.
 
 Its tests are the unit project's, because there is nothing here a substitute
 cannot vouch for: reading `/proc` is behind a port like everything else, and what

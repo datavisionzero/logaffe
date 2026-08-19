@@ -336,11 +336,17 @@ is one grouped scan of a fraction of one key, so there are **no rollup tables an
 no downsampling on write** — a second write path and a backfill story bought for
 a saving that does not exist at this size.
 
-That grouped statement is the one part of samples that is **hand-written SQL** and
-it lives with the log path's, in the folder `docs/codebase.md` keeps them in.
-`date_bin` with an average and a maximum per bucket is awkward to express through
-EF and is shaped by the key it scans, which is the same reason the other queries
-in that folder are there. The maximum rides beside the average because
+That grouped statement is the one part of samples that is **hand-written SQL**,
+and it sits with the sample store rather than in the folder the log path's
+queries are kept in — that folder is the log path's, and what holds those
+together is that re-reading them is the standing cost of changing one of the
+entry table's indexes. This one is not in that set: there is one index here and
+one read over it.
+
+It is written out for the plainer reason that it cannot be expressed otherwise.
+`date_bin` with an average and a maximum per bucket is arithmetic on an instant,
+and no LINQ provider translates it — composed through EF the query does not
+compile to SQL at all. The maximum rides beside the average because
 [MCP](./mcp.md) hands both to the agent, an average being exactly what hides the
 spike worth finding.
 

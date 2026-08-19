@@ -10,7 +10,7 @@ using ModelContextProtocol.Protocol;
 namespace Logaffe.Api.Mcp;
 
 /// <summary>
-/// The second adapter over the read use cases: four tools at <c>/mcp</c>, behind
+/// The second adapter over the read use cases: five tools at <c>/mcp</c>, behind
 /// an agent token.
 /// </summary>
 /// <remarks>
@@ -54,10 +54,12 @@ public static class AgentSurface
                 transport.Stateless = true)
 
             // Named one by one rather than swept out of the assembly. There are
-            // four tools and there are four here, and adding a fifth is a line
+            // five tools and there are five here, and adding a sixth is a line
             // in this file rather than a side effect of writing a method
             // somewhere (ADR 0018).
-            .WithTools([typeof(ProjectTools), typeof(EntryTools)], AgentJson.Options);
+            .WithTools(
+                [typeof(ProjectTools), typeof(EntryTools), typeof(HostTools)],
+                AgentJson.Options);
 
         return services;
     }
@@ -78,7 +80,7 @@ public static class AgentSurface
 
             // It is publicly reachable but it is not the HTTP contract. That
             // document describes what the operator's browser and a sender talk
-            // to; the shape of these four is in the tool list an agent asks for.
+            // to; the shape of these five is in the tool list an agent asks for.
             .ExcludeFromDescription();
 
         // The stream a client opens when it expects the server to speak first.
@@ -108,7 +110,7 @@ public static class AgentSurface
 }
 
 /// <summary>
-/// How the four tools are written on the wire.
+/// How the five tools are written on the wire.
 /// </summary>
 /// <remarks>
 /// <para>

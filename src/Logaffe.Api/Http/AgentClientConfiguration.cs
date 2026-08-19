@@ -27,7 +27,7 @@ namespace Logaffe.Api.Http;
 public static class AgentClientConfiguration
 {
     /// <summary>
-    /// Where the four MCP tools answer. It is written down here because it is
+    /// Where the five MCP tools answer. It is written down here because it is
     /// what goes into every agent's configuration, so it is a promise to
     /// everything already connected rather than a route that can be moved.
     /// </summary>

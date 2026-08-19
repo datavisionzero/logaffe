@@ -81,6 +81,32 @@ public sealed record ListedAgentTokenResponse(
 /// <inheritdoc cref="ReadIngestTokenResponse"/>
 public sealed record ReadAgentTokenResponse(string Token, string ClientConfiguration);
 
+/// <inheritdoc cref="IssuedIngestTokenResponse"/>
+/// <param name="CollectorCommand">
+/// The finished command that starts this host's collector, with this
+/// installation's address, this token and the two mounts a container needs to
+/// see its machine already in it — the one paste <c>docs/metrics.md</c>
+/// promises.
+/// </param>
+public sealed record IssuedHostTokenResponse(
+    Guid Id, string Token, string CollectorCommand, DateTimeOffset IssuedAt);
+
+/// <summary>
+/// One of a host's tokens as the operator sees it in a list, carrying no secret
+/// and nothing sealed.
+/// </summary>
+/// <param name="LastUsedAt">
+/// Null until a collector has presented it, and accurate to within five minutes
+/// (ADR 0033). It is what says a rotation is finished — the old token's last use
+/// stops moving — and it is not the same fact as when the host last reported,
+/// which is read off the newest sample.
+/// </param>
+public sealed record ListedHostTokenResponse(
+    Guid Id, string Identifier, DateTimeOffset IssuedAt, DateTimeOffset? LastUsedAt);
+
+/// <inheritdoc cref="ReadIngestTokenResponse"/>
+public sealed record ReadHostTokenResponse(string Token, string CollectorCommand);
+
 /// <summary>
 /// The operator's token acts, reached over HTTP.
 /// </summary>
@@ -88,7 +114,7 @@ public sealed record ReadAgentTokenResponse(string Token, string ClientConfigura
 /// <para>
 /// Every one of these is behind the operator's session and none of them is
 /// reachable over MCP — not as a permission but as an absence from that
-/// interface, which offers four read tools and nothing else
+/// interface, which offers five read tools and nothing else
 /// (ADR 0018). A log entry that asks an agent to mint a credential has to find
 /// nothing to call.
 /// </para>
@@ -97,19 +123,19 @@ public sealed record ReadAgentTokenResponse(string Token, string ClientConfigura
 /// records the method, the path and the status and never a body, and
 /// <see cref="TokenText.ToString"/> is redacted so that one reaching a log line
 /// by way of an interpolation carries the part that identifies it and not the
-/// part that admits anything. Two of these bodies carry a token a second time,
+/// part that admits anything. Three of these bodies carry a token a second time,
 /// in the middle of a string a person is meant to paste —
-/// <see cref="DeliverySnippet"/> and
-/// <see cref="AgentClientConfiguration"/> — which the redaction cannot help
-/// with, and which is the whole reason the rule is about bodies rather than
-/// about tokens.
+/// <see cref="DeliverySnippet"/>,
+/// <see cref="AgentClientConfiguration"/> and
+/// <see cref="CollectorCommand"/> — which the redaction cannot help with, and
+/// which is the whole reason the rule is about bodies rather than about tokens.
 /// </para>
 /// <para>
-/// The two kinds are two sets of routes rather than one with a kind in it, for
-/// the same reason the store is two methods: they are two tables, they are
-/// refused at each other's doors by the prefix, and an ingest token belongs to a
-/// project while an agent token belongs to the installation
-/// (<c>docs/ui.md</c>).
+/// The three kinds are three sets of routes rather than one with a kind in it,
+/// for the same reason the store is three methods: they are three tables, they
+/// are refused at each other's doors by the prefix, and each belongs somewhere
+/// different — an ingest token to a project, a host token to a host, an agent
+/// token to the installation (<c>docs/ui.md</c>).
 /// </para>
 /// </remarks>
 public static class TokenEndpoints
@@ -123,6 +149,7 @@ public static class TokenEndpoints
 
         operatorSurface.MapIngestTokens();
         operatorSurface.MapAgentTokens();
+        operatorSurface.MapHostTokens();
 
         return endpoints;
     }
@@ -312,6 +339,105 @@ public static class TokenEndpoints
                     ? Results.NoContent()
                     : Results.NotFound())
             .WithName("RevokeAgentToken")
+            .WithSummary("Ends a token, immediately.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+    }
+
+    private static void MapHostTokens(this IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapPost("/hosts/{hostId:guid}/host-tokens", async (
+                Guid hostId,
+                IssueHostToken issue,
+                HttpContext context,
+                CancellationToken cancellationToken) =>
+            {
+                var attempt = await issue.ExecuteAsync(hostId, cancellationToken);
+
+                // The ingest token's answers, pointed at a machine. A third is
+                // refused rather than queued: two is what moving a fleet over one
+                // machine at a time needs, and a third means the operator has
+                // lost track of which one they are retiring.
+                return attempt.Outcome switch
+                {
+                    IssueHostTokenOutcome.NoSuchHost => Results.NotFound(),
+                    IssueHostTokenOutcome.AlreadyHoldsTwo => Results.Conflict(),
+                    _ => Results.Created(
+                        ReadBackOf("host-tokens", attempt.Token!.Id),
+                        new IssuedHostTokenResponse(
+                            attempt.Token.Id,
+                            attempt.Token.Token.Text,
+                            CollectorCommand.For(context.Request, attempt.Token.Token),
+                            attempt.Token.IssuedAt)),
+                };
+            })
+            .WithName("IssueHostToken")
+            .WithSummary("Gives a host a token its collector can report on.")
+            .Produces<IssuedHostTokenResponse>(StatusCodes.Status201Created)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status409Conflict);
+
+        endpoints.MapGet("/hosts/{hostId:guid}/host-tokens", async (
+                Guid hostId,
+                ListHostTokens list,
+                CancellationToken cancellationToken) =>
+            {
+                var held = await list.ExecuteAsync(hostId, cancellationToken);
+
+                // A host that is not there is 404 rather than an empty list: a
+                // machine nothing can deliver to and a deleted host are two
+                // different readings.
+                if (held is null)
+                {
+                    return Results.NotFound();
+                }
+
+                // A list decrypts nothing, and here that is worth more than
+                // anywhere else: this screen is opened for every machine, and the
+                // credential is wanted for one.
+                return Results.Ok(held.Select(token => new ListedHostTokenResponse(
+                    token.Id, token.Identifier.Value, token.IssuedAt, token.LastUsedAt)));
+            })
+            .WithName("ListHostTokens")
+            .WithSummary("What one host can currently receive samples on.")
+            .Produces<IEnumerable<ListedHostTokenResponse>>()
+            .Produces(StatusCodes.Status404NotFound);
+
+        endpoints.MapGet("/host-tokens/{id:guid}/token", async (
+                Guid id,
+                ReadTokenBack read,
+                HttpContext context,
+                CancellationToken cancellationToken) =>
+            {
+                var token = await read.HostTokenAsync(id, cancellationToken);
+
+                // This one is read back more than the others are: what the
+                // operator wants is rarely the token but the command that starts
+                // a collector with it in place, and on a fleet that is the
+                // difference between looking a value up and going round every
+                // machine (ADR 0022).
+                return token is null
+                    ? Results.NotFound()
+                    : Results.Ok(new ReadHostTokenResponse(
+                        token.Text, CollectorCommand.For(context.Request, token)));
+            })
+            .WithName("ReadHostTokenBack")
+            .WithSummary("The token that is in the row, and the command to paste it in.")
+            .Produces<ReadHostTokenResponse>()
+            .Produces(StatusCodes.Status404NotFound);
+
+        endpoints.MapDelete("/host-tokens/{id:guid}", async (
+                Guid id,
+                RevokeToken revoke,
+                CancellationToken cancellationToken) =>
+                // A collector still holding it neither retries nor notices: it
+                // drops each reading and takes the next one a minute later, so a
+                // rotation done carelessly costs a gap in the band and nothing
+                // else.
+                await revoke.HostTokenAsync(id, cancellationToken)
+                    ? Results.NoContent()
+                    : Results.NotFound())
+            .WithName("RevokeHostToken")
             .WithSummary("Ends a token, immediately.")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);

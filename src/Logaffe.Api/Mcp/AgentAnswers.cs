@@ -4,6 +4,7 @@ using Logaffe.Api.Queries;
 using Logaffe.Application.Operations;
 using Logaffe.Application.Ports;
 using Logaffe.Domain.Entries;
+using Logaffe.Domain.Hosts;
 using Logaffe.Domain.Queries;
 
 namespace Logaffe.Api.Mcp;
@@ -48,10 +49,19 @@ public static class AgentCap
 /// One project, as <c>list_projects</c> answers with it.
 /// </summary>
 /// <remarks>
-/// The group and the last receipt are the two a project may not have, and they
-/// are declared optional for the reason <see cref="AgentJson"/> gives: a project
-/// in no group leaves the field out, and a schema requiring it would have the
-/// client throw the whole list away.
+/// The group, the host and the last receipt are the three a project may not have,
+/// and they are declared optional for the reason <see cref="AgentJson"/> gives: a
+/// project in no group leaves the field out, and a schema requiring it would have
+/// the client throw the whole list away.
+/// <para>
+/// <b>The group is a name and the host is an identity</b>, which looks
+/// inconsistent and is not: nothing on this surface takes a group, so its name is
+/// the only useful form of it, and something does take a host — so what the
+/// project has to carry is the value that tool is asked with. Resolving a name
+/// into an identity would be a query this adapter is not allowed to have
+/// (<c>docs/mcp.md</c>), and the machine's name comes back with its samples,
+/// which is the one moment there is a reason to say it.
+/// </para>
 /// </remarks>
 public sealed record AgentProject
 {
@@ -67,6 +77,13 @@ public sealed record AgentProject
         + "and it is what resolves a request naming one of those. It narrows "
         + "nothing: every tool reads one project, and a group is not one.")]
     public string? Group { get; init; }
+
+    [Description(
+        "The machine this project runs on, or absent when the operator tracks "
+        + "none for it. Pass it to get_host_samples to see what that machine was "
+        + "doing while these entries were being written. It narrows nothing: "
+        + "every entry tool reads one project, and a host is not one.")]
+    public Guid? HostId { get; init; }
 
     [Description("How long the project keeps its entries, counted from receipt.")]
     public required int RetentionDays { get; init; }
@@ -88,6 +105,7 @@ public sealed record AgentProject
         Id = project.Id,
         Name = project.Name,
         Group = group,
+        HostId = project.HostId,
         RetentionDays = project.Retention.Days,
         CreatedAt = project.CreatedAt,
         LastReceivedAt = project.LastReceivedAt,
@@ -347,4 +365,145 @@ public sealed record CountAnswer
     /// <inheritdoc cref="SearchAnswer.RanOut"/>
     public static CountAnswer RanOut(IReadOnlyList<Narrowing> narrow) =>
         new() { Narrow = narrow };
+}
+
+/// <summary>
+/// One span of a read of a host's samples.
+/// </summary>
+/// <remarks>
+/// Every field is always here: a span with no reading in it is absent from the
+/// answer altogether rather than present and empty, so a bucket that exists is
+/// one a machine reported in.
+/// </remarks>
+public sealed record AgentSampleBucket
+{
+    [Description(
+        "The beginning of this span. Spans are contiguous and equal, so the next "
+        + "one starts bucketSeconds later — but a span the machine reported "
+        + "nothing in is missing from the list, so the starts are not necessarily "
+        + "consecutive.")]
+    public required DateTimeOffset Start { get; init; }
+
+    [Description("The share of the span the processor spent busy, from 0 to 1.")]
+    public required double CpuAverage { get; init; }
+
+    [Description("The highest single reading in the span, on the same scale.")]
+    public required double CpuPeak { get; init; }
+
+    [Description("Bytes of memory in use, averaged across the span.")]
+    public required long MemoryUsedAverage { get; init; }
+
+    public required long MemoryUsedPeak { get; init; }
+
+    [Description(
+        "Bytes of memory the machine has. It is not averaged — it is how large "
+        + "the machine is rather than how much of it was in use.")]
+    public required long MemoryTotal { get; init; }
+
+    [Description(
+        "The one-minute load average. It counts runnable work rather than "
+        + "processors, so what it means depends on how many the machine has, "
+        + "which is not reported.")]
+    public required double LoadAverage { get; init; }
+
+    public required double LoadPeak { get; init; }
+
+    public static AgentSampleBucket Of(SampleBucket bucket) => new()
+    {
+        Start = bucket.Start,
+        CpuAverage = bucket.CpuAverage,
+        CpuPeak = bucket.CpuPeak,
+        MemoryUsedAverage = bucket.MemoryUsedAverage,
+        MemoryUsedPeak = bucket.MemoryUsedPeak,
+        MemoryTotal = bucket.MemoryTotal,
+        LoadAverage = bucket.LoadAverage,
+        LoadPeak = bucket.LoadPeak,
+    };
+}
+
+/// <summary>One span of a read of one of a host's filesystems.</summary>
+public sealed record AgentFilesystemBucket
+{
+    public required DateTimeOffset Start { get; init; }
+
+    [Description(
+        "Where the filesystem is mounted, as the operator named it in their "
+        + "collector's configuration.")]
+    public required string Mount { get; init; }
+
+    public required long UsedAverage { get; init; }
+
+    public required long UsedPeak { get; init; }
+
+    [Description("Bytes the filesystem holds. Not averaged, for MemoryTotal's reason.")]
+    public required long Total { get; init; }
+
+    public static AgentFilesystemBucket Of(FilesystemBucket bucket) => new()
+    {
+        Start = bucket.Start,
+        Mount = bucket.MountPath.Value,
+        UsedAverage = bucket.UsedAverage,
+        UsedPeak = bucket.UsedPeak,
+        Total = bucket.Total,
+    };
+}
+
+/// <summary>
+/// What <c>get_host_samples</c> answers with.
+/// </summary>
+/// <remarks>
+/// The spans and their width are on every answer; the host's name and the
+/// narrowings are each on some of them, and are optional for the reason
+/// <see cref="AgentJson"/> gives.
+/// </remarks>
+public sealed record HostSamplesAnswer
+{
+    /// <summary>
+    /// What the machine is called, and absent only on a read that expired —
+    /// which found the host and then answered nothing about it.
+    /// </summary>
+    [Description("What the operator calls this machine.")]
+    public string? Host { get; init; }
+
+    [Description(
+        "How long each span is. It is chosen from the range so that the answer "
+        + "stays inside a cap, and it is never finer than the minute a machine "
+        + "reports at.")]
+    public required double BucketSeconds { get; init; }
+
+    [Description(
+        "The spans, oldest first. A span the machine reported nothing in is "
+        + "absent rather than zero.")]
+    public required IReadOnlyList<AgentSampleBucket> Samples { get; init; }
+
+    [Description(
+        "The same spans, once per filesystem the collector was told to measure. "
+        + "Empty when it was told to measure none.")]
+    public required IReadOnlyList<AgentFilesystemBucket> Filesystems { get; init; }
+
+    /// <inheritdoc cref="SearchAnswer.Narrow"/>
+    public IReadOnlyList<Narrowing>? Narrow { get; init; }
+
+    public static HostSamplesAnswer Of(HostSamples samples, TimeSpan span) => new()
+    {
+        Host = samples.Name,
+        BucketSeconds = span.TotalSeconds,
+        Samples = [.. samples.Window.Samples.Select(AgentSampleBucket.Of)],
+        Filesystems = [.. samples.Window.Filesystems.Select(AgentFilesystemBucket.Of)],
+    };
+
+    /// <inheritdoc cref="SearchAnswer.RanOut"/>
+    /// <remarks>
+    /// There is one adjustment to offer and it is always the same one: the range
+    /// is the only thing a sample read takes, so a shorter one is the whole of
+    /// what can be narrowed.
+    /// </remarks>
+    public static HostSamplesAnswer RanOut(
+        TimeSpan span, IReadOnlyList<Narrowing> narrow) => new()
+    {
+        BucketSeconds = span.TotalSeconds,
+        Samples = [],
+        Filesystems = [],
+        Narrow = narrow,
+    };
 }
