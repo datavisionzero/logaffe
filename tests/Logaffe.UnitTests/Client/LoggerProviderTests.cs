@@ -233,6 +233,77 @@ public sealed class LoggerProviderTests
         Assert.Null(registered.ImplementationInstance);
     }
 
+    /// <summary>
+    /// One call is one sender.
+    /// </summary>
+    /// <remarks>
+    /// A second call carries a second installation and a second project's token,
+    /// which is a configuration rather than a duplicate — and de-duplicating by
+    /// the provider's own type, as the framework's own providers do, dropped both
+    /// of them without a word.
+    /// </remarks>
+    [Fact]
+    public void Every_call_registers_a_sender_of_its_own()
+    {
+        var services = new ServiceCollection();
+
+        services.AddLogging(builder =>
+        {
+            builder.AddLogaffe(new Uri("https://logs.example.com"), "lgf_i_one");
+            builder.AddLogaffe(new Uri("https://other.example.com"), "lgf_i_two");
+        });
+
+        var registered = services
+            .Where(service => service.ServiceType == typeof(ILoggerProvider))
+            .ToList();
+
+        Assert.Equal(2, registered.Count);
+        Assert.All(registered, service => Assert.NotNull(service.ImplementationFactory));
+    }
+
+    /// <summary>
+    /// An application bringing its own <c>HttpClient</c> keeps the flush on
+    /// shutdown.
+    /// </summary>
+    /// <remarks>
+    /// The flush is the container disposing the provider, and the only thing
+    /// taking a client used to be the provider's constructor — a provider the
+    /// application built itself, which is exactly the one the container will not
+    /// dispose. The careful sender lost its last entries for being careful.
+    /// </remarks>
+    [Fact]
+    public async Task A_sender_bringing_its_own_client_is_still_flushed_by_the_container()
+    {
+        using var installation = new TakingDeliveries();
+        using var http = new HttpClient(installation);
+
+        var services = new ServiceCollection();
+
+        services.AddLogging(builder => builder.AddLogaffe(
+            options =>
+            {
+                options.Installation = new Uri("https://logs.example.com");
+                options.IngestToken = "lgf_i_test";
+
+                // Longer than this test will live: what arrives, arrives because
+                // shutdown flushed it and for no other reason.
+                options.BatchInterval = TimeSpan.FromMinutes(5);
+            },
+            http));
+
+        var container = services.BuildServiceProvider();
+
+        container.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("checkout")
+            .LogInformation("last words");
+
+        await container.DisposeAsync();
+
+        var line = JsonNode.Parse(Assert.Single((await installation.TakeAsync(1)).Lines))!;
+
+        Assert.Equal("last words", (string?)line["@mt"]);
+    }
+
     private static async Task<JsonNode> LoggedAsync(
         Action<ILogger> log, Action<LogaffeLoggerOptions>? configure = null)
     {

@@ -48,6 +48,20 @@ builder.Logging.AddLogaffe(options =>
 | `DeliveryTimeout` | `10s` | how long one request may take |
 | `OnFailure` | `Console.Error` | `(message, exception)` — where problems are reported |
 
+### Your own `HttpClient`
+
+```csharp
+builder.Logging.AddLogaffe(options => { … }, httpClient);
+```
+
+The client stays yours and is not disposed with the provider. Take this overload
+rather than constructing `LogaffeLoggerProvider` yourself and calling
+`AddProvider` — a container never disposes what it did not create, and that
+disposal is the flush.
+
+**Each call adds one sender.** Two calls are two installations, each with its own
+token, queue and flush.
+
 **The application's own filters apply first.** This is a provider like any
 other, so `LogLevel` configuration and category filters decide what reaches it;
 there is no second filter to keep in step.
@@ -62,7 +76,8 @@ an application outage, which is the thing this exists to prevent.
 **The host disposes it, which is what flushes it.** The provider is registered
 as a factory rather than a ready-made instance, because a container never
 disposes an object it did not create — and without that disposal the flush never
-runs and an application's last entries never leave.
+runs and an application's last entries never leave. Every `AddLogaffe` overload
+registers one, the one taking an `HttpClient` included.
 
 **Nothing is guaranteed to arrive.** No durable buffer, no retry outliving the
 process. The application still has its own log, which is where a failed delivery
