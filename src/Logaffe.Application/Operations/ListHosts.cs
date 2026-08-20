@@ -33,8 +33,9 @@ public sealed record ListedHost(
 /// Every host the installation holds.
 /// </summary>
 /// <remarks>
-/// Three reads, none of them per row: the hosts, the token counts of all of them
-/// at once, and when each last reported. The last is one grouped statement over
+/// Three reads, none of them per row: the hosts, the tokens of all of them at
+/// once — counted out of the one listing the settings tree is assembled from
+/// too — and when each last reported. The last is one grouped statement over
 /// the end of the sample key rather than one lookup per host, because unlike the
 /// project list's equivalent there is no per-project reader standing in the way —
 /// samples are not scoped the way entries are (ADR 0045).
@@ -46,7 +47,7 @@ public sealed class ListHosts(
         CancellationToken cancellationToken)
     {
         var held = await hosts.ListAsync(cancellationToken);
-        var counts = await tokens.CountHostTokensAsync(cancellationToken);
+        var heldTokens = await tokens.ListHostTokensAsync(cancellationToken);
         var reported = await samples.LastReportedAsync(cancellationToken);
 
         var on = (await projects.ListAsync(cancellationToken))
@@ -60,7 +61,7 @@ public sealed class ListHosts(
                 host.Id,
                 host.Name,
                 host.CreatedAt,
-                counts.TryGetValue(host.Id, out var count) ? count : 0,
+                heldTokens.TryGetValue(host.Id, out var holding) ? holding.Count : 0,
                 reported.TryGetValue(host.Id, out var last) ? last : null,
                 on.TryGetValue(host.Id, out var running) ? running : 0)),
         ];

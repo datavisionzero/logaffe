@@ -71,16 +71,18 @@ public static class SettingsTools
         var heldHosts = await hosts.ExecuteAsync(cancellationToken);
         var sampleWindow = await samples.ReadAsync(cancellationToken);
 
-        // The tokens are asked for one project and one host at a time, because
-        // that is the act the application layer has: `ListIngestTokens` answers
-        // for one project. A query that fetched every token in one statement
-        // would be behaviour this adapter invented, and the counts the settings
-        // screens read come from the same acts (ADR 0030). An installation has
-        // a handful of projects, so the tree is a handful of reads.
+        // The tokens of every project in one read and the tokens of every host in
+        // one more, out of the same acts the operator's own screens read — which
+        // is what lets this be one tool without inventing a query here
+        // (ADR 0030). A read per project is what this used to be, and it was the
+        // one call on this surface that grew with the installation.
+        var heldIngestTokens = await ingestTokens.ExecuteAsync(cancellationToken);
+        var heldHostTokens = await hostTokens.ExecuteAsync(cancellationToken);
+
         var settingsProjects = new List<SettingsProject>(heldProjects.Count);
         foreach (var project in heldProjects)
         {
-            var held = await ingestTokens.ExecuteAsync(project.Id, cancellationToken) ?? [];
+            var held = heldIngestTokens.GetValueOrDefault(project.Id, []);
 
             settingsProjects.Add(new SettingsProject
             {
@@ -98,7 +100,7 @@ public static class SettingsTools
         var settingsHosts = new List<SettingsHost>(heldHosts.Count);
         foreach (var host in heldHosts)
         {
-            var held = await hostTokens.ExecuteAsync(host.Id, cancellationToken) ?? [];
+            var held = heldHostTokens.GetValueOrDefault(host.Id, []);
 
             settingsHosts.Add(new SettingsHost
             {

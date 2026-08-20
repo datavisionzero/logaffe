@@ -3,6 +3,30 @@ using Logaffe.Domain.Tokens;
 namespace Logaffe.Application.Ports;
 
 /// <summary>
+/// One token row as everything but authentication wants it: what names it, the
+/// public middle of its text, when it was issued and when it was last used.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>The sealed half is not in it.</b> Listing tokens is the operator reading
+/// their settings, and none of that shows a credential — the one act that
+/// unseals one is <see cref="Operations.ReadTokenBack"/>, which asks for a
+/// single token by its identity. So the listings read the columns they answer
+/// with and leave the sealed secret in the database, whether they are asked for
+/// one project or for every project at once.
+/// </para>
+/// <para>
+/// It carries no owner: a listing for one project is already scoped to it, and
+/// the one for all of them is keyed by the project.
+/// </para>
+/// </remarks>
+public sealed record HeldToken(
+    Guid Id,
+    TokenIdentifier Identifier,
+    DateTimeOffset IssuedAt,
+    DateTimeOffset? LastUsedAt);
+
+/// <summary>
 /// The token rows an installation holds, found by the identifier a presented
 /// token carries and by the identity the operator's own acts name.
 /// </summary>
@@ -55,39 +79,40 @@ public interface ITokens
     /// What one project holds — one token, or two while it is being rotated —
     /// oldest first, so that the one being rotated away is the one at the top.
     /// </summary>
-    Task<IReadOnlyList<IngestToken>> ListIngestTokensAsync(
+    Task<IReadOnlyList<HeldToken>> ListIngestTokensAsync(
         Guid projectId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// How many ingest tokens each project holds, projects holding none left
-    /// out.
+    /// What every project holds, keyed by the project, oldest first within each;
+    /// projects holding no token are left out.
     /// </summary>
     /// <remarks>
-    /// One statement for the whole project list rather than one per row. A
-    /// project holding no token at all is a project whose door is closed, which
-    /// is what the operator is reading the list for; the number is 0, 1 or 2 and
-    /// nothing else can put it there.
+    /// One statement for the whole installation rather than one per project.
+    /// Both the lists the operator opens a session on and the settings tree an
+    /// administering agent starts at are answered from here, so there stays one
+    /// way to learn what tokens a project holds however many projects are being
+    /// asked about.
     /// </remarks>
-    Task<IReadOnlyDictionary<Guid, int>> CountIngestTokensAsync(
+    Task<IReadOnlyDictionary<Guid, IReadOnlyList<HeldToken>>> ListIngestTokensAsync(
         CancellationToken cancellationToken);
 
     /// <summary>
     /// What one host holds — one token, or two while it is being rotated —
     /// oldest first, so that the one being rotated away is the one at the top.
     /// </summary>
-    Task<IReadOnlyList<HostToken>> ListHostTokensAsync(
+    Task<IReadOnlyList<HeldToken>> ListHostTokensAsync(
         Guid hostId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// How many host tokens each host holds, hosts holding none left out.
+    /// What every host holds, keyed by the host, oldest first within each; hosts
+    /// holding no token are left out.
     /// </summary>
     /// <remarks>
-    /// One statement for the whole host list rather than one per row, for the
-    /// reason the ingest counts are: a host holding no token at all is one no
-    /// collector can report to, which is what the operator is reading the list
-    /// for.
+    /// One statement for the whole fleet, for the reason the ingest listing is
+    /// one: a host holding no token at all is one no collector can report to,
+    /// and finding that out should not cost a read per machine.
     /// </remarks>
-    Task<IReadOnlyDictionary<Guid, int>> CountHostTokensAsync(
+    Task<IReadOnlyDictionary<Guid, IReadOnlyList<HeldToken>>> ListHostTokensAsync(
         CancellationToken cancellationToken);
 
     /// <summary>

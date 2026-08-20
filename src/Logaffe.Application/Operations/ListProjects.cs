@@ -50,13 +50,13 @@ public sealed record ListedProject(
 /// asked for.
 /// </para>
 /// <para>
-/// Two reads that are not per row — the projects, and the token counts of all
-/// of them at once — and then one lookup per project for when it last received
-/// an entry. That last one is per row on purpose: the reader takes the project
-/// because a query always runs inside one, and an installation holds projects in
-/// tens rather than in thousands, so the choice is between ten reads at the end
-/// of an index and a read across every project the reader is not allowed to
-/// have.
+/// Two reads that are not per row — the projects, and the tokens of all of them
+/// at once, counted out of the one listing the settings tree is assembled from
+/// too — and then one lookup per project for when it last received an entry.
+/// That last one is per row on purpose: the reader takes the project because a
+/// query always runs inside one, and an installation holds projects in tens
+/// rather than in thousands, so the choice is between ten reads at the end of an
+/// index and a read across every project the reader is not allowed to have.
 /// </para>
 /// </remarks>
 public sealed class ListProjects(IProjects projects, ITokens tokens, IEntryReader entries)
@@ -65,7 +65,7 @@ public sealed class ListProjects(IProjects projects, ITokens tokens, IEntryReade
         CancellationToken cancellationToken)
     {
         var held = await projects.ListAsync(cancellationToken);
-        var counts = await tokens.CountIngestTokensAsync(cancellationToken);
+        var heldTokens = await tokens.ListIngestTokensAsync(cancellationToken);
 
         var listed = new List<ListedProject>(held.Count);
 
@@ -81,7 +81,7 @@ public sealed class ListProjects(IProjects projects, ITokens tokens, IEntryReade
                 project.HostId,
                 project.Retention,
                 project.CreatedAt,
-                counts.TryGetValue(project.Id, out var count) ? count : 0,
+                heldTokens.TryGetValue(project.Id, out var holding) ? holding.Count : 0,
                 await entries.LastReceivedAsync(project.Id, cancellationToken)));
         }
 

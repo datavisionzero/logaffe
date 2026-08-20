@@ -41,36 +41,72 @@ public sealed class Tokens(LogaffeDbContext context) : ITokens
     public Task<HostToken?> FindHostTokenAsync(Guid id, CancellationToken cancellationToken) =>
         context.HostTokens.SingleOrDefaultAsync(t => t.Id == id, cancellationToken);
 
-    public async Task<IReadOnlyList<IngestToken>> ListIngestTokensAsync(
+    // The sealed secret is not among the columns selected, here or below: what
+    // unseals one is a lookup by identity, and a listing is the operator reading
+    // their settings. The projection is what keeps that true in the statement
+    // and not only in what the act hands back.
+    public async Task<IReadOnlyList<HeldToken>> ListIngestTokensAsync(
         Guid projectId, CancellationToken cancellationToken) =>
         await context.IngestTokens
             .Where(t => t.ProjectId == projectId)
             .OrderBy(t => t.IssuedAt)
+            .Select(t => new HeldToken(t.Id, t.Identifier, t.IssuedAt, t.LastUsedAt))
             .ToListAsync(cancellationToken);
 
-    // One grouped statement on ix_ingest_token_project for the whole project
-    // list, rather than one count per row.
-    public async Task<IReadOnlyDictionary<Guid, int>> CountIngestTokensAsync(
-        CancellationToken cancellationToken) =>
-        await context.IngestTokens
-            .GroupBy(t => t.ProjectId)
-            .Select(project => new { ProjectId = project.Key, Count = project.Count() })
-            .ToDictionaryAsync(row => row.ProjectId, row => row.Count, cancellationToken);
+    // One statement over the whole ingest-token table rather than one read per
+    // project, and there is no index to narrow it by because nothing is being
+    // narrowed: the table holds two rows per project at the most
+    // (IngestToken.MaximumPerProject), so every row of it is what was asked for.
+    // The grouping is done here rather than in the database because a grouped
+    // statement would hand back the same rows for the reader to take apart
+    // anyway.
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<HeldToken>>>
+        ListIngestTokensAsync(CancellationToken cancellationToken)
+    {
+        var rows = await context.IngestTokens
+            .OrderBy(t => t.IssuedAt)
+            .Select(t => new
+            {
+                t.ProjectId,
+                Held = new HeldToken(t.Id, t.Identifier, t.IssuedAt, t.LastUsedAt),
+            })
+            .ToListAsync(cancellationToken);
 
-    public async Task<IReadOnlyList<HostToken>> ListHostTokensAsync(
+        return rows
+            .GroupBy(row => row.ProjectId)
+            .ToDictionary(
+                project => project.Key,
+                IReadOnlyList<HeldToken> (project) => [.. project.Select(row => row.Held)]);
+    }
+
+    public async Task<IReadOnlyList<HeldToken>> ListHostTokensAsync(
         Guid hostId, CancellationToken cancellationToken) =>
         await context.HostTokens
             .Where(t => t.HostId == hostId)
             .OrderBy(t => t.IssuedAt)
+            .Select(t => new HeldToken(t.Id, t.Identifier, t.IssuedAt, t.LastUsedAt))
             .ToListAsync(cancellationToken);
 
-    // One grouped statement on ix_host_token_host for the whole host list.
-    public async Task<IReadOnlyDictionary<Guid, int>> CountHostTokensAsync(
-        CancellationToken cancellationToken) =>
-        await context.HostTokens
-            .GroupBy(t => t.HostId)
-            .Select(host => new { HostId = host.Key, Count = host.Count() })
-            .ToDictionaryAsync(row => row.HostId, row => row.Count, cancellationToken);
+    // One statement over the whole host-token table, for the reason the ingest
+    // listing above is one.
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<HeldToken>>>
+        ListHostTokensAsync(CancellationToken cancellationToken)
+    {
+        var rows = await context.HostTokens
+            .OrderBy(t => t.IssuedAt)
+            .Select(t => new
+            {
+                t.HostId,
+                Held = new HeldToken(t.Id, t.Identifier, t.IssuedAt, t.LastUsedAt),
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(row => row.HostId)
+            .ToDictionary(
+                host => host.Key,
+                IReadOnlyList<HeldToken> (host) => [.. host.Select(row => row.Held)]);
+    }
 
     public async Task<IReadOnlyList<AgentToken>> ListAgentTokensAsync(
         CancellationToken cancellationToken) =>

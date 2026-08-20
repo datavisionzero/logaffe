@@ -24,6 +24,13 @@ internal sealed class InMemoryTokens : ITokens
     /// <summary>How many statements the store was asked to write.</summary>
     public int Writes { get; private set; }
 
+    /// <summary>
+    /// How many statements the store was asked to list tokens with. It is what
+    /// says a list of every project's tokens is one read rather than one per
+    /// project, which is the whole of what a settings tree costs here.
+    /// </summary>
+    public int Reads { get; private set; }
+
     public Task<IngestToken?> FindIngestTokenAsync(
         TokenIdentifier identifier, CancellationToken cancellationToken) =>
         Task.FromResult(_ingestTokens.SingleOrDefault(t => t.Identifier == identifier));
@@ -45,29 +52,41 @@ internal sealed class InMemoryTokens : ITokens
     public Task<HostToken?> FindHostTokenAsync(Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(_hostTokens.SingleOrDefault(t => t.Id == id));
 
-    public Task<IReadOnlyList<IngestToken>> ListIngestTokensAsync(
+    public Task<IReadOnlyList<HeldToken>> ListIngestTokensAsync(
         Guid projectId, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<IngestToken>>(
-            [.. _ingestTokens.Where(t => t.ProjectId == projectId).OrderBy(t => t.IssuedAt)]);
+        Read<IReadOnlyList<HeldToken>>(
+            [.. _ingestTokens
+                .Where(t => t.ProjectId == projectId)
+                .OrderBy(t => t.IssuedAt)
+                .Select(Held)]);
 
-    public Task<IReadOnlyDictionary<Guid, int>> CountIngestTokensAsync(
+    public Task<IReadOnlyDictionary<Guid, IReadOnlyList<HeldToken>>> ListIngestTokensAsync(
         CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyDictionary<Guid, int>>(
+        Read<IReadOnlyDictionary<Guid, IReadOnlyList<HeldToken>>>(
             _ingestTokens
+                .OrderBy(t => t.IssuedAt)
                 .GroupBy(t => t.ProjectId)
-                .ToDictionary(project => project.Key, project => project.Count()));
+                .ToDictionary(
+                    project => project.Key,
+                    IReadOnlyList<HeldToken> (project) => [.. project.Select(Held)]));
 
-    public Task<IReadOnlyList<HostToken>> ListHostTokensAsync(
+    public Task<IReadOnlyList<HeldToken>> ListHostTokensAsync(
         Guid hostId, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<HostToken>>(
-            [.. _hostTokens.Where(t => t.HostId == hostId).OrderBy(t => t.IssuedAt)]);
+        Read<IReadOnlyList<HeldToken>>(
+            [.. _hostTokens
+                .Where(t => t.HostId == hostId)
+                .OrderBy(t => t.IssuedAt)
+                .Select(Held)]);
 
-    public Task<IReadOnlyDictionary<Guid, int>> CountHostTokensAsync(
+    public Task<IReadOnlyDictionary<Guid, IReadOnlyList<HeldToken>>> ListHostTokensAsync(
         CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyDictionary<Guid, int>>(
+        Read<IReadOnlyDictionary<Guid, IReadOnlyList<HeldToken>>>(
             _hostTokens
+                .OrderBy(t => t.IssuedAt)
                 .GroupBy(t => t.HostId)
-                .ToDictionary(host => host.Key, host => host.Count()));
+                .ToDictionary(
+                    host => host.Key,
+                    IReadOnlyList<HeldToken> (host) => [.. host.Select(Held)]));
 
     public Task<IReadOnlyList<AgentToken>> ListAgentTokensAsync(
         CancellationToken cancellationToken) =>
@@ -102,6 +121,18 @@ internal sealed class InMemoryTokens : ITokens
 
     public Task RecordUseAsync(HostToken token, CancellationToken cancellationToken) =>
         Write(() => { });
+
+    private Task<T> Read<T>(T answer)
+    {
+        Reads++;
+        return Task.FromResult(answer);
+    }
+
+    private static HeldToken Held(IngestToken token) =>
+        new(token.Id, token.Identifier, token.IssuedAt, token.LastUsedAt);
+
+    private static HeldToken Held(HostToken token) =>
+        new(token.Id, token.Identifier, token.IssuedAt, token.LastUsedAt);
 
     private Task Write(Action write)
     {

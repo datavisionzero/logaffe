@@ -180,6 +180,24 @@ public sealed class ProjectActsTests
     }
 
     [Fact]
+    public async Task What_each_project_can_receive_on_is_one_read_for_the_whole_list()
+    {
+        // The same read the settings tree is assembled from, and the reason the
+        // count on this list is not a second way of asking: it is one statement
+        // here whether the installation holds two projects or a hundred.
+        var api = await CreateAsync("api", 7);
+        var web = await CreateAsync("web", 30);
+        await IssueAsync(api!.Id);
+        await IssueAsync(web!.Id);
+
+        var readsBefore = _tokens.Reads;
+
+        await Listing().ExecuteAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(readsBefore + 1, _tokens.Reads);
+    }
+
+    [Fact]
     public async Task Each_row_says_when_that_project_last_received_an_entry()
     {
         var api = await CreateAsync("api", 7);

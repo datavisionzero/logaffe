@@ -53,7 +53,36 @@ public sealed class ListIngestTokens(IProjects projects, ITokens tokens)
 
         var held = await tokens.ListIngestTokensAsync(projectId, cancellationToken);
 
-        return [.. held.Select(token => new ListedIngestToken(
-            token.Id, token.Identifier, token.IssuedAt, token.LastUsedAt))];
+        return [.. held.Select(Listed)];
     }
+
+    /// <summary>
+    /// What every project holds, keyed by the project; a project holding no
+    /// token is not in the answer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// One read for the whole installation, and the same act as the one above
+    /// rather than a second way to learn the same fact — which is what makes it
+    /// safe for the settings tree to be assembled out of it while the screen
+    /// that opens one project still asks for one project.
+    /// </para>
+    /// <para>
+    /// There is no project that is not there to report here, so nothing is
+    /// nullable: the caller is holding the project list this was read beside,
+    /// and a project missing from the answer is one whose door is closed.
+    /// </para>
+    /// </remarks>
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<ListedIngestToken>>> ExecuteAsync(
+        CancellationToken cancellationToken)
+    {
+        var held = await tokens.ListIngestTokensAsync(cancellationToken);
+
+        return held.ToDictionary(
+            project => project.Key,
+            IReadOnlyList<ListedIngestToken> (project) => [.. project.Value.Select(Listed)]);
+    }
+
+    private static ListedIngestToken Listed(HeldToken token) =>
+        new(token.Id, token.Identifier, token.IssuedAt, token.LastUsedAt);
 }

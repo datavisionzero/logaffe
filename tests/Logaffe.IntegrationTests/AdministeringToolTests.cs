@@ -1,8 +1,15 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Logaffe.Api.Http;
+using Logaffe.Application.Ports;
+using Logaffe.Domain.Hosts;
+using Logaffe.Domain.Projects;
+using Logaffe.Domain.Tokens;
+using Logaffe.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -37,6 +44,12 @@ namespace Logaffe.IntegrationTests;
 public sealed class AdministeringToolTests(PostgresFixture postgres) : IAsyncLifetime
 {
     private const string TheirPassword = "a passphrase they typed";
+
+    /// <summary>The size the settings tree is held to, and twenty machines with it.</summary>
+    private const int HundredProjects = 100;
+
+    /// <inheritdoc cref="HundredProjects"/>
+    private const int TwentyHosts = 20;
 
     private static readonly Guid NoSuchThing = new("0195f0d4-0000-7000-8000-000000000000");
 
@@ -312,6 +325,49 @@ public sealed class AdministeringToolTests(PostgresFixture postgres) : IAsyncLif
         Assert.Null(token.LastUsedAt);
         Assert.DoesNotContain(issued.Token, raw.GetRawText(), StringComparison.Ordinal);
         Assert.DoesNotContain("logaffe_", raw.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task The_settings_tree_is_answered_whole_at_the_size_groups_exist_for()
+    {
+        // A hundred projects and twenty hosts, every one of them mid-rotation:
+        // the size an installation reaches before it is organised into groups,
+        // and the size at which this tool used to be a read per project and per
+        // host on the one connection the request holds.
+        await SeedAsync(HundredProjects, TwentyHosts);
+
+        await using var agent = await ConnectAsync(_administering);
+
+        var started = Stopwatch.GetTimestamp();
+        var raw = await CallAsync(agent, "get_settings", []);
+        var took = Stopwatch.GetElapsedTime(started);
+
+        var settings = raw.Deserialize<SettingsBody>(Web)!;
+
+        TestContext.Current.TestOutputHelper?.WriteLine(
+            $"get_settings over {HundredProjects} projects and {TwentyHosts} hosts, " +
+            $"two tokens each: {took.TotalMilliseconds:F0} ms");
+
+        // Whole, and not merely quick: every project and every host is in it
+        // with both of the tokens it holds, which is what says the one read
+        // per kind took nothing away from the answer.
+        Assert.Equal(HundredProjects, settings.Projects.Count);
+        Assert.Equal(TwentyHosts, settings.Hosts.Count);
+        Assert.All(
+            settings.Projects,
+            project => Assert.Equal(IngestToken.MaximumPerProject, project.IngestTokens.Count));
+        Assert.All(
+            settings.Hosts,
+            host => Assert.Equal(HostToken.MaximumPerHost, host.HostTokens.Count));
+        Assert.DoesNotContain("logaffe_", raw.GetRawText(), StringComparison.Ordinal);
+
+        // A ceiling rather than a benchmark, with room for a machine running CI
+        // and a container: what it holds is that the first call an agent makes
+        // finishes inside the budget a read gets (ADR 0026) at this size, rather
+        // than outlasting the client's timeout with nothing to show.
+        Assert.True(
+            took < TimeSpan.FromSeconds(5),
+            $"The settings tree took {took.TotalMilliseconds:F0} ms.");
     }
 
     [Fact]
@@ -643,6 +699,53 @@ public sealed class AdministeringToolTests(PostgresFixture postgres) : IAsyncLif
 
         return string.Concat(
             result.Content.OfType<TextContentBlock>().Select(block => block.Text));
+    }
+
+    /// <summary>
+    /// Projects and hosts written straight into the store, because what is being
+    /// asked about is the read and not the acts that put them there.
+    /// </summary>
+    private async Task SeedAsync(int projects, int hosts)
+    {
+        using var scope = _installation.Services.CreateScope();
+
+        var context = scope.ServiceProvider.GetRequiredService<LogaffeDbContext>();
+        var cipher = scope.ServiceProvider.GetRequiredService<ISecretCipher>();
+        var now = DateTimeOffset.UtcNow;
+
+        for (var i = 0; i < projects; i++)
+        {
+            var project = Project.Create($"project-{i:D3}", RetentionWindow.OfDays(14), now);
+            context.Projects.Add(project);
+
+            for (var held = 0; held < IngestToken.MaximumPerProject; held++)
+            {
+                var minted = TokenText.Mint(TokenKind.Ingest);
+                context.IngestTokens.Add(IngestToken.Issue(
+                    project.Id,
+                    minted.Identifier,
+                    cipher.Encrypt(minted.Secret),
+                    now.AddMinutes(held)));
+            }
+        }
+
+        for (var i = 0; i < hosts; i++)
+        {
+            var host = Host.Create($"host-{i:D2}", now);
+            context.Hosts.Add(host);
+
+            for (var held = 0; held < HostToken.MaximumPerHost; held++)
+            {
+                var minted = TokenText.Mint(TokenKind.Host);
+                context.HostTokens.Add(HostToken.Issue(
+                    host.Id,
+                    minted.Identifier,
+                    cipher.Encrypt(minted.Secret),
+                    now.AddMinutes(held)));
+            }
+        }
+
+        await context.SaveChangesAsync(TestContext.Current.CancellationToken);
     }
 
     private async Task<string> IssueAgentTokenAsync(

@@ -350,19 +350,19 @@ public sealed class AuthenticateTokenTests
             Guid id, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task<IReadOnlyList<IngestToken>> ListIngestTokensAsync(
+        public Task<IReadOnlyList<HeldToken>> ListIngestTokensAsync(
             Guid projectId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task<IReadOnlyDictionary<Guid, int>> CountIngestTokensAsync(
+        public Task<IReadOnlyDictionary<Guid, IReadOnlyList<HeldToken>>> ListIngestTokensAsync(
             CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task<IReadOnlyList<HostToken>> ListHostTokensAsync(
+        public Task<IReadOnlyList<HeldToken>> ListHostTokensAsync(
             Guid hostId, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task<IReadOnlyDictionary<Guid, int>> CountHostTokensAsync(
+        public Task<IReadOnlyDictionary<Guid, IReadOnlyList<HeldToken>>> ListHostTokensAsync(
             CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 

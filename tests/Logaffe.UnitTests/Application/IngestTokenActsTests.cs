@@ -225,6 +225,56 @@ public sealed class IngestTokenActsTests
         Assert.Single(_tokens.Stored);
     }
 
+    [Fact]
+    public async Task Every_project_is_answered_in_one_read_however_many_there_are()
+    {
+        // The settings tree an administering agent starts at is assembled out of
+        // this act, and what it used to cost was a read per project. The number
+        // asserted here is the whole of the fix: one, at any size.
+        var quiet = _projects.Holding("web", RetentionWindow.OfDays(7), Now).Id;
+
+        var many = new List<Guid> { _project };
+        for (var i = 0; i < 40; i++)
+        {
+            many.Add(_projects.Holding($"api-{i}", RetentionWindow.OfDays(7), Now).Id);
+        }
+
+        foreach (var project in many)
+        {
+            await Issuing().ExecuteAsync(project, TestContext.Current.CancellationToken);
+        }
+
+        var readsBefore = _tokens.Reads;
+
+        var held = await Listing().ExecuteAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(readsBefore + 1, _tokens.Reads);
+
+        // And it is the same answer as asking one project at a time, project by
+        // project — including that a project whose door is closed is absent
+        // rather than present and empty.
+        Assert.Equal([.. many.Order()], [.. held.Keys.Order()]);
+        Assert.DoesNotContain(quiet, held.Keys);
+        Assert.Equal(
+            (await ListedAsync(_project)).Select(token => token.Id),
+            held[_project].Select(token => token.Id));
+    }
+
+    [Fact]
+    public async Task A_projects_tokens_come_back_oldest_first_however_they_are_asked_for()
+    {
+        // Which of the two is being rotated away is read off the order, so the
+        // list of all projects owes the same order the list of one does.
+        var first = await IssueAsync();
+        _clock.Now = Now.AddHours(1);
+        var second = await IssueAsync();
+
+        var held = await Listing().ExecuteAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(
+            [first!.Id, second!.Id], held[_project].Select(token => token.Id));
+    }
+
     /// <summary>
     /// One issuing into the project that is there, which is every case but the
     /// two that are about the project rather than the token.

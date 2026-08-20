@@ -51,7 +51,29 @@ public sealed class ListHostTokens(IHosts hosts, ITokens tokens)
 
         var held = await tokens.ListHostTokensAsync(hostId, cancellationToken);
 
-        return [.. held.Select(token => new ListedHostToken(
-            token.Id, token.Identifier, token.IssuedAt, token.LastUsedAt))];
+        return [.. held.Select(Listed)];
     }
+
+    /// <summary>
+    /// What every host holds, keyed by the host; a host holding no token is not
+    /// in the answer.
+    /// </summary>
+    /// <remarks>
+    /// One read for the whole fleet, and the same act as the one above rather
+    /// than a second way to learn the same fact. On a fleet this is the
+    /// difference the settings tree is made of: the machines are read once
+    /// together, and the credential is still asked for one machine at a time.
+    /// </remarks>
+    public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<ListedHostToken>>> ExecuteAsync(
+        CancellationToken cancellationToken)
+    {
+        var held = await tokens.ListHostTokensAsync(cancellationToken);
+
+        return held.ToDictionary(
+            host => host.Key,
+            IReadOnlyList<ListedHostToken> (host) => [.. host.Value.Select(Listed)]);
+    }
+
+    private static ListedHostToken Listed(HeldToken token) =>
+        new(token.Id, token.Identifier, token.IssuedAt, token.LastUsedAt);
 }
