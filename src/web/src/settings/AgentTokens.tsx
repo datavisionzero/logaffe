@@ -97,7 +97,12 @@ export function AgentTokens() {
     event.preventDefault();
 
     await act(async () => {
-      const { data, error, response } = await api.POST("/agent-tokens", { body: { name } });
+      // Reading, and said rather than left out: what an agent is given unless
+      // the operator decides otherwise (`VISION.md`). Choosing the other kind is
+      // not on this screen yet.
+      const { data, error, response } = await api.POST("/agent-tokens", {
+        body: { name, kind: "reading", mayDestroy: false },
+      });
 
       if (data === undefined) {
         if (response.status === 400) {

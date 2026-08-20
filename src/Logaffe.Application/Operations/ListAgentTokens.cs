@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Tokens;
 
 namespace Logaffe.Application.Operations;
 
@@ -13,6 +14,16 @@ namespace Logaffe.Application.Operations;
 /// What the operator recognizes the agent by, and nothing the server acts on.
 /// Two agent tokens may share one.
 /// </param>
+/// <param name="Kind">
+/// What this token is, which the operator cannot read off the list any other
+/// way and which decides whether revoking it is urgent. A list of long-lived
+/// credentials whose powers are invisible is a list nobody prunes, which is the
+/// argument the last use already won (ADR 0033).
+/// </param>
+/// <param name="MayDestroy">
+/// Whether this token may delete a project or a host, or lower a retention
+/// window. Never true of a reading token.
+/// </param>
 /// <param name="LastUsedAt">
 /// The load-bearing field of ADR 0021: a token that has not been used in months
 /// is one to revoke, and this list is the only place that fact is visible. It is
@@ -22,6 +33,8 @@ namespace Logaffe.Application.Operations;
 public sealed record ListedAgentToken(
     Guid Id,
     string Name,
+    AgentTokenKind Kind,
+    bool MayDestroy,
     DateTimeOffset IssuedAt,
     DateTimeOffset? LastUsedAt);
 
@@ -42,6 +55,11 @@ public sealed class ListAgentTokens(ITokens tokens)
         var held = await tokens.ListAgentTokensAsync(cancellationToken);
 
         return [.. held.Select(token => new ListedAgentToken(
-            token.Id, token.Name, token.IssuedAt, token.LastUsedAt))];
+            token.Id,
+            token.Name,
+            token.Kind,
+            token.MayDestroy,
+            token.IssuedAt,
+            token.LastUsedAt))];
     }
 }

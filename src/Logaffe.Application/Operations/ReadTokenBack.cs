@@ -53,7 +53,9 @@ public sealed class ReadTokenBack(ITokens tokens, ISecretCipher cipher)
         return token is null
             ? null
             : TokenText.From(
-                TokenKind.Agent, token.Identifier, cipher.Decrypt(token.EncryptedSecret));
+                token.Kind.AsTokenKind(),
+                token.Identifier,
+                cipher.Decrypt(token.EncryptedSecret));
     }
 
     /// <inheritdoc cref="IngestTokenAsync"/>

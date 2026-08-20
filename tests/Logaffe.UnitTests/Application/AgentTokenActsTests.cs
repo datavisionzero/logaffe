@@ -4,9 +4,9 @@ using Logaffe.Domain.Tokens;
 namespace Logaffe.UnitTests.Application;
 
 /// <summary>
-/// What the operator does to the credentials their agents read with: issue one
-/// under a name, rename it, read it back, retire it, and look at the list that
-/// says which one has gone quiet.
+/// What the operator does to the credentials their agents act with: issue one
+/// under a name and a kind, rename it, read it back, retire it, and look at the
+/// list that says which one has gone quiet and what each of them may do.
 /// </summary>
 public sealed class AgentTokenActsTests
 {
@@ -30,13 +30,53 @@ public sealed class AgentTokenActsTests
         Assert.Equal(issued.Token.Identifier, stored.Identifier);
         Assert.Equal(issued.Token.Secret, _cipher.Decrypt(stored.EncryptedSecret));
         Assert.Null(stored.LastUsedAt);
+
+        // What `VISION.md` means by read-only by default, at the line where the
+        // default is applied rather than asserted.
+        Assert.Equal(AgentTokenKind.Reading, stored.Kind);
+        Assert.False(stored.MayDestroy);
+    }
+
+    [Fact]
+    public async Task An_administering_token_carries_the_other_prefix_and_what_it_may_destroy()
+    {
+        var issued = await IssueAsync(
+            "the setting-up agent", AgentTokenKind.Administering, mayDestroy: true);
+
+        // The prefix is what refuses a token at the wrong half of the surface
+        // before the database is asked anything, so the kind chooses it
+        // (ADR 0046).
+        Assert.Equal(TokenKind.Administering, issued.Token.Kind);
+        Assert.StartsWith(
+            TokenText.AdministeringPrefix, issued.Token.Text, StringComparison.Ordinal);
+
+        var stored = Assert.Single(_tokens.StoredAgentTokens);
+        Assert.Equal(AgentTokenKind.Administering, stored.Kind);
+        Assert.True(stored.MayDestroy);
     }
 
     [Fact]
     public async Task A_name_that_is_not_a_name_is_refused()
     {
-        await Assert.ThrowsAsync<ArgumentException>(
-            () => Issuing().ExecuteAsync("   ", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentException>(() => Issuing().ExecuteAsync(
+            "   ",
+            AgentTokenKind.Reading,
+            mayDestroy: false,
+            TestContext.Current.CancellationToken));
+
+        Assert.Empty(_tokens.StoredAgentTokens);
+    }
+
+    [Fact]
+    public async Task A_reading_token_is_not_issued_to_destroy()
+    {
+        // Refused rather than stored as a flag that means nothing: a reading
+        // token makes no change of any kind.
+        await Assert.ThrowsAsync<ArgumentException>(() => Issuing().ExecuteAsync(
+            "terminal agent",
+            AgentTokenKind.Reading,
+            mayDestroy: true,
+            TestContext.Current.CancellationToken));
 
         Assert.Empty(_tokens.StoredAgentTokens);
     }
@@ -67,14 +107,19 @@ public sealed class AgentTokenActsTests
             _tokens.StoredAgentTokens.Select(token => token.Name));
     }
 
-    [Fact]
-    public async Task A_mislaid_token_is_read_back_rather_than_reissued()
+    [Theory]
+    [InlineData(AgentTokenKind.Reading)]
+    [InlineData(AgentTokenKind.Administering)]
+    public async Task A_mislaid_token_is_read_back_rather_than_reissued(AgentTokenKind kind)
     {
-        var issued = await IssueAsync("terminal agent");
+        var issued = await IssueAsync("terminal agent", kind);
 
         var readBack = await ReadingBack().AgentTokenAsync(
             issued.Id, TestContext.Current.CancellationToken);
 
+        // Put together again out of the row and the key, prefix included: a
+        // token read back is the token that was issued, or it is not worth
+        // reading back (ADR 0022).
         Assert.NotNull(readBack);
         Assert.Equal(issued.Token.Text, readBack.Text);
     }
@@ -127,14 +172,15 @@ public sealed class AgentTokenActsTests
     }
 
     [Fact]
-    public async Task The_list_is_the_name_the_issue_date_and_the_last_use()
+    public async Task The_list_is_the_name_the_kind_the_issue_date_and_the_last_use()
     {
-        // The three fields that make the list worth having: a token that has
-        // not been used in months is one to revoke, and this is the only place
-        // that fact is visible.
+        // The fields that make the list worth having: a token that has not been
+        // used in months is one to revoke, a token that administers is one to
+        // revoke sooner, and this is the only place either fact is visible.
         var quiet = await IssueAsync("the laptop that was replaced");
         _clock.Now = Now.AddDays(1);
-        var busy = await IssueAsync("terminal agent");
+        var busy = await IssueAsync(
+            "the setting-up agent", AgentTokenKind.Administering, mayDestroy: true);
         _tokens.StoredAgentTokens[1].WasUsedAt(Now.AddDays(30));
 
         var listed = await Listing().ExecuteAsync(TestContext.Current.CancellationToken);
@@ -144,6 +190,14 @@ public sealed class AgentTokenActsTests
         Assert.Equal(Now, listed[0].IssuedAt);
         Assert.Null(listed[0].LastUsedAt);
         Assert.Equal(Now.AddDays(30), listed[1].LastUsedAt);
+
+        // And what each of them is, because the list is where an operator
+        // decides what to revoke and a credential whose powers are invisible
+        // there is one that is never revoked for being too strong.
+        Assert.Equal(AgentTokenKind.Reading, listed[0].Kind);
+        Assert.False(listed[0].MayDestroy);
+        Assert.Equal(AgentTokenKind.Administering, listed[1].Kind);
+        Assert.True(listed[1].MayDestroy);
     }
 
     [Fact]
@@ -158,8 +212,11 @@ public sealed class AgentTokenActsTests
         Assert.Single(_tokens.StoredAgentTokens);
     }
 
-    private Task<IssuedToken> IssueAsync(string name) =>
-        Issuing().ExecuteAsync(name, TestContext.Current.CancellationToken);
+    private Task<IssuedToken> IssueAsync(
+        string name,
+        AgentTokenKind kind = AgentTokenKind.Reading,
+        bool mayDestroy = false) =>
+        Issuing().ExecuteAsync(name, kind, mayDestroy, TestContext.Current.CancellationToken);
 
     private IssueAgentToken Issuing() => new(_tokens, _cipher, _clock);
 

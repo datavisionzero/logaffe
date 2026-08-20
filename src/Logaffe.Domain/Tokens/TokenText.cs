@@ -29,6 +29,15 @@ public sealed class TokenText
     public const string HostPrefix = "logaffe_host";
 
     /// <summary>
+    /// The administering agent token's prefix. It is the short word rather than
+    /// the long one because it is read by people — in a configuration file, in a
+    /// secret scanner's pattern — and because the reading token's prefix could
+    /// not be changed to match it without ending every agent token that exists
+    /// (ADR 0046).
+    /// </summary>
+    public const string AdministeringPrefix = "logaffe_admin";
+
+    /// <summary>
     /// Fifty-two symbols of <see cref="TokenAlphabet"/> — two hundred and sixty
     /// bits. The identifier is added to the token rather than carved out of it,
     /// because splitting a credential into a public and a secret part is only
@@ -127,6 +136,7 @@ public sealed class TokenText
         TokenKind.Ingest => IngestPrefix,
         TokenKind.Agent => AgentPrefix,
         TokenKind.Host => HostPrefix,
+        TokenKind.Administering => AdministeringPrefix,
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown token kind."),
     };
 
@@ -142,6 +152,9 @@ public sealed class TokenText
                 return true;
             case HostPrefix:
                 kind = TokenKind.Host;
+                return true;
+            case AdministeringPrefix:
+                kind = TokenKind.Administering;
                 return true;
             default:
                 kind = default;

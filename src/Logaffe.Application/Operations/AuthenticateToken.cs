@@ -4,15 +4,25 @@ using Logaffe.Domain.Tokens;
 namespace Logaffe.Application.Operations;
 
 /// <summary>
+/// What an admitted agent may ask for: which half of MCP its token earns, and
+/// whether it may make a change after which stored data is gone.
+/// </summary>
+/// <remarks>
+/// Both are read off the row and neither is negotiable in the call — there is no
+/// act anywhere that changes either after the token was issued (ADR 0046).
+/// </remarks>
+public sealed record AdmittedAgent(AgentTokenKind Kind, bool MayDestroy);
+
+/// <summary>
 /// What a presented token admits: for a delivery of entries, the project it goes
-/// to; for a delivery of samples, the host they were read off; for an agent, the
-/// permission to read; and for anything else, nothing.
+/// to; for a delivery of samples, the host they were read off; for an agent,
+/// which half of MCP it earns; and for anything else, nothing.
 /// </summary>
 /// <remarks>
 /// <para>
 /// This is the first thing every public endpoint does, and the only place any of
 /// them learns who is calling. It is one shape for three doors deliberately —
-/// ADR 0021 keeps one credential model pointing in three directions, and the
+/// ADR 0021 keeps one credential model pointing in four directions, and the
 /// prefix is what refuses each at the others' endpoints, before the database is
 /// asked anything at all.
 /// </para>
@@ -109,29 +119,46 @@ public sealed class AuthenticateToken(
     }
 
     /// <summary>
-    /// Whether <paramref name="authorization"/> admits a read over MCP. There is
-    /// nothing further to return: an agent token reads every project and writes
-    /// nothing, so that it was admitted at all is the whole of its permission
-    /// (ADR 0021).
+    /// What an agent presenting <paramref name="authorization"/> is admitted to
+    /// at <c>/mcp</c>, or <c>null</c> when it is admitted to nothing — the same
+    /// silent refusal the two deliveries get.
     /// </summary>
-    public async Task<bool> AdmitsReadAsync(
+    /// <remarks>
+    /// The kind comes back with it because it is what the adapter above hands
+    /// out a tool list from, and asking for it a second time would be a second
+    /// lookup on every call an agent makes (ADR 0046).
+    /// </remarks>
+    public async Task<AdmittedAgent?> AdmittedAgentAsync(
         string? authorization, CancellationToken cancellationToken)
     {
-        if (!TryReadPresented(authorization, TokenKind.Agent, out var presented))
+        if (!TryReadPresented(authorization, out var presented)
+            || !AgentTokenKinds.TryFromTokenKind(presented.Kind, out var presentedKind))
         {
-            return false;
+            return null;
         }
 
         var token = await tokens.FindAgentTokenAsync(presented.Identifier, cancellationToken);
         if (token is null)
         {
             RefuseAtTheSamePrice(presented);
-            return false;
+            return null;
         }
 
         if (!Matches(presented, token.EncryptedSecret))
         {
-            return false;
+            return null;
+        }
+
+        // The two agent kinds share a table, so the prefix alone cannot settle
+        // which one this is: it is written by whoever presents the token, and a
+        // reading token with the administering prefix put over it carries a
+        // secret that still matches its row. The row is what says what the token
+        // is, and the kinds do not meet — which is the sentence the whole of ADR
+        // 0046 rests on. It is asked after the comparison rather than before, so
+        // that a rewritten prefix costs exactly what a good token costs.
+        if (token.Kind != presentedKind)
+        {
+            return null;
         }
 
         var now = clock.GetUtcNow();
@@ -141,7 +168,7 @@ public sealed class AuthenticateToken(
             await tokens.RecordUseAsync(token, cancellationToken);
         }
 
-        return true;
+        return new AdmittedAgent(token.Kind, token.MayDestroy);
     }
 
     /// <summary>
@@ -185,7 +212,16 @@ public sealed class AuthenticateToken(
     /// the alphabet. None of that reaches the database.
     /// </summary>
     private static bool TryReadPresented(
-        string? authorization, TokenKind kind, out TokenText presented)
+        string? authorization, TokenKind kind, out TokenText presented) =>
+        TryReadPresented(authorization, out presented) && presented.Kind == kind;
+
+    /// <inheritdoc cref="TryReadPresented(string?, TokenKind, out TokenText)"/>
+    /// <remarks>
+    /// Without a kind, for the one door two kinds arrive at: <c>/mcp</c> answers
+    /// a reading token and an administering one, and which of them this is is
+    /// the caller's to read off <see cref="TokenText.Kind"/>.
+    /// </remarks>
+    private static bool TryReadPresented(string? authorization, out TokenText presented)
     {
         presented = null!;
 
@@ -201,7 +237,6 @@ public sealed class AuthenticateToken(
             return false;
         }
 
-        return TokenText.TryParse(value[Scheme.Length..].TrimStart(), out presented)
-            && presented.Kind == kind;
+        return TokenText.TryParse(value[Scheme.Length..].TrimStart(), out presented);
     }
 }

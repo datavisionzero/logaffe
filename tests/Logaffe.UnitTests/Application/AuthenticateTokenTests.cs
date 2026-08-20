@@ -20,12 +20,63 @@ public sealed class AuthenticateTokenTests
     }
 
     [Fact]
-    public async Task An_agent_token_admits_a_read()
+    public async Task An_agent_token_admits_the_half_of_the_surface_it_was_issued_for()
     {
-        var issued = TokenText.Mint(TokenKind.Agent);
+        var reading = TokenText.Mint(TokenKind.Agent);
 
-        Assert.True(await Authenticating(issued).AdmitsReadAsync(
-            Bearer(issued), TestContext.Current.CancellationToken));
+        var admitted = await Authenticating(reading).AdmittedAgentAsync(
+            Bearer(reading), TestContext.Current.CancellationToken);
+
+        // The kind comes back with the admission because it is what the tool
+        // list above is chosen from, and asking for it again would be a second
+        // lookup on every call an agent makes (ADR 0046).
+        Assert.NotNull(admitted);
+        Assert.Equal(AgentTokenKind.Reading, admitted.Kind);
+        Assert.False(admitted.MayDestroy);
+    }
+
+    [Fact]
+    public async Task An_administering_token_admits_the_other_half_and_says_whether_it_destroys()
+    {
+        var administering = TokenText.Mint(TokenKind.Administering);
+
+        var admitted = await Authenticating(administering, mayDestroy: true).AdmittedAgentAsync(
+            Bearer(administering), TestContext.Current.CancellationToken);
+
+        Assert.NotNull(admitted);
+        Assert.Equal(AgentTokenKind.Administering, admitted.Kind);
+        Assert.True(admitted.MayDestroy);
+    }
+
+    [Fact]
+    public async Task A_prefix_written_over_a_token_does_not_change_what_the_token_is()
+    {
+        // The two agent kinds share a table, so this is the one place where the
+        // prefix is not enough: the secret of a reading token still matches its
+        // row when the administering prefix is put in front of it, and if the
+        // row were not asked, the kinds would meet — which is the sentence the
+        // whole of ADR 0046 rests on.
+        var reading = TokenText.Mint(TokenKind.Agent);
+        var asAdministering = TokenText.From(
+            TokenKind.Administering, reading.Identifier, reading.Secret);
+
+        var tokens = new StubTokens();
+        Assert.Null(await Authenticating(reading, tokens).AdmittedAgentAsync(
+            Bearer(asAdministering), TestContext.Current.CancellationToken));
+
+        // Refused by the row rather than at the door, and the lookup is what
+        // says so: both prefixes belong at this endpoint, so this one is not the
+        // wrong-kind refusal the other three doors make.
+        Assert.Equal(1, tokens.Lookups);
+
+        // And the same the other way, so that neither kind is a way into the
+        // other.
+        var administering = TokenText.Mint(TokenKind.Administering);
+        var asReading = TokenText.From(
+            TokenKind.Agent, administering.Identifier, administering.Secret);
+
+        Assert.Null(await Authenticating(administering).AdmittedAgentAsync(
+            Bearer(asReading), TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -75,7 +126,7 @@ public sealed class AuthenticateTokenTests
             Bearer(agent), TestContext.Current.CancellationToken));
 
         var atMcp = new StubTokens();
-        Assert.False(await Authenticating(agent, atMcp).AdmitsReadAsync(
+        Assert.Null(await Authenticating(agent, atMcp).AdmittedAgentAsync(
             Bearer(ingest), TestContext.Current.CancellationToken));
 
         Assert.Equal(0, atIngest.Lookups);
@@ -156,11 +207,11 @@ public sealed class AuthenticateTokenTests
         var clock = new FixedClock(Issued.AddDays(1));
         var authenticate = Authenticating(issued, tokens, clock: clock);
 
-        _ = await authenticate.AdmitsReadAsync(
+        _ = await authenticate.AdmittedAgentAsync(
             Bearer(issued), TestContext.Current.CancellationToken);
 
         clock.Now += AuthenticateToken.UseWriteInterval;
-        Assert.True(await authenticate.AdmitsReadAsync(
+        Assert.NotNull(await authenticate.AdmittedAgentAsync(
             Bearer(issued), TestContext.Current.CancellationToken));
 
         Assert.Equal(2, tokens.Writes);
@@ -205,7 +256,8 @@ public sealed class AuthenticateTokenTests
         TokenText issued,
         StubTokens? tokens = null,
         StubCipher? cipher = null,
-        FixedClock? clock = null)
+        FixedClock? clock = null,
+        bool mayDestroy = false)
     {
         tokens ??= new StubTokens();
         cipher ??= new StubCipher();
@@ -215,10 +267,10 @@ public sealed class AuthenticateTokenTests
             tokens.IngestToken = IngestToken.Issue(
                 Project, issued.Identifier, cipher.Encrypt(issued.Secret), Issued);
         }
-        else
+        else if (AgentTokenKinds.TryFromTokenKind(issued.Kind, out var kind))
         {
             tokens.AgentToken = AgentToken.Issue(
-                "agent", issued.Identifier, cipher.Encrypt(issued.Secret), Issued);
+                "agent", kind, mayDestroy, issued.Identifier, cipher.Encrypt(issued.Secret), Issued);
         }
 
         // What the stub cipher was asked before the operation ran is setup, not

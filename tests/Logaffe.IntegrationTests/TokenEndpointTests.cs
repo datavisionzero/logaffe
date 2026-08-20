@@ -103,6 +103,11 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
 
         Assert.StartsWith(TokenText.AgentPrefix, issued.Token);
 
+        // Reading, because nothing said otherwise. This is the line where
+        // `VISION.md`'s read-only by default is applied rather than asserted.
+        Assert.Equal("reading", issued.Kind);
+        Assert.False(issued.MayDestroy);
+
         // What the product hands over is the finished configuration, not the
         // bare token: the address and the token already in place.
         var configuration = JsonDocument.Parse(issued.ClientConfiguration)
@@ -118,6 +123,8 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
             await client.GetAsync("/agent-tokens", TestContext.Current.CancellationToken));
         var only = Assert.Single(listed);
         Assert.Equal("claude-code", only.Name);
+        Assert.Equal("reading", only.Kind);
+        Assert.False(only.MayDestroy);
         Assert.Null(only.LastUsedAt);
         Assert.DoesNotContain(issued.Token, await ListBodyAsync(client));
 
@@ -141,6 +148,88 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         using var again = await client.DeleteAsync(
             $"/agent-tokens/{issued.Id}", TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, again.StatusCode);
+    }
+
+    [Fact]
+    public async Task An_administering_token_carries_the_other_prefix_and_says_what_it_may_do()
+    {
+        using var client = await SignedInAsync();
+
+        var issued = await ReadAsync<IssuedAgentToken>(
+            await client.PostAsJsonAsync(
+                "/agent-tokens",
+                new { name = "the setting-up agent", kind = "administering", mayDestroy = true },
+                TestContext.Current.CancellationToken));
+
+        // The prefix is what refuses a token at the wrong half of the surface
+        // before the database is asked anything (ADR 0046), and it is inside the
+        // configuration the operator pastes.
+        Assert.StartsWith(TokenText.AdministeringPrefix, issued.Token);
+        Assert.Equal("administering", issued.Kind);
+        Assert.True(issued.MayDestroy);
+        Assert.Contains(issued.Token, issued.ClientConfiguration, StringComparison.Ordinal);
+
+        // The list is where an operator decides what to revoke, so what a token
+        // may do is on it.
+        var listed = await ReadAsync<ListedAgentToken[]>(
+            await client.GetAsync("/agent-tokens", TestContext.Current.CancellationToken));
+        var only = Assert.Single(listed);
+        Assert.Equal("administering", only.Kind);
+        Assert.True(only.MayDestroy);
+
+        // And it reads back as what it is, prefix included.
+        var readBack = await ReadAsync<ReadAgentToken>(await client.GetAsync(
+            $"/agent-tokens/{issued.Id}/token", TestContext.Current.CancellationToken));
+        Assert.Equal(issued.Token, readBack.Token);
+    }
+
+    [Fact]
+    public async Task An_administering_token_destroys_nothing_unless_it_was_issued_to()
+    {
+        using var client = await SignedInAsync();
+
+        var issued = await ReadAsync<IssuedAgentToken>(
+            await client.PostAsJsonAsync(
+                "/agent-tokens",
+                new { name = "the setting-up agent", kind = "administering" },
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal("administering", issued.Kind);
+        Assert.False(issued.MayDestroy);
+    }
+
+    [Fact]
+    public async Task A_reading_token_that_would_destroy_is_refused_rather_than_narrowed()
+    {
+        using var client = await SignedInAsync();
+
+        // Said outright and left to the default alike: a reading token makes no
+        // change of any kind, so the flag on one is not a smaller request but a
+        // request nobody could have meant. Neither is quietly turned into a
+        // reading token that does not destroy.
+        object[] nonsense =
+        [
+            new { name = "terminal agent", kind = "reading", mayDestroy = true },
+            new { name = "terminal agent", mayDestroy = true },
+        ];
+
+        foreach (var body in nonsense)
+        {
+            using var response = await client.PostAsJsonAsync(
+                "/agent-tokens", body, TestContext.Current.CancellationToken);
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        // And a kind that is neither, which never reaches a row at all.
+        using var neither = await client.PostAsJsonAsync(
+            "/agent-tokens",
+            new { name = "terminal agent", kind = "root" },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, neither.StatusCode);
+
+        Assert.Empty(await ReadAsync<ListedAgentToken[]>(
+            await client.GetAsync("/agent-tokens", TestContext.Current.CancellationToken)));
     }
 
     [Fact]
@@ -326,11 +415,29 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
 
     private sealed record ReadIngestToken(string Token, string DeliverySnippet);
 
+    /// <remarks>
+    /// The kind is read as the string it travels as rather than as the enum it
+    /// came from, because what the operator's browser and anybody's script see
+    /// is the word — and a number appearing there instead is the kind of change
+    /// the checked-in contract exists to catch.
+    /// </remarks>
     private sealed record IssuedAgentToken(
-        Guid Id, string Name, string Token, string ClientConfiguration, DateTimeOffset IssuedAt);
+        Guid Id,
+        string Name,
+        string Kind,
+        bool MayDestroy,
+        string Token,
+        string ClientConfiguration,
+        DateTimeOffset IssuedAt);
 
+    /// <inheritdoc cref="IssuedAgentToken"/>
     private sealed record ListedAgentToken(
-        Guid Id, string Name, DateTimeOffset IssuedAt, DateTimeOffset? LastUsedAt);
+        Guid Id,
+        string Name,
+        string Kind,
+        bool MayDestroy,
+        DateTimeOffset IssuedAt,
+        DateTimeOffset? LastUsedAt);
 
     private sealed record ReadAgentToken(string Token, string ClientConfiguration);
 }

@@ -130,8 +130,11 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
         IssuedToken issued;
         await using (var context = ContextFor(installation))
         {
-            issued = await new IssueAgentToken(new Tokens(context), cipher, At(Now))
-                .ExecuteAsync("claude-code", TestContext.Current.CancellationToken);
+            issued = await new IssueAgentToken(new Tokens(context), cipher, At(Now)).ExecuteAsync(
+                "claude-code",
+                AgentTokenKind.Reading,
+                mayDestroy: false,
+                TestContext.Current.CancellationToken);
         }
 
         await using (var context = ContextFor(installation))

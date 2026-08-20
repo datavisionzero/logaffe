@@ -52,7 +52,20 @@ public sealed record ReadIngestTokenResponse(string Token, string DeliverySnippe
 /// The operator's name for the token, conventionally the client it is being
 /// issued for. It is a label for the list and nothing the server acts on.
 /// </param>
-public sealed record IssueAgentTokenRequest(string? Name);
+/// <param name="Kind">
+/// Reading or administering, and reading when it is left out — which is what
+/// <c>VISION.md</c>'s read-only by default means where it is applied rather than
+/// asserted. It is settled here and by nothing afterwards: there is no act that
+/// changes what a token is (ADR 0046).
+/// </param>
+/// <param name="MayDestroy">
+/// Whether an administering token may delete a project or a host, or lower a
+/// retention window. Off when it is left out, and refused outright on a reading
+/// token — which changes nothing at all, so the flag there is not a smaller
+/// request but a nonsense one.
+/// </param>
+public sealed record IssueAgentTokenRequest(
+    string? Name, AgentTokenKind? Kind, bool? MayDestroy);
 
 /// <inheritdoc cref="IssueAgentTokenRequest"/>
 public sealed record RenameAgentTokenRequest(string? Name);
@@ -66,17 +79,33 @@ public sealed record RenameAgentTokenRequest(string? Name);
 public sealed record IssuedAgentTokenResponse(
     Guid Id,
     string Name,
+    AgentTokenKind Kind,
+    bool MayDestroy,
     string Token,
     string ClientConfiguration,
     DateTimeOffset IssuedAt);
 
 /// <summary>One agent token as the operator sees it in a list.</summary>
+/// <param name="Kind">
+/// What this token is. The list is where an operator decides what to revoke, and
+/// a credential whose powers are not visible there is one that is never revoked
+/// for being too strong.
+/// </param>
+/// <param name="MayDestroy">
+/// Whether it may delete a project or a host, or lower a retention window. Never
+/// true of a reading token.
+/// </param>
 /// <param name="LastUsedAt">
 /// The load-bearing field of ADR 0021: a token that has not been used in months
 /// is one to revoke, and this list is the only place that fact is visible.
 /// </param>
 public sealed record ListedAgentTokenResponse(
-    Guid Id, string Name, DateTimeOffset IssuedAt, DateTimeOffset? LastUsedAt);
+    Guid Id,
+    string Name,
+    AgentTokenKind Kind,
+    bool MayDestroy,
+    DateTimeOffset IssuedAt,
+    DateTimeOffset? LastUsedAt);
 
 /// <inheritdoc cref="ReadIngestTokenResponse"/>
 public sealed record ReadAgentTokenResponse(string Token, string ClientConfiguration);
@@ -112,11 +141,12 @@ public sealed record ReadHostTokenResponse(string Token, string CollectorCommand
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every one of these is behind the operator's session and none of them is
-/// reachable over MCP — not as a permission but as an absence from that
-/// interface, which offers five read tools and nothing else
-/// (ADR 0018). A log entry that asks an agent to mint a credential has to find
-/// nothing to call.
+/// Every one of these is behind the operator's session. The agent token's are
+/// reachable from nowhere else at all — not as a permission but as an absence
+/// from the other interface, which is what keeps the rest of ADR 0046 coherent:
+/// an agent that could issue an agent token would grant itself the kind and the
+/// flag the operator withheld, and both would be decoration. A log entry that
+/// asks an agent to mint one has to find nothing to call.
 /// </para>
 /// <para>
 /// <b>A token appears in a response body and nowhere else.</b> The request log
@@ -131,11 +161,13 @@ public sealed record ReadHostTokenResponse(string Token, string CollectorCommand
 /// which is the whole reason the rule is about bodies rather than about tokens.
 /// </para>
 /// <para>
-/// The three kinds are three sets of routes rather than one with a kind in it,
-/// for the same reason the store is three methods: they are three tables, they
-/// are refused at each other's doors by the prefix, and each belongs somewhere
-/// different — an ingest token to a project, a host token to a host, an agent
-/// token to the installation (<c>docs/ui.md</c>).
+/// The three tables are three sets of routes rather than one with a kind in it,
+/// for the same reason the store is three methods: they are refused at each
+/// other's doors by the prefix, and each belongs somewhere different — an ingest
+/// token to a project, a host token to a host, an agent token to the
+/// installation (<c>docs/ui.md</c>). The two kinds an agent token comes in do
+/// share these routes, because they are one table and one list: what tells them
+/// apart is a field the operator sets once, not an address.
 /// </para>
 /// </remarks>
 public static class TokenEndpoints
@@ -260,19 +292,37 @@ public static class TokenEndpoints
                     return NotAName();
                 }
 
-                var issued = await issue.ExecuteAsync(request.Name!, cancellationToken);
+                // Reading unless the operator said otherwise, which is where the
+                // default of `VISION.md` is applied rather than asserted.
+                var kind = request.Kind ?? AgentTokenKind.Reading;
+                var mayDestroy = request.MayDestroy ?? false;
+
+                // Refused rather than ignored. A reading token makes no change
+                // of any kind, so a destructive flag on one is not a smaller
+                // request — it is a request nobody could have meant, and
+                // storing it as a flag that means nothing is how a list stops
+                // being readable.
+                if (mayDestroy && kind is not AgentTokenKind.Administering)
+                {
+                    return OnlyAnAdministeringTokenDestroys();
+                }
+
+                var issued = await issue.ExecuteAsync(
+                    request.Name!, kind, mayDestroy, cancellationToken);
 
                 return Results.Created(
                     ReadBackOf("agent-tokens", issued.Id),
                     new IssuedAgentTokenResponse(
                         issued.Id,
                         request.Name!.Trim(),
+                        kind,
+                        mayDestroy,
                         issued.Token.Text,
                         AgentClientConfiguration.For(context.Request, issued.Token),
                         issued.IssuedAt));
             })
             .WithName("IssueAgentToken")
-            .WithSummary("Gives an agent a token to read with.")
+            .WithSummary("Gives an agent a token to read or to administer with.")
             .Produces<IssuedAgentTokenResponse>(StatusCodes.Status201Created)
             .ProducesValidationProblem();
 
@@ -283,7 +333,12 @@ public static class TokenEndpoints
                 var held = await list.ExecuteAsync(cancellationToken);
 
                 return Results.Ok(held.Select(token => new ListedAgentTokenResponse(
-                    token.Id, token.Name, token.IssuedAt, token.LastUsedAt)));
+                    token.Id,
+                    token.Name,
+                    token.Kind,
+                    token.MayDestroy,
+                    token.IssuedAt,
+                    token.LastUsedAt)));
             })
             .WithName("ListAgentTokens")
             .WithSummary("Every agent token the installation holds.")
@@ -456,6 +511,16 @@ public static class TokenEndpoints
     /// </summary>
     private static bool IsAName(string? name) =>
         !string.IsNullOrWhiteSpace(name) && name.Trim().Length <= AgentToken.NameMaxLength;
+
+    private static IResult OnlyAnAdministeringTokenDestroys() => Results.ValidationProblem(
+        new Dictionary<string, string[]>
+        {
+            ["mayDestroy"] =
+            [
+                "Only an administering token can be issued to destroy: a reading "
+                + "token makes no change of any kind.",
+            ],
+        });
 
     private static IResult NotAName() => Results.ValidationProblem(
         new Dictionary<string, string[]>

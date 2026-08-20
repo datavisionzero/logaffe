@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using Logaffe.Application.Operations;
+using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol.Server;
 
 namespace Logaffe.Api.Mcp;
@@ -12,7 +13,14 @@ namespace Logaffe.Api.Mcp;
 /// not offered here as anything — not read-only, not confirmable, not behind a
 /// setting — because they are absent from this interface rather than forbidden
 /// on it (ADR 0018).
+/// <para>
+/// <b>A reading token and nothing else is offered this.</b> An administering
+/// token authenticates at the same endpoint and is handed a tool list that does
+/// not contain it — absent rather than present and refusing, which is what keeps
+/// a session that can act from ever holding a log line (ADR 0046).
+/// </para>
 /// </remarks>
+[Authorize(Policy = AgentAuthentication.ReadingPolicy)]
 [McpServerToolType]
 public static class ProjectTools
 {

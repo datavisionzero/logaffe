@@ -21,6 +21,15 @@ public sealed class AgentTokenConfiguration : IEntityTypeConfiguration<AgentToke
             .HasMaxLength(AgentToken.NameMaxLength)
             .IsRequired();
 
+        // On the row as well as in the prefix, and stored as the number the
+        // enum is: the prefix is written by whoever presents the token, so it
+        // says which half of the surface a call is aimed at and this says what
+        // the token actually is (ADR 0046). Reading is zero, which is what every
+        // agent token issued before this column existed became.
+        builder.Property(t => t.Kind).HasColumnName("kind").IsRequired();
+
+        builder.Property(t => t.MayDestroy).HasColumnName("may_destroy").IsRequired();
+
         builder.Property(t => t.Identifier)
             .HasColumnName("identifier")
             .HasMaxLength(TokenIdentifier.Length)

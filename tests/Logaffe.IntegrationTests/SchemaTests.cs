@@ -3,6 +3,8 @@ using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Logaffe.IntegrationTests;
@@ -41,6 +43,44 @@ public sealed class SchemaTests(PostgresFixture postgres)
             Assert.Empty(await context.Database.GetPendingMigrationsAsync(TestContext.Current.CancellationToken));
             Assert.NotEmpty(await context.Database.GetAppliedMigrationsAsync(TestContext.Current.CancellationToken));
         }
+    }
+
+    [Fact]
+    public async Task An_agent_token_from_before_the_kind_existed_becomes_a_reading_one()
+    {
+        // The upgrade an installation that has been running since before ADR
+        // 0046 makes. What `VISION.md` says is read-only by default, and this is
+        // the line where the default is applied rather than asserted: a token
+        // that was issued when there was only one kind is that kind afterwards,
+        // and the agent holding it does not have to be reconnected.
+        var connectionString = await postgres.CreateDatabaseAsync();
+        await using var context = ContextFor(connectionString);
+
+        await context.Database.GetService<IMigrator>().MigrateAsync(
+            BeforeTheKind, TestContext.Current.CancellationToken);
+
+        var minted = TokenText.Mint(TokenKind.Agent);
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO agent_token (id, name, identifier, secret, issued_at)
+            VALUES ({0}, {1}, {2}, {3}, {4})
+            """,
+            [Guid.CreateVersion7(), "terminal agent", minted.Identifier.Value, Ciphertext, Now],
+            TestContext.Current.CancellationToken);
+
+        await MigratorFor(context).ApplyAsync(TestContext.Current.CancellationToken);
+
+        await using var reader = ContextFor(connectionString);
+        var stored = await reader.AgentTokens.SingleAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(AgentTokenKind.Reading, stored.Kind);
+        Assert.False(stored.MayDestroy);
+
+        // And it is still the token that was pasted into a client: the row is
+        // found by the identifier the presented token carries, and nothing about
+        // that changed.
+        Assert.Equal(minted.Identifier, stored.Identifier);
+        Assert.Equal(Ciphertext, stored.EncryptedSecret);
     }
 
     [Fact]
@@ -243,7 +283,13 @@ public sealed class SchemaTests(PostgresFixture postgres)
         await MigratorFor(context).ApplyAsync(TestContext.Current.CancellationToken);
 
         var minted = TokenText.Mint(TokenKind.Agent);
-        context.AgentTokens.Add(AgentToken.Issue("terminal agent", minted.Identifier, Ciphertext, Now));
+        context.AgentTokens.Add(AgentToken.Issue(
+            "terminal agent",
+            AgentTokenKind.Reading,
+            mayDestroy: false,
+            minted.Identifier,
+            Ciphertext,
+            Now));
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         await using var reader = ContextFor(connectionString);
@@ -258,6 +304,12 @@ public sealed class SchemaTests(PostgresFixture postgres)
 
     private static LogaffeDbContext ContextFor(string connectionString) =>
         new(new DbContextOptionsBuilder<LogaffeDbContext>().UseNpgsql(connectionString).Options);
+
+    /// <summary>
+    /// The last migration before the agent token had a kind, which is the schema
+    /// an installation upgrading into ADR 0046 arrives on.
+    /// </summary>
+    private const string BeforeTheKind = "20260819161242_HostsAndSamples";
 
     private static SchemaMigrator MigratorFor(LogaffeDbContext context) =>
         new(context, NullLogger<SchemaMigrator>.Instance);

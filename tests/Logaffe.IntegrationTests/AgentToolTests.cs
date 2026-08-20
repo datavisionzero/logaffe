@@ -5,6 +5,7 @@ using Logaffe.Api.Http;
 using Logaffe.Api.Mcp;
 using Logaffe.Domain.Entries;
 using Microsoft.AspNetCore.Mvc.Testing;
+using ModelContextProtocol;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using Npgsql;
@@ -153,6 +154,34 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
             tools.Select(tool => tool.Name).Order());
 
         Assert.All(tools, tool => Assert.NotEmpty(tool.Description ?? string.Empty));
+    }
+
+    [Fact]
+    public async Task An_administering_token_arrives_here_and_is_offered_none_of_the_five()
+    {
+        // Both kinds come to one endpoint, and the tool list is the token's
+        // (`docs/mcp.md`): an MCP client is handed what its credential earns
+        // rather than pointed at a second address. What an administering token
+        // earns is the settings surface, which is not built yet — so what it is
+        // offered today is nothing at all, and in particular not a reading tool.
+        using var operatorClient = await SignedInAsync();
+        var administering = await IssueAdministeringTokenAsync(operatorClient);
+
+        await using var agent = await ConnectAsync(administering);
+
+        Assert.Empty(await agent.ListToolsAsync(
+            cancellationToken: TestContext.Current.CancellationToken));
+
+        // Absent from the list is not the whole of it: a tool named by a client
+        // that read the other token's list is refused as well, so the two kinds
+        // do not meet through a guess either (ADR 0046).
+        var refused = await Assert.ThrowsAsync<McpProtocolException>(
+            async () => await agent.CallToolAsync(
+                "list_projects",
+                new Dictionary<string, object?>(),
+                cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Contains("authorization", refused.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -899,7 +928,7 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
     }
 
-    private async Task<McpClient> ConnectAsync()
+    private async Task<McpClient> ConnectAsync(string? token = null)
     {
         var transport = new HttpClientTransport(
             new HttpClientTransportOptions
@@ -908,7 +937,7 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
                 TransportMode = HttpTransportMode.StreamableHttp,
                 AdditionalHeaders = new Dictionary<string, string>
                 {
-                    ["Authorization"] = $"Bearer {_agentToken}",
+                    ["Authorization"] = $"Bearer {token ?? _agentToken}",
                 },
 
                 // Nothing is delivered without a call (`docs/mcp.md`), so there
@@ -958,6 +987,12 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
         (await ReadAsync<IssuedTokenBody>(await client.PostAsJsonAsync(
             "/agent-tokens",
             new { name = "a terminal agent" },
+            TestContext.Current.CancellationToken))).Token;
+
+    private async Task<string> IssueAdministeringTokenAsync(HttpClient client) =>
+        (await ReadAsync<IssuedTokenBody>(await client.PostAsJsonAsync(
+            "/agent-tokens",
+            new { name = "the setting-up agent", kind = "administering" },
             TestContext.Current.CancellationToken))).Token;
 
     private async Task<string> IssueIngestTokenAsync(HttpClient client, Guid projectId) =>

@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using Logaffe.Api.Cli;
 using Logaffe.Api.Hosting;
 using Logaffe.Api.Http;
@@ -192,8 +194,9 @@ builder.Services.AddScoped<SweepExpiredEntries>();
 builder.Services.AddScoped<SweepExpiredSamples>();
 
 // The operator's token acts. They are registered here and reachable from HTTP
-// and the command line; what makes them unreachable over MCP is that the MCP
-// adapter offers five read tools and nothing else (ADR 0018).
+// and the command line; the agent token's stay unreachable over MCP, because an
+// agent that could issue one would grant itself the kind and the flag the
+// operator withheld (ADR 0046).
 builder.Services.AddScoped<IssueIngestToken>();
 builder.Services.AddScoped<ListIngestTokens>();
 builder.Services.AddScoped<IssueHostToken>();
@@ -235,9 +238,21 @@ builder.Services.AddLogaffeAgentAuthentication();
 builder.Services.AddLogaffeRateLimits();
 builder.Services.AddLogaffeOpenApi();
 
+// The one closed set that crosses the operator's surface — which kind an agent
+// token is — travels as the name it is called by rather than as a number, the
+// same choice the MCP answers make for the same reason: a number would put a
+// mapping into the checked-in contract, into the web client and into whatever
+// script an operator writes, and nothing would keep the three of them true.
+// Integers are not accepted alongside, so a kind that is not one of the two is
+// refused at the door rather than stored as a row nobody can read.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(
+        new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false)));
+
 // The second adapter over the reads above. It is registered beside them rather
 // than inside them: what an agent may call is a fact about this composition
-// root, and the five tools are the whole of it (ADR 0018).
+// root, and which of the tools a given agent is offered is a fact about the
+// token it presented (ADR 0046).
 builder.Services.AddLogaffeAgentTools();
 
 var app = builder.Build();

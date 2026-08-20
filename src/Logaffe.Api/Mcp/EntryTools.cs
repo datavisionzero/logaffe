@@ -3,6 +3,7 @@ using Logaffe.Api.Queries;
 using Logaffe.Application.Operations;
 using Logaffe.Domain.Entries;
 using Logaffe.Domain.Queries;
+using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
@@ -32,7 +33,14 @@ namespace Logaffe.Api.Mcp;
 /// no subscription, no poll and nothing delivered without a call — the fourth
 /// read on this surface is the operator's alone (<c>docs/mcp.md</c>).
 /// </para>
+/// <para>
+/// <b>A reading token and nothing else is offered this.</b> An administering
+/// token authenticates at the same endpoint and is handed a tool list that does
+/// not contain it — absent rather than present and refusing, which is what keeps
+/// a session that can act from ever holding a log line (ADR 0046).
+/// </para>
 /// </remarks>
+[Authorize(Policy = AgentAuthentication.ReadingPolicy)]
 [McpServerToolType]
 public static class EntryTools
 {

@@ -434,8 +434,11 @@ public sealed class ClaimActsTests
         /// An agent the operator connected, issued the way they issue one.
         /// </summary>
         public Task<IssuedToken> IssueAgentTokenAsync(string name) =>
-            new IssueAgentToken(Tokens, Cipher, Clock)
-                .ExecuteAsync(name, TestContext.Current.CancellationToken);
+            new IssueAgentToken(Tokens, Cipher, Clock).ExecuteAsync(
+                name,
+                AgentTokenKind.Reading,
+                mayDestroy: false,
+                TestContext.Current.CancellationToken);
 
         /// <summary>
         /// A project's ingest token, put in the store directly: which project it

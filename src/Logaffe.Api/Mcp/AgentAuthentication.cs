@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Logaffe.Application.Operations;
+using Logaffe.Domain.Tokens;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
@@ -19,17 +20,40 @@ namespace Logaffe.Api.Mcp;
 /// operator's surface, because neither endpoint asks the other's scheme.
 /// </para>
 /// <para>
-/// There is nothing to carry out of a successful authentication. An agent token
-/// reads every project and writes nothing, so that it was admitted at all is the
-/// whole of its permission (ADR 0021) — the principal below holds no claim
-/// because there is no fact about the caller that any tool is entitled to
-/// branch on.
+/// <b>Both kinds of agent token arrive here</b>, and what a successful
+/// authentication carries out is which of the two this one is. That is the whole
+/// of what the tools branch on: a reading token is offered the five tools and no
+/// setting, an administering token the settings and no entry, and the two lists
+/// do not meet (ADR 0046). It is a claim rather than something read again inside
+/// a call, because the row was already fetched to verify the secret and asking
+/// twice would be a second lookup on every call an agent makes.
 /// </para>
 /// </remarks>
 public static class AgentAuthentication
 {
     /// <summary>What the MCP endpoint names when it asks to be behind the door.</summary>
     public const string Scheme = "Agent";
+
+    /// <summary>
+    /// Which kind of agent token was presented, spelled as
+    /// <see cref="AgentTokenKind"/> names it.
+    /// </summary>
+    public const string KindClaim = "logaffe:agent-kind";
+
+    /// <summary>
+    /// Present, and only present, on an administering token issued to destroy.
+    /// Nothing is written when the flag is off: an absent claim and a claim
+    /// saying <c>false</c> are one fact, and one of them is harder to get wrong.
+    /// </summary>
+    public const string MayDestroyClaim = "logaffe:may-destroy";
+
+    /// <summary>
+    /// What the five reading tools ask for. A token that is not a reading one is
+    /// not offered them at all — the tool is absent from the list rather than
+    /// present and refusing, which is what makes the split legible to the agent
+    /// holding the token.
+    /// </summary>
+    public const string ReadingPolicy = "logaffe:agent-reads";
 
     public static IServiceCollection AddLogaffeAgentAuthentication(
         this IServiceCollection services)
@@ -40,6 +64,13 @@ public static class AgentAuthentication
         services
             .AddAuthentication()
             .AddScheme<AuthenticationSchemeOptions, AgentAuthenticationHandler>(Scheme, null);
+
+        services
+            .AddAuthorizationBuilder()
+            .AddPolicy(ReadingPolicy, policy => policy
+                .AddAuthenticationSchemes(Scheme)
+                .RequireAuthenticatedUser()
+                .RequireClaim(KindClaim, nameof(AgentTokenKind.Reading)));
 
         return services;
     }
@@ -63,18 +94,29 @@ public sealed class AgentAuthenticationHandler(
 
         var admitted = await Context.RequestServices
             .GetRequiredService<AuthenticateToken>()
-            .AdmitsReadAsync(presented, Context.RequestAborted);
+            .AdmittedAgentAsync(presented, Context.RequestAborted);
 
-        if (!admitted)
+        if (admitted is null)
         {
-            // Revoked, never issued, or an ingest token pasted into an agent
-            // configuration. Which of the three it was is not said here and is
-            // not knowable from the answer (ADR 0031).
-            return AuthenticateResult.Fail("The presented token admits no read.");
+            // Revoked, never issued, an ingest token pasted into an agent
+            // configuration, or a token whose prefix says one kind where its row
+            // says the other. Which of them it was is not said here and is not
+            // knowable from the answer (ADR 0031).
+            return AuthenticateResult.Fail("The presented token admits nothing.");
+        }
+
+        var claims = new List<Claim>
+        {
+            new(AgentAuthentication.KindClaim, admitted.Kind.ToString()),
+        };
+
+        if (admitted.MayDestroy)
+        {
+            claims.Add(new Claim(AgentAuthentication.MayDestroyClaim, bool.TrueString));
         }
 
         return AuthenticateResult.Success(new AuthenticationTicket(
-            new ClaimsPrincipal(new ClaimsIdentity(Scheme.Name)), Scheme.Name));
+            new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme.Name)), Scheme.Name));
     }
 
     /// <remarks>

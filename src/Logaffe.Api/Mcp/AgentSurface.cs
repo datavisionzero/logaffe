@@ -11,7 +11,7 @@ namespace Logaffe.Api.Mcp;
 
 /// <summary>
 /// The second adapter over the read use cases: five tools at <c>/mcp</c>, behind
-/// an agent token.
+/// a reading agent token.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -26,6 +26,14 @@ namespace Logaffe.Api.Mcp;
 /// would be a second way to ask the same thing with its own caching and its own
 /// surface. Nothing is registered here that writes, and nothing reaches a
 /// project or a token (ADR 0018).
+/// </para>
+/// <para>
+/// <b>One endpoint, and the tool list is the token's.</b> Both kinds of agent
+/// token arrive at <c>/mcp</c> — an MCP client is handed the tools its
+/// credential earns, so how many servers an operator wires up is decided by how
+/// many tokens they hold rather than by how many addresses exist. The five below
+/// are the reading token's; the administering token's surface is not built yet,
+/// and until it is, what that token is offered is an empty list (ADR 0046).
 /// </para>
 /// </remarks>
 public static class AgentSurface
@@ -59,7 +67,15 @@ public static class AgentSurface
             // somewhere (ADR 0018).
             .WithTools(
                 [typeof(ProjectTools), typeof(EntryTools), typeof(HostTools)],
-                AgentJson.Options);
+                AgentJson.Options)
+
+            // What makes the `[Authorize]` on those three do anything: the tool
+            // list a client is handed is filtered by what the presented token
+            // earns, and a tool it does not earn is missing from the list rather
+            // than present and refusing. Today that is one list and an empty
+            // one — an administering token authenticates here and is offered
+            // nothing at all until the surface it earns exists (ADR 0046).
+            .AddAuthorizationFilters();
 
         return services;
     }
@@ -80,7 +96,7 @@ public static class AgentSurface
 
             // It is publicly reachable but it is not the HTTP contract. That
             // document describes what the operator's browser and a sender talk
-            // to; the shape of these five is in the tool list an agent asks for.
+            // to; the shape of the tools is in the tool list an agent asks for.
             .ExcludeFromDescription();
 
         // The stream a client opens when it expects the server to speak first.

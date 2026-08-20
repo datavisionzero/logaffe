@@ -1861,7 +1861,7 @@
         "tags": [
           "logaffe"
         ],
-        "summary": "Gives an agent a token to read with.",
+        "summary": "Gives an agent a token to read or to administer with.",
         "operationId": "IssueAgentToken",
         "requestBody": {
           "content": {
@@ -2168,6 +2168,12 @@
   },
   "components": {
     "schemas": {
+      "AgentTokenKind": {
+        "enum": [
+          "reading",
+          "administering"
+        ]
+      },
       "BackupCodesResponse": {
         "required": [
           "codes"
@@ -2719,7 +2725,9 @@
       },
       "IssueAgentTokenRequest": {
         "required": [
-          "name"
+          "name",
+          "kind",
+          "mayDestroy"
         ],
         "type": "object",
         "properties": {
@@ -2727,6 +2735,22 @@
             "type": [
               "null",
               "string"
+            ]
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/AgentTokenKind"
+              }
+            ]
+          },
+          "mayDestroy": {
+            "type": [
+              "null",
+              "boolean"
             ]
           }
         }
@@ -2749,6 +2773,8 @@
         "required": [
           "id",
           "name",
+          "kind",
+          "mayDestroy",
           "token",
           "clientConfiguration",
           "issuedAt"
@@ -2761,6 +2787,12 @@
           },
           "name": {
             "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentTokenKind"
+          },
+          "mayDestroy": {
+            "type": "boolean"
           },
           "token": {
             "type": "string"
@@ -2829,6 +2861,8 @@
         "required": [
           "id",
           "name",
+          "kind",
+          "mayDestroy",
           "issuedAt",
           "lastUsedAt"
         ],
@@ -2840,6 +2874,12 @@
           },
           "name": {
             "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/AgentTokenKind"
+          },
+          "mayDestroy": {
+            "type": "boolean"
           },
           "issuedAt": {
             "type": "string",

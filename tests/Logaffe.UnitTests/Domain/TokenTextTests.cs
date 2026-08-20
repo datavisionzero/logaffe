@@ -8,6 +8,7 @@ public sealed class TokenTextTests
     [InlineData(TokenKind.Ingest, "logaffe_ingest")]
     [InlineData(TokenKind.Agent, "logaffe_agent")]
     [InlineData(TokenKind.Host, "logaffe_host")]
+    [InlineData(TokenKind.Administering, "logaffe_admin")]
     public void A_minted_token_is_its_prefix_its_identifier_and_its_secret(
         TokenKind kind, string prefix)
     {
@@ -52,11 +53,28 @@ public sealed class TokenTextTests
         Assert.NotEqual(TokenKind.Ingest, agent.Kind);
     }
 
+    [Fact]
+    public void The_two_agent_kinds_are_told_apart_by_their_prefixes_too()
+    {
+        // They share an endpoint, so this is what settles which half of the
+        // surface a call is aimed at before the database is asked anything at
+        // all (ADR 0046). What it does not settle is what the token is: that is
+        // on the row, because the prefix is written by whoever presents it.
+        Assert.True(TokenText.TryParse(
+            TokenText.Mint(TokenKind.Administering).Text, out var administering));
+
+        Assert.Equal(TokenKind.Administering, administering.Kind);
+        Assert.NotEqual(TokenKind.Agent, administering.Kind);
+        Assert.NotEqual(
+            TokenText.AgentPrefix,
+            TokenText.PrefixOf(TokenKind.Administering));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("not-a-token")]
-    [InlineData("logaffe_admin_aaaaaaaaaaaa_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")]
+    [InlineData("logaffe_reader_aaaaaaaaaaaa_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")]
     [InlineData("logaffe_ingest_aaaaaaaaaaaa")]
     [InlineData("logaffe_ingest_aaaaaaaaaaaa_bbbbbbbbbbbb_cccccccccccc")]
     public void A_value_that_is_not_one_of_these_is_refused(string? value) =>

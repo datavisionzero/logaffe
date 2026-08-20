@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Logaffe.Application.Operations;
 using Logaffe.Domain.Hosts;
+using Microsoft.AspNetCore.Authorization;
 using ModelContextProtocol;
 using ModelContextProtocol.Server;
 
@@ -26,7 +27,14 @@ namespace Logaffe.Api.Mcp;
 /// configuration — so the boundary that holds untrusted content inside one
 /// project has nothing here to hold apart (ADR 0045).
 /// </para>
+/// <para>
+/// <b>A reading token and nothing else is offered this.</b> An administering
+/// token authenticates at the same endpoint and is handed a tool list that does
+/// not contain it — absent rather than present and refusing, which is what keeps
+/// a session that can act from ever holding a log line (ADR 0046).
+/// </para>
 /// </remarks>
+[Authorize(Policy = AgentAuthentication.ReadingPolicy)]
 [McpServerToolType]
 public static class HostTools
 {

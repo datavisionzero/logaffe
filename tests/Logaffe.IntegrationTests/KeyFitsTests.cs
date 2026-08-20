@@ -69,6 +69,8 @@ public sealed class KeyFitsTests(PostgresFixture postgres) : IDisposable
         var cipher = CipherOn(volume);
         context.AgentTokens.Add(AgentToken.Issue(
             "terminal agent",
+            AgentTokenKind.Reading,
+            mayDestroy: false,
             TokenIdentifier.Mint(),
             cipher.Encrypt(TokenText.Mint(TokenKind.Agent).Secret),
             Now));
