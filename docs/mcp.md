@@ -39,7 +39,7 @@ remembered afterwards.
 
 An agent token is issued as **reading** or as **administering**, and the two do
 not overlap. A reading token is given the five tools below and reaches no
-setting; an administering token is given the settings surface and reaches no
+setting; an administering token is given the twenty-one after them and reaches no
 entry. The kind is settled when the token is issued and **cannot be changed
 afterwards**: an agent that needs the other one is given a second token, and the
 operator revokes whatever it replaces.
@@ -297,52 +297,97 @@ sentence from these values, and the agent is handed the fact
 
 ## Administering
 
-An administering token reaches what the settings screens carry
-([Projects and tokens](./projects.md), [Metrics](./metrics.md)) and nothing
-besides: it creates, renames and deletes projects, groups and hosts, moves a
-project between groups, puts one on a host, sets a retention window and the
-installation's window for samples, and issues and revokes ingest and host tokens.
+**Twenty-one tools, seventeen of them on a token that may not destroy.** They are
+the acts the settings screens carry, named as the product already names them
+([Projects and tokens](./projects.md), [Metrics](./metrics.md)) rather than in a
+vocabulary invented for this door.
 
-**It reads that surface as well as writing it**, because renaming presupposes
-listing and the surface is unusable otherwise. This is not the read the other kind
-has: what comes back is names, windows and when a token was last used, every bit
-of it written by the operator and none of it text an application logged. That is
-what keeps this surface free of untrusted content, and it holds exactly as long as
-every name on it is the operator's own
-([ADR 0046](./adr/0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)).
+**`get_settings`** — the whole surface in one answer: the groups, the projects
+with the group each sits in, the host each sits on and its retention window, the
+hosts, the installation's window for samples, and for each project and host how
+many tokens it holds and when each was last used. **No token value is in it**, and
+neither is an entry.
 
-### Destroying is a second thing to be issued
+It is one tool rather than one per list for the reason `list_projects` carries the
+group and the host rather than leaving them to tools of their own: it is a tree
+that fits in one answer, and a second read path for a fact the first already
+carries is another thing to keep in step. It is also why it is not called
+`list_projects` — that name is taken on the other surface, by a tool that answers
+differently, and an operator who has wired up both agents should not meet one word
+meaning two things. The identities are the same ones, so the two are looking at
+one installation.
 
-An administering token may destroy data only if it was issued saying so, off
-unless asked for, and settled once like the kind itself. **Destructive means data
-that does not come back**, and it is four things: deleting a project, whose
-entries go with it
+**Projects** — `create_project`, `rename_project`, `move_project_to_group`,
+`put_project_on_host` and `delete_project`. Creating a project hands back no
+token; issuing one does, exactly as the screen does it
+([Projects and tokens](./projects.md#the-ingest-token)).
+
+**Groups** — `create_group`, `rename_group` and `delete_group`. Deleting one is
+not destructive, and it is the clearest illustration of what that word is doing
+here: a group holds nothing, so its projects come out of it and stay
+([ADR 0039](./adr/0039-a-group-has-an-identity-and-holds-nothing.md)).
+
+**Hosts** — `create_host`, `rename_host` and `delete_host`.
+
+**Retention** — `extend_project_retention` and `shorten_project_retention`,
+`extend_sample_retention` and `shorten_sample_retention`, against the one act the
+installation performs. **The window is two tools because only one direction
+destroys**, and splitting it is what keeps the flag legible in the tool list: a
+token that may not destroy is not handed a shortening tool that refuses, it is
+handed no shortening tool at all. A call that would move the window the other way
+is refused in a sentence naming the tool that does it, and the agent knows which
+it wants because `get_settings` told it where the window is now.
+
+**`count_entries_outside_window`** — how many entries a proposed window would
+drop, asked before anything drops. It is not destructive and it is on every
+administering token, including one that cannot shorten: an agent that may not make
+the change can still tell the operator what it would cost, which is the useful
+half of the answer. It returns a number and no entry, so it is a count on this
+surface for the reason a sample is a read on the other one
+([ADR 0045](./adr/0045-a-sample-is-not-an-entry-and-may-be-read-across-projects.md)).
+
+**Tokens** — `issue_ingest_token`, `revoke_ingest_token`, `issue_host_token` and
+`revoke_host_token`. Revoking is two tools where the installation has one act that
+takes any token, and the split is the whole point: an agent token is then absent
+from the list rather than refused inside a call, which is what "never reachable"
+has to mean to be worth saying.
+
+### Destroying is four tools
+
+An administering token is handed `delete_project`, `delete_host`,
+`shorten_project_retention` and `shorten_sample_retention` only if it was issued
+saying so, off unless asked for, and settled once like the kind itself.
+**Destructive means data that does not come back**: deleting a project takes its
+entries with it
 ([ADR 0019](./adr/0019-a-project-is-deleted-at-once-and-its-entries-follow.md)),
-deleting a host and its samples, **lowering a project's retention window**, and
-**lowering the installation's sample retention**.
+deleting a host takes its samples, and each shortening removes what now falls
+outside the window.
 
-The last two are why the flag is not called *delete*. They read like settings and
-they remove stored entries, which makes them the ones worth being unable to do by
-accident. Creating, renaming, moving, raising a window and revoking a token are
-not destructive: a revoked token stops a sender delivering and the entries that
-would have arrived never exist, but nothing that is already there is gone
-afterwards, and another token closes the gap.
+The two shortenings are why the flag is not called *delete*. They read like
+settings and they remove stored entries, which makes them the ones worth being
+unable to do by accident. Everything else on the surface stays: creating,
+renaming, moving, extending a window and revoking a token are not destructive — a
+revoked token stops a sender delivering and the entries that would have arrived
+never exist, but nothing that is already there is gone afterwards, and another
+token closes the gap.
 
 ### A token is issued, never read back
 
-An administering token may issue an ingest or a host token, on any project or host
-and not only on one it has just made, and may **never read an existing one back** —
-not directly, and not through the delivery snippet, which carries the token inside
-it. A token value reaches an agent at the moment it is created and never again;
-recovering one is an errand at a browser, where the operator reads it back as
-they always could
+`issue_ingest_token` and `issue_host_token` work on any project or host, not only
+on one the agent has just made, and there is **no tool that reads an existing
+token back** — not directly, and not through the delivery snippet, which carries
+the token inside it. A token value reaches an agent at the moment it is created
+and never again; recovering one is an errand at a browser, where the operator
+reads it back as they always could
 ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)).
+`get_settings` counts a project's tokens and says when each was last used, which
+is what rotation needs to know and is not the token.
 
 Issuing where a token already exists is rotation, and it is allowed outright
 rather than tolerated, because the narrow rule does not survive the section above
-it: revoking is not destructive, so an agent could revoke the live token and
-issue a fresh one and be where the rule said it could not go. What it buys is the
-whole cycle — issue the second token, hand it over, revoke the first.
+it: revoking is not destructive, so an agent could revoke the live token and issue
+a fresh one and be where the rule said it could not go. What it buys is the whole
+cycle — issue the second token, hand it over, revoke the first.
 
 **The blast radius is stated plainly rather than softened**
 ([ADR 0046](./adr/0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)):
