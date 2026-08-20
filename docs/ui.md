@@ -352,6 +352,33 @@ The agent tokens live here rather than inside a project because an agent token
 reads every project — putting it under one of them would say something untrue
 about what it can do.
 
+**Issuing one asks which kind it is**, reading or administering, with reading
+offered: `VISION.md` says agent access is read-only by default, and a default is
+a thing a screen shows rather than a thing a document claims. **The may-destroy
+flag is offered only for an administering token**, off, and what it means is
+written where it is turned on — deleting a project, deleting a host, shortening a
+project's retention window, shortening the one for samples, and nothing else.
+Four acts named rather than a sentence about permissions, because those four are
+the ones after which data does not come back
+([ADR 0046](./adr/0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)).
+
+**The list says what each token is** — the kind, and whether it may destroy —
+beside the name and the last use. The list is where an operator decides what to
+revoke, and a credential whose powers are not visible there is one that is never
+revoked for being too strong. The screen also says that **the two do not
+combine**: an administering token cannot be given the reading tools and a reading
+token cannot be given the settings, so changing what a token may do is issuing
+another and revoking this one. That is said where someone would otherwise look
+for the switch, because there is no switch and nothing here edits a kind or a
+flag. Renaming stays what it always was, a label for the list.
+
+The configuration block carries the token that was issued and **suggests a server
+name that differs by kind** — an operator wiring up both puts two servers into
+one client, and two entries called `logaffe` is a mistake the product can spare
+them ([MCP](./mcp.md)). And one sentence says what the split does not do, where
+that operator would read it: putting both in one assistant's context is something
+they can do and this installation cannot prevent or notice.
+
 **The groups are here for the same reason**: a group is a fact about the
 installation's projects taken together, and no single project's screen can hold
 one. The area lists them with how many projects each holds — counted off the

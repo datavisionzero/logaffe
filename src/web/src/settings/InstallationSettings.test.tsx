@@ -35,12 +35,16 @@ function aSession(session: {
 function anAgentToken(token: {
   id: string;
   name: string;
+  kind?: "reading" | "administering";
+  mayDestroy?: boolean;
   issuedAt?: string;
   lastUsedAt?: string | null;
 }) {
   return {
     id: token.id,
     name: token.name,
+    kind: token.kind ?? "reading",
+    mayDestroy: token.mayDestroy ?? false,
     issuedAt: token.issuedAt ?? "2026-08-01T09:00:00.000Z",
     lastUsedAt: token.lastUsedAt ?? null,
   };
@@ -214,6 +218,186 @@ describe("the agent tokens", () => {
     await operator.click(screen.getByRole("button", { name: /issue an agent token/i }));
 
     expect(await screen.findByText(/mcpServers/)).toBeInTheDocument();
+  });
+
+  it("offers reading, which is what an agent is given unless told otherwise", async () => {
+    const installation = openAgents({
+      "POST /agent-tokens": {
+        status: 201,
+        body: {
+          id: "a1",
+          name: "terminal",
+          kind: "reading",
+          mayDestroy: false,
+          token: "logaffe_agent_7hb1zz_secret",
+          clientConfiguration: '{ "mcpServers": { "logaffe": { "type": "http" } } }',
+          issuedAt: "2026-08-08T09:00:00.000Z",
+        },
+      },
+      "GET /agent-tokens": [
+        { body: [] },
+        { body: [anAgentToken({ id: "a1", name: "terminal" })] },
+      ],
+    });
+
+    const operator = userEvent.setup();
+
+    // The default is a thing the screen shows rather than a thing `VISION.md`
+    // claims, so it is offered ticked and the flag beside the other kind is not
+    // on the screen at all.
+    expect(await screen.findByLabelText(/read entries/i)).toBeChecked();
+    expect(screen.queryByLabelText(/may destroy data/i)).toBeNull();
+
+    await operator.type(screen.getByLabelText(/name for a new token/i), "terminal");
+    await operator.click(screen.getByRole("button", { name: /issue an agent token/i }));
+
+    await waitFor(() =>
+      expect(installation.sentTo("POST /agent-tokens")).toEqual([
+        { name: "terminal", kind: "reading", mayDestroy: false },
+      ]),
+    );
+  });
+
+  it("offers destroying only for an administering token, off, and named", async () => {
+    const installation = openAgents({
+      "POST /agent-tokens": {
+        status: 201,
+        body: {
+          id: "a2",
+          name: "the setting-up agent",
+          kind: "administering",
+          mayDestroy: true,
+          token: "logaffe_admin_7hb1zz_secret",
+          clientConfiguration: '{ "mcpServers": { "logaffe-admin": { "type": "http" } } }',
+          issuedAt: "2026-08-08T09:00:00.000Z",
+        },
+      },
+      "GET /agent-tokens": [
+        { body: [] },
+        {
+          body: [
+            anAgentToken({
+              id: "a2",
+              name: "the setting-up agent",
+              kind: "administering",
+              mayDestroy: true,
+            }),
+          ],
+        },
+      ],
+    });
+
+    const operator = userEvent.setup();
+
+    await operator.click(await screen.findByLabelText(/work the settings/i));
+
+    const flag = screen.getByLabelText(/may destroy data/i);
+    expect(flag).not.toBeChecked();
+
+    // What it means is written where it is turned on: the four acts, named,
+    // rather than a sentence about permissions (ADR 0046).
+    expect(screen.getByText(/deleting a project, deleting a host/i)).toBeInTheDocument();
+    expect(screen.getByText(/do not come back/i)).toBeInTheDocument();
+
+    await operator.click(flag);
+    await operator.type(
+      screen.getByLabelText(/name for a new token/i),
+      "the setting-up agent",
+    );
+    await operator.click(screen.getByRole("button", { name: /issue an agent token/i }));
+
+    await waitFor(() =>
+      expect(installation.sentTo("POST /agent-tokens")).toEqual([
+        { name: "the setting-up agent", kind: "administering", mayDestroy: true },
+      ]),
+    );
+  });
+
+  it("drops a flag that was ticked and then abandoned, rather than sending nonsense", async () => {
+    const installation = openAgents({
+      "POST /agent-tokens": {
+        status: 201,
+        body: {
+          id: "a1",
+          name: "terminal",
+          kind: "reading",
+          mayDestroy: false,
+          token: "logaffe_agent_7hb1zz_secret",
+          clientConfiguration: '{ "mcpServers": { "logaffe": { "type": "http" } } }',
+          issuedAt: "2026-08-08T09:00:00.000Z",
+        },
+      },
+      "GET /agent-tokens": [
+        { body: [] },
+        { body: [anAgentToken({ id: "a1", name: "terminal" })] },
+      ],
+    });
+
+    const operator = userEvent.setup();
+
+    await operator.click(await screen.findByLabelText(/work the settings/i));
+    await operator.click(screen.getByLabelText(/may destroy data/i));
+    await operator.click(screen.getByLabelText(/read entries/i));
+
+    await operator.type(screen.getByLabelText(/name for a new token/i), "terminal");
+    await operator.click(screen.getByRole("button", { name: /issue an agent token/i }));
+
+    // A reading token that destroys is the one request the installation refuses
+    // outright, and the screen never makes it.
+    await waitFor(() =>
+      expect(installation.sentTo("POST /agent-tokens")).toEqual([
+        { name: "terminal", kind: "reading", mayDestroy: false },
+      ]),
+    );
+  });
+
+  it("says what each token is, where an operator decides what to revoke", async () => {
+    openAgents({
+      "GET /agent-tokens": {
+        body: [
+          anAgentToken({ id: "a1", name: "terminal" }),
+          anAgentToken({
+            id: "a2",
+            name: "the setting-up agent",
+            kind: "administering",
+            mayDestroy: true,
+          }),
+        ],
+      },
+    });
+
+    const reading = (await screen.findByText("terminal")).closest("tr")!;
+    const administering = screen.getByText("the setting-up agent").closest("tr")!;
+
+    expect(within(reading).getByText("Reads")).toBeInTheDocument();
+    expect(within(reading).queryByText(/may destroy/i)).toBeNull();
+    expect(within(administering).getByText("Administers")).toBeInTheDocument();
+    expect(within(administering).getByText(/may destroy data/i)).toBeInTheDocument();
+  });
+
+  it("offers no way to change what a token may do, and says what to do instead", async () => {
+    openAgents({
+      "GET /agent-tokens": {
+        body: [
+          anAgentToken({ id: "a2", name: "the setting-up agent", kind: "administering" }),
+        ],
+      },
+    });
+
+    const row = (await screen.findByText("the setting-up agent")).closest("tr")!;
+
+    // The kinds do not meet and neither is editable (ADR 0046). Renaming stays
+    // what it is: a label for the list.
+    expect(within(row).getAllByRole("button").map((act) => act.textContent)).toEqual([
+      "Show the configuration",
+      "Rename",
+      "Revoke",
+    ]);
+    expect(screen.getByText(/issued a second token/i)).toBeInTheDocument();
+
+    // And the one thing the split does not do, where an operator wiring both
+    // into one assistant would read it.
+    expect(screen.getByText(/an assistant wired to both holds both/i)).toBeInTheDocument();
   });
 
   it("reads a token back, because that and being able to use it are one errand", async () => {

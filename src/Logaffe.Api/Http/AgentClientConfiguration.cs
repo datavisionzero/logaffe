@@ -27,11 +27,25 @@ namespace Logaffe.Api.Http;
 public static class AgentClientConfiguration
 {
     /// <summary>
-    /// Where the five MCP tools answer. It is written down here because it is
-    /// what goes into every agent's configuration, so it is a promise to
-    /// everything already connected rather than a route that can be moved.
+    /// Where the tools answer — the five of a reading token and the twenty-one
+    /// of an administering one, on one endpoint (ADR 0046). It is written down
+    /// here because it is what goes into every agent's configuration, so it is a
+    /// promise to everything already connected rather than a route that can be
+    /// moved.
     /// </summary>
     public const string McpPath = "/mcp";
+
+    /// <summary>What a reading token's block calls the server.</summary>
+    public const string ReadingServerName = "logaffe";
+
+    /// <summary>
+    /// What an administering token's block calls the server. The two names
+    /// differ because an operator wiring up both kinds puts two servers in one
+    /// client, and two entries called <c>logaffe</c> is a mistake the product
+    /// can spare them — the block is a suggestion either way, since the name is
+    /// the client's own business and the installation never learns it.
+    /// </summary>
+    public const string AdministeringServerName = "logaffe-admin";
 
     /// <summary>
     /// What the operator pastes into their agent's configuration file.
@@ -44,9 +58,9 @@ public static class AgentClientConfiguration
         JsonSerializer.Serialize(
             new
             {
-                mcpServers = new
+                mcpServers = new Dictionary<string, object>
                 {
-                    logaffe = new
+                    [ServerNameFor(token.Kind)] = new
                     {
                         type = "http",
                         url = $"{request.Scheme}://{request.Host}{McpPath}",
@@ -55,4 +69,12 @@ public static class AgentClientConfiguration
                 },
             },
             new JsonSerializerOptions { WriteIndented = true });
+
+    /// <summary>
+    /// The name the block suggests, which follows the kind the token already
+    /// carries in its prefix rather than being asked for a second time.
+    /// </summary>
+    private static string ServerNameFor(TokenKind kind) => kind is TokenKind.Administering
+        ? AdministeringServerName
+        : ReadingServerName;
 }

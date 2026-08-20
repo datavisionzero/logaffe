@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Logaffe.Api.Http;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
@@ -111,7 +112,8 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         // What the product hands over is the finished configuration, not the
         // bare token: the address and the token already in place.
         var configuration = JsonDocument.Parse(issued.ClientConfiguration)
-            .RootElement.GetProperty("mcpServers").GetProperty("logaffe");
+            .RootElement.GetProperty("mcpServers")
+            .GetProperty(AgentClientConfiguration.ReadingServerName);
         Assert.EndsWith("/mcp", configuration.GetProperty("url").GetString());
         Assert.Equal(
             $"Bearer {issued.Token}",
@@ -168,6 +170,18 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         Assert.Equal("administering", issued.Kind);
         Assert.True(issued.MayDestroy);
         Assert.Contains(issued.Token, issued.ClientConfiguration, StringComparison.Ordinal);
+
+        // The block suggests the other name for the server, because an operator
+        // wiring up both kinds puts two of them in one client and two entries
+        // called `logaffe` is a mistake the product can spare them.
+        var servers = JsonDocument.Parse(issued.ClientConfiguration)
+            .RootElement.GetProperty("mcpServers");
+        Assert.Equal(
+            $"Bearer {issued.Token}",
+            servers.GetProperty(AgentClientConfiguration.AdministeringServerName)
+                .GetProperty("headers").GetProperty("Authorization").GetString());
+        Assert.False(servers.TryGetProperty(
+            AgentClientConfiguration.ReadingServerName, out _));
 
         // The list is where an operator decides what to revoke, so what a token
         // may do is on it.

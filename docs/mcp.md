@@ -91,6 +91,13 @@ token inside it and in the name it suggests for the server:
 }
 ```
 
+The server is called **`logaffe`** for a reading token and **`logaffe-admin`**
+for an administering one. That is a suggestion rather than a setting — what a
+client calls a server is its own business and the installation never learns
+it — but it is the suggestion an operator wiring up both kinds needs, because
+two entries under one name in one client is one of them silently replacing the
+other.
+
 The endpoint is **`/mcp`** on the installation's own address. It is written down
 here rather than only in the code because it goes into the configuration of
 every agent that ever connects, which makes it a promise to all of them rather
