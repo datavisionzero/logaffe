@@ -71,11 +71,19 @@ public static class ProjectAdministration
 
         var created = await create.ExecuteAsync(wanted, window, groupId, cancellationToken);
 
+        // Named one by one, the way the move below names them: the group is
+        // only missing when one was given, so a catch-all standing for it would
+        // dereference a null the day a fourth outcome exists — and hand the
+        // agent an internal error where every other refusal here is a sentence
+        // it can act on.
         return created.Outcome switch
         {
             CreateProjectOutcome.Created => AdministeredProject.Of(created.Project!),
             CreateProjectOutcome.NameTaken => throw Refused.ProjectNameTaken(wanted),
-            _ => throw Refused.NoSuchGroup(groupId!.Value),
+            CreateProjectOutcome.NoSuchGroup => throw Refused.NoSuchGroup(groupId!.Value),
+            _ => throw new InvalidOperationException(
+                $"Creating a project ended in {created.Outcome}, which this tool cannot "
+                + "say anything about."),
         };
     }
 

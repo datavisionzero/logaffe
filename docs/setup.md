@@ -237,11 +237,13 @@ nothing ([Metrics](./metrics.md#the-host-token)), so it is not a credential that
 carries anything out of the installation it no longer belongs to. That is the
 whole of the distinction being drawn in the paragraph below.
 
-**The agent tokens end with it**, and the command says how many went, because
-each one is a client configuration somewhere that has just stopped reading. An
-agent token reads every entry in every project ([MCP](./mcp.md)), so it is the
-one thing the installation holds that must not survive changing hands — and
-issuing a new one is a paste per agent.
+**The agent tokens end with it — both kinds** — and the command says how many
+went, because each one is a client configuration somewhere that has just stopped
+working. A reading token reads every entry in every project, and an administering
+token works the settings and may have been issued to destroy
+([MCP](./mcp.md), [ADR 0046](./adr/0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)),
+so they are the one thing the installation holds that must not survive changing
+hands — and issuing a new one is a paste per agent.
 
 **It is not a security boundary, and it is not treated as one.** Whoever can run
 a command in the container already owns the database and could do this and more

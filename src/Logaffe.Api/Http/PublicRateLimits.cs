@@ -61,11 +61,13 @@ public static class PublicRateLimits
     public const string Sample = "sample";
 
     /// <summary>
-    /// The throttle in front of the five MCP tools, which are publicly reachable
-    /// like everything else this product exposes. An agent calls because the
-    /// operator asked — there is no poll and no subscription behind this door
-    /// (<c>docs/mcp.md</c>) — so what it stands in front of is a loop that got
-    /// away from a model rather than ordinary use.
+    /// The throttle in front of the MCP tools — the five a reading token earns
+    /// and the twenty-one an administering one does, on the one endpoint they
+    /// share (ADR 0046) — which are publicly reachable like everything else this
+    /// product exposes. An agent calls because the operator asked — there is no
+    /// poll and no subscription behind this door (<c>docs/mcp.md</c>) — so what
+    /// it stands in front of is a loop that got away from a model rather than
+    /// ordinary use.
     /// </summary>
     public const string Agent = "agent";
 

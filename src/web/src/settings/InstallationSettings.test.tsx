@@ -351,6 +351,31 @@ describe("the agent tokens", () => {
     );
   });
 
+  it("puts a refusal that is not about the name where it can be read", async () => {
+    openAgents({
+      "GET /agent-tokens": { body: [] },
+      "POST /agent-tokens": {
+        status: 400,
+        body: {
+          errors: {
+            mayDestroy: ["Only an administering token can be issued to destroy."],
+          },
+        },
+      },
+    });
+
+    const operator = userEvent.setup();
+
+    await operator.type(await screen.findByLabelText(/name for a new token/i), "terminal");
+    await operator.click(screen.getByRole("button", { name: /issue an agent token/i }));
+
+    // Placed in the name's field it would be placed nowhere, and the button
+    // would appear to do nothing at all.
+    expect(
+      await screen.findByText(/only an administering token can be issued to destroy/i),
+    ).toBeInTheDocument();
+  });
+
   it("says what each token is, where an operator decides what to revoke", async () => {
     openAgents({
       "GET /agent-tokens": {

@@ -128,15 +128,17 @@ public static class RecoverCommand
 
             // Said as its own line and with the number in it, because it is the
             // one consequence of this command that leaves work behind: each of
-            // these is a client configuration to go and replace.
+            // these is a client configuration to go and replace. What each of
+            // them stops doing is not said, because the count covers both kinds
+            // and the operator knows which they issued (ADR 0046).
             if (recovered.AgentTokensRemoved > 0)
             {
                 Console.WriteLine(
                     recovered.AgentTokensRemoved == 1
-                        ? "Its one agent token went with it, and that agent reads nothing "
-                        + "until it is given a new one."
+                        ? "Its one agent token went with it, and that agent can do nothing "
+                        + "here until it is given a new one."
                         : $"Its {recovered.AgentTokensRemoved} agent tokens went with it, and "
-                        + "those agents read nothing until they are given new ones.");
+                        + "those agents can do nothing here until they are given new ones.");
             }
 
             if (recovered.DrawnSecret is not null)
@@ -197,11 +199,11 @@ public static class RecoverCommand
             This does not reset a password.
 
             It removes the operator account. The sessions, the backup codes and the
-            agent tokens go with it, so every agent connected to this installation
-            stops reading until it is given a new one. Projects, ingest tokens and log
-            entries are untouched — the installation changes hands, it does not lose
-            what it holds, and an application shipping logs through it does not
-            notice.
+            agent tokens go with it — both kinds — so every agent connected to this
+            installation stops, whether it was reading entries or working the settings,
+            until it is given a new one. Projects, ingest tokens and log entries are
+            untouched — the installation changes hands, it does not lose what it holds,
+            and an application shipping logs through it does not notice.
             """);
 
         // Which door this is about to open, said before it is opened, because the

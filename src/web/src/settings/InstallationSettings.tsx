@@ -20,7 +20,7 @@ import { SettingsScreen } from "./SettingsScreen";
  *
  * What is left is the five things that are the installation's rather than a
  * project's, and they are five areas because that is what they are: the browsers
- * signed in, the tokens agents read with, the operator's own credentials, the
+ * signed in, the tokens agents connect with, the operator's own credentials, the
  * groups the projects are listed under, and the machines they run on. Four of
  * them are lists of what exists and the credentials are three acts on one
  * account, which is why those stay together on one area rather than becoming

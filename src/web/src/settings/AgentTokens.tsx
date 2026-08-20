@@ -130,8 +130,19 @@ export function AgentTokens() {
       });
 
       if (data === undefined) {
+        // This route refuses two things, and only one of them is the name. The
+        // other is the combination the screen no longer offers — a reading token
+        // that destroys — and a refusal about it would otherwise be placed in
+        // the name's field, which is to say nowhere: the button would appear to
+        // do nothing at all.
         if (response.status === 400) {
-          setProblem(problemWith(error, "name"));
+          const named = problemWith(error, "name");
+
+          if (named === undefined) {
+            return problemWith(error, "mayDestroy") ?? "This installation refused the token.";
+          }
+
+          setProblem(named);
           return false;
         }
 

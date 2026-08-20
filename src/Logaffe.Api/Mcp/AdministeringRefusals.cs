@@ -4,8 +4,9 @@ using ModelContextProtocol;
 namespace Logaffe.Api.Mcp;
 
 /// <summary>
-/// The refusals the twenty acts share, in one place because they are the same
-/// sentence every time.
+/// The refusals the nineteen acts share, in one place because they are the same
+/// sentence every time. The other two of the twenty-one refuse nothing: they
+/// read.
 /// </summary>
 /// <remarks>
 /// <para>

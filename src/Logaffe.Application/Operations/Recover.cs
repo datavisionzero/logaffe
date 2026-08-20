@@ -53,9 +53,11 @@ public sealed record Recovered(
 /// way an ingest token is (ADR 0021). It goes for the reason the ingest token
 /// stays: this is the act by which an installation changes hands, and an ingest
 /// token surviving keeps an application delivering, while an agent token
-/// surviving leaves whoever held it reading every entry in every project, past
-/// the password and the second factor of an operator who no longer exists
-/// (<c>docs/mcp.md</c>).
+/// surviving leaves whoever held it past the password and the second factor of
+/// an operator who no longer exists — reading every entry in every project, or
+/// working the settings of an installation that is no longer theirs, depending
+/// on which kind it is (<c>docs/mcp.md</c>, ADR 0046). Both kinds go: they share
+/// a table, and the stronger case is the second one.
 /// </para>
 /// <para>
 /// <b>It is not a security boundary.</b> Whoever can run a command in the
