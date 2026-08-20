@@ -42,8 +42,9 @@ any kind. The operator can **read it back at any time** — it is stored encrypt
 rather than hashed, so mislaying it means looking it up rather than rotating and
 redeploying
 ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)).
-It carries a recognizable prefix — `logaffe_ingest`, against the agent token's
-`logaffe_agent` and the host token's `logaffe_host`
+It carries a recognizable prefix — `logaffe_ingest`, against a reading agent
+token's `logaffe_agent`, an administering one's `logaffe_admin`
+([MCP](./mcp.md#one-kind-or-the-other)) and the host token's `logaffe_host`
 ([Metrics](./metrics.md#the-host-token)) — which costs nothing and means an
 accidental
 appearance in a repository or a log is something a scanner can find. That second case is not
@@ -219,14 +220,27 @@ locally, exactly as they would through a botched rotation.
 ## Projects belong to the operator alone
 
 Creating, renaming, deleting a project, issuing, rotating or revoking a token,
-and everything there is to do to a group, are **operator acts that are not
-reachable over MCP at all**
-([ADR 0018](./adr/0018-projects-and-tokens-are-never-reachable-over-mcp.md)). The
-agent reads entries and counts them; it cannot bring a project into existence,
-end one, mint a credential, or move a project from one group to another — and
-the same is true of every act on a host. It is told which group a project is in
-and which host it sits on, because both are facts about the project it is reading
-([MCP](./mcp.md)).
+and everything there is to do to a group, are **operator acts**. An agent reaches
+them only on a token the operator issued for exactly that, and such a token reads
+no entry at all — it is a different credential from the one their reading agent
+holds, not the same one with more turned on
+([ADR 0046](./adr/0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)).
+
+**The agent that reads entries reaches none of it.** It cannot bring a project
+into existence, end one, mint a credential, or move a project from one group to
+another, and the same is true of every act on a host: a log entry asking the
+agent that is reading it to make a project finds nothing to call. It is told
+which group a project is in and which host it sits on, because both are facts
+about the project it is reading ([MCP](./mcp.md)).
+
+**Deleting a project and lowering a retention window are destructive**, and an
+administering token makes neither unless it was issued to
+([MCP](./mcp.md#destroying-is-a-second-thing-to-be-issued)). Revoking a token is
+not: it stops a sender delivering, and nothing that is already stored is gone.
+
+**An agent token is never issued over MCP**, on any token — an agent that could
+mint one would hand itself what the operator withheld — and neither are the
+operator's own credentials or their sessions.
 
 ## What is deliberately not here
 

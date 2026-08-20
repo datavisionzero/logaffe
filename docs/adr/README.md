@@ -41,7 +41,7 @@ material value to understanding the decision.
 - [0015 – The operator has no username and no email](./0015-the-operator-has-no-username-and-no-email.md)
 - [0016 – The second factor is TOTP](./0016-the-second-factor-is-totp.md)
 - [0017 – A wrong password never locks the account](./0017-a-wrong-password-never-locks-the-account.md)
-- [0018 – Projects and tokens are never reachable over MCP](./0018-projects-and-tokens-are-never-reachable-over-mcp.md)
+- [0018 – Projects and tokens are never reachable over MCP](./0018-projects-and-tokens-are-never-reachable-over-mcp.md) — superseded by 0046
 - [0019 – A project is deleted at once and its entries follow](./0019-a-project-is-deleted-at-once-and-its-entries-follow.md)
 - [0020 – Retention has a maximum](./0020-retention-has-a-maximum.md)
 - [0021 – An agent token is a copied secret](./0021-an-agent-token-is-a-copied-secret.md)
@@ -69,3 +69,4 @@ material value to understanding the decision.
 - [0043 – Metrics come from the host, not from the application](./0043-metrics-come-from-the-host-not-from-the-application.md)
 - [0044 – A sample has a closed schema](./0044-a-sample-has-a-closed-schema.md)
 - [0045 – A sample is not an entry, and may be read across projects](./0045-a-sample-is-not-an-entry-and-may-be-read-across-projects.md)
+- [0046 – Administration is reachable over MCP, on a token that reads no entries](./0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)

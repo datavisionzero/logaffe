@@ -114,8 +114,10 @@ one indexed lookup ([ADR 0031](./adr/0031-a-token-names-its-own-row.md)), and it
 records **when it was last used**, to within five minutes
 ([ADR 0033](./adr/0033-the-last-use-of-a-token-is-written-coarsely.md)).
 
-**Its prefix is `logaffe_host`**, against `logaffe_ingest` and `logaffe_agent`.
-There are now three kinds and none of them is accepted at another's endpoint. The
+**Its prefix is `logaffe_host`**, against `logaffe_ingest`, `logaffe_agent` and
+`logaffe_admin`. There are four kinds, none accepted where another belongs, and
+the two agent prefixes decide which tools a caller is handed at the one endpoint
+they share ([MCP](./mcp.md#one-kind-or-the-other)). The
 prefix is read before the token is looked up at all, so a host token pasted into
 a Serilog sink is turned away legibly and without the database being asked
 anything.
@@ -303,9 +305,10 @@ The read has **five seconds** like every other
 ([ADR 0026](./adr/0026-a-read-has-five-seconds.md)), the samples arrive as
 **named values and never as prose**
 ([ADR 0012](./adr/0012-log-content-reaches-an-agent-as-data-never-as-prose.md)),
-and the tool **writes nothing and manages nothing** — it cannot create a host,
-delete one, mint a token or say which host a project sits on
-([ADR 0018](./adr/0018-projects-and-tokens-are-never-reachable-over-mcp.md)).
+and the tool **writes nothing and manages nothing** — creating a host, deleting
+one, minting its token and saying which host a project sits on are the
+administering surface, which no token holding this one reaches
+([ADR 0046](./adr/0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)).
 
 **This is the one read that is not inside a single project**, and why that is
 allowed is [ADR 0045](./adr/0045-a-sample-is-not-an-entry-and-may-be-read-across-projects.md):

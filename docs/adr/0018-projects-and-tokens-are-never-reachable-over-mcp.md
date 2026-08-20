@@ -1,5 +1,14 @@
 # Projects and Tokens Are Never Reachable Over MCP
 
+**Superseded by
+[ADR 0046](./0046-administration-is-reachable-on-a-token-that-reads-no-entries.md).**
+Administration is reachable, on a token that reads no entries and is never also a
+reading token. The attack described below was not overstated and has not gone
+away — 0046 restates it and answers it by removing untrusted content from the
+session that can act, rather than by guarding the action. This document is kept
+because it is where the refusal was argued, and because the sentence it could
+say and 0046 cannot is the thing that was traded.
+
 Creating, renaming and deleting projects, and issuing, rotating and revoking
 ingest tokens, are absent from the agent interface — not read-only, not
 confirmable, not available behind a setting. `VISION.md` says agent access is

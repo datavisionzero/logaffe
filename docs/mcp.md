@@ -1,9 +1,11 @@
 # MCP
 
 `VISION.md` puts agent access on equal footing with the web UI, and this is the
-door it comes through. The agent reads logs on the operator's behalf, over the
-same query surface the UI uses ([Querying](./querying.md)), and it can do nothing
-else at all.
+door it comes through. An agent either reads logs on the operator's behalf, over
+the same query surface the UI uses ([Querying](./querying.md)), or administers the
+installation over the surface the settings screens carry. Never both: which of the
+two it is, is decided by the token it presents and by nothing else
+([ADR 0046](./adr/0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)).
 
 The endpoint is publicly reachable and authenticated, like everything else this
 product exposes, and it carries a rate limit like every other public surface —
@@ -20,9 +22,10 @@ operator, **readable again whenever it is wanted**
 ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)),
 **named** so that a list of them is readable, recording **when it was last
 used**, and **revocable individually and immediately**. The product has one model
-for a machine credential, pointing in three directions — an ingest token writes
-to one project, a host token writes to one host
-([Metrics](./metrics.md#the-host-token)), and an agent token reads everything
+for a machine credential, pointing in four directions — an ingest token writes to
+one project, a host token writes to one host
+([Metrics](./metrics.md#the-host-token)), and an agent token either reads every
+project or administers the installation
 ([ADR 0021](./adr/0021-an-agent-token-is-a-copied-secret.md)).
 
 The name is the operator's own, and naming a token after the client it was issued
@@ -31,6 +34,36 @@ more — it does not identify the token to the server and changing it changes
 nothing else. The installation never learns what a client calls itself: a token
 is issued before any client has connected with it, and nothing about a call is
 remembered afterwards.
+
+### One kind or the other
+
+An agent token is issued as **reading** or as **administering**, and the two do
+not overlap. A reading token is given the five tools below and reaches no
+setting; an administering token is given the settings surface and reaches no
+entry. The kind is settled when the token is issued and **cannot be changed
+afterwards**: an agent that needs the other one is given a second token, and the
+operator revokes whatever it replaces.
+
+This is not a tidiness of the model, it is the whole of what makes administration
+safe enough to offer at all. Prompt injection out of a log entry needs one session
+that both holds untrusted text and can act, and an administering token never reads
+an entry, so it never holds the text
+([ADR 0046](./adr/0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)).
+A capability added to a reading token would build precisely the session that
+argument refuses.
+
+**Both kinds arrive at the same endpoint.** `/mcp` answers with the tool list the
+presented token earns, so how many servers an operator wires is decided by how
+many tokens they hold rather than by how many addresses exist. A second URL would
+be two routes, two rate-limit buckets and two things to keep in step, for nothing
+the token does not already say.
+
+**What the split does not do is separate the agent.** An operator who wires both
+servers into one assistant has put both in one model's context, and nothing here
+prevents that or notices it. What it buys is that an agent which never reads
+entries becomes possible, that the combination is a deliberate act rather than the
+default, and that the two are revoked independently — the answer to trouble is to
+revoke one rather than to go dark.
 
 ### Connecting is one paste
 
@@ -41,7 +74,8 @@ string is the fiddliest part of connecting an agent, and it is the part most
 likely to be got wrong in a way that reports nothing useful.
 
 What they are handed is the block itself, with this installation's address and
-this token already in it:
+this token already in it — the same block for either kind, differing only in the
+token inside it and in the name it suggests for the server:
 
 ```json
 {
@@ -80,12 +114,16 @@ place that fact is visible. The last use is accurate to within five minutes and
 is not shown as though it were finer
 ([ADR 0033](./adr/0033-the-last-use-of-a-token-is-written-coarsely.md)).
 
-**The three token kinds carry different prefixes**, and none is accepted at
-another's endpoint. Pasting an ingest token into an agent configuration is a
-mistake that will happen, and it should fail immediately and legibly rather than
-send someone looking in the wrong place. The prefix is read before the token is
-looked up at all, so the wrong kind is turned away without the database being
-asked anything ([ADR 0031](./adr/0031-a-token-names-its-own-row.md)).
+**The four token kinds carry different prefixes** — `logaffe_ingest`,
+`logaffe_host`, `logaffe_agent` for a reading token and `logaffe_admin` for an
+administering one — and none is accepted where another belongs. Pasting an ingest
+token into an agent configuration is a mistake that will happen, and it should
+fail immediately and legibly rather than send someone looking in the wrong place.
+The two agent kinds share an endpoint and are told apart the same way, which is
+why the kind is in the prefix rather than only in the row: it is read before the
+token is looked up at all, so what a caller may ask for is settled without the
+database being asked anything
+([ADR 0031](./adr/0031-a-token-names-its-own-row.md)).
 
 An agent token is ended by revoking it, which **removes the row** exactly as
 revoking an ingest token does
@@ -93,7 +131,8 @@ revoking an ingest token does
 retired agent leaves no entry in the list and no sealed secret behind it. It also
 ends when [Host Recovery](./setup.md#host-recovery) hands the installation to a
 new operator, which is the one act that removes every agent token at once — a
-credential that reads everything must not outlive the operator who issued it
+credential that reads every project, or administers the installation, must not
+outlive the operator who issued it
 ([ADR 0013](./adr/0013-host-recovery-returns-the-installation-to-unclaimed.md)).
 A password change does **not** end it: an operator who has to
 reconnect every agent whenever they change their password is an operator who
@@ -101,7 +140,7 @@ changes their password less often.
 
 ## The tools
 
-Five, and no others.
+Five for a reading token, and no others.
 
 **`list_projects`** — the projects in the installation, each with its name, the
 group it sits in when it sits in one, the host it sits on when it sits on one,
@@ -256,14 +295,87 @@ sentence**, for the same reason entries are: the operator's screen writes the
 sentence from these values, and the agent is handed the fact
 ([ADR 0012](./adr/0012-log-content-reaches-an-agent-as-data-never-as-prose.md)).
 
+## Administering
+
+An administering token reaches what the settings screens carry
+([Projects and tokens](./projects.md), [Metrics](./metrics.md)) and nothing
+besides: it creates, renames and deletes projects, groups and hosts, moves a
+project between groups, puts one on a host, sets a retention window and the
+installation's window for samples, and issues and revokes ingest and host tokens.
+
+**It reads that surface as well as writing it**, because renaming presupposes
+listing and the surface is unusable otherwise. This is not the read the other kind
+has: what comes back is names, windows and when a token was last used, every bit
+of it written by the operator and none of it text an application logged. That is
+what keeps this surface free of untrusted content, and it holds exactly as long as
+every name on it is the operator's own
+([ADR 0046](./adr/0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)).
+
+### Destroying is a second thing to be issued
+
+An administering token may destroy data only if it was issued saying so, off
+unless asked for, and settled once like the kind itself. **Destructive means data
+that does not come back**, and it is four things: deleting a project, whose
+entries go with it
+([ADR 0019](./adr/0019-a-project-is-deleted-at-once-and-its-entries-follow.md)),
+deleting a host and its samples, **lowering a project's retention window**, and
+**lowering the installation's sample retention**.
+
+The last two are why the flag is not called *delete*. They read like settings and
+they remove stored entries, which makes them the ones worth being unable to do by
+accident. Creating, renaming, moving, raising a window and revoking a token are
+not destructive: a revoked token stops a sender delivering and the entries that
+would have arrived never exist, but nothing that is already there is gone
+afterwards, and another token closes the gap.
+
+### A token is issued, never read back
+
+An administering token may issue an ingest or a host token, on any project or host
+and not only on one it has just made, and may **never read an existing one back** —
+not directly, and not through the delivery snippet, which carries the token inside
+it. A token value reaches an agent at the moment it is created and never again;
+recovering one is an errand at a browser, where the operator reads it back as
+they always could
+([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)).
+
+Issuing where a token already exists is rotation, and it is allowed outright
+rather than tolerated, because the narrow rule does not survive the section above
+it: revoking is not destructive, so an agent could revoke the live token and
+issue a fresh one and be where the rule said it could not go. What it buys is the
+whole cycle — issue the second token, hand it over, revoke the first.
+
+**The blast radius is stated plainly rather than softened**
+([ADR 0046](./adr/0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)):
+an administering agent can put a live write credential into a project the operator
+trusts, which is forged entries in a stream they read as real. What bounds it is
+not a confirmation step. It is that an administering token reads no entry, so the
+sentence asking for the credential never enters its context, and that an ingest
+token is write-only, so nothing is read back out through one.
+
+### Three things no token reaches
+
+Absent from the interface rather than withheld by a flag, the way this whole
+surface was absent before.
+
+- **Agent tokens.** An agent that could issue one would grant itself the kind and
+  the flag the operator withheld, and both would be decoration. This is the one
+  that makes the rest coherent.
+- **The operator's credentials** — password, second factor, backup codes. An agent
+  that can re-enrol a second factor owns the account.
+- **Sessions.** Ending one denies the operator their own access, and listing them
+  is a record of where the operator has been.
+
 ## What the agent cannot do
 
-- **It cannot write anything, anywhere.** There is no tool that creates, edits or
-  deletes an entry, and none that acknowledges, marks or annotates one.
-- **It cannot manage projects or tokens.** Not as a permission, but as an absence
-  from the interface
-  ([ADR 0018](./adr/0018-projects-and-tokens-are-never-reachable-over-mcp.md)) —
-  a log entry that asks an agent to mint a credential must find nothing to call.
+- **No token writes an entry.** There is no tool that creates, edits or deletes
+  one, and none that acknowledges, marks or annotates one. Deleting a project
+  takes its entries with it, and that is the only way an entry leaves by an
+  agent's hand.
+- **A reading token manages nothing.** Not as a permission, but as an absence
+  from the tool list it is handed: a log entry that asks the agent reading it to
+  mint a credential must find nothing to call, which is the argument 0018 made
+  and the one thing this interface still owes it in full
+  ([ADR 0046](./adr/0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)).
 - **It cannot follow logs live.** There is no tail, no subscription and no
   polling loop offered to an agent. `VISION.md` is explicit that the agent looks
   because the operator asked, and that passive continuous monitoring is not part
@@ -275,9 +387,10 @@ sentence from these values, and the agent is handed the fact
   tool returns rather than by counting tools, because `get_host_samples` answers
   for a machine that may carry several and carries no entry in its answer
   ([ADR 0045](./adr/0045-a-sample-is-not-an-entry-and-may-be-read-across-projects.md)).
-- **It cannot manage hosts.** Creating a host, naming one, deleting one, minting
-  its token, or saying which host a project sits on are operator acts and absent
-  from this interface for ADR 0018's reason.
+- **A reading token cannot manage hosts either.** Creating a host, naming one,
+  deleting one, minting its token, or saying which host a project sits on are on
+  the administering surface, and absent from the reading one for the same reason
+  as everything else there.
 - **It cannot ask for a sample to be taken.** It reads what the collectors have
   already delivered; nothing on this surface reaches out to a machine.
 

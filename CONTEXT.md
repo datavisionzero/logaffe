@@ -31,8 +31,9 @@ _Avoid_: User, admin, account, owner, tenant
 
 **Agent**:
 An AI acting on the operator's behalf, reaching the installation over MCP as the
-second first-class consumer beside the operator. It reads on request and never
-watches on its own.
+second first-class consumer beside the operator. It acts on request and never
+watches on its own, and what it can do is what its **Agent Token** is: it reads
+entries or it administers the installation, and no token is both.
 _Avoid_: Bot, assistant, integration, client, sender
 
 **Claim**:
@@ -128,11 +129,37 @@ particular client.
 _Avoid_: Example, code sample, quickstart, onboarding, sink configuration
 
 **Agent Token**:
-The read-only secret an agent presents to MCP, issued and named by the operator,
-readable again at any time, recording when it was last used, and revocable on its
-own. Several exist at once, and it reads every project while granting no write of
-any kind.
+The secret an agent presents to MCP, issued and named by the operator, readable
+again at any time, recording when it was last used, and revocable on its own.
+Several exist at once, and each is issued as one kind or the other — a **Reading
+Token** or an **Administering Token** — which its prefix carries and which never
+changes for as long as the token exists.
 _Avoid_: API key, session, connected agent, read token, credential
+
+**Reading Token**:
+The **Agent Token** issued to read: the query surface the operator has — entries,
+counts and samples across every project — and no setting and no write of any
+kind. It is what an agent is given unless the operator decides otherwise, and it
+is the kind that meets untrusted log content.
+_Avoid_: Read scope, viewer, query token, read-only key, permission
+
+**Administering Token**:
+The **Agent Token** issued to administer: the settings an operator works —
+projects, groups, hosts, retention windows, and the issuing and revoking of
+ingest and host tokens — and no **Log Entry**, ever. It issues a write credential
+without ever reading one back, it reaches no **Agent Token**, no operator
+credential and no **Session**, and it makes no **Destructive Change** unless it
+was issued for that as well.
+_Avoid_: Admin scope, write token, management key, root token, permission
+
+**Destructive Change**:
+An administering act after which stored data is gone: deleting a project or a
+host, and lowering a **Retention Window** — a project's, or the installation's
+for samples. An **Administering Token** may make one only if it was issued to,
+which is settled when it is issued and never changes. Creating, renaming, moving,
+raising a window and revoking a token are not one: nothing that is there stops
+being there.
+_Avoid_: Dangerous operation, write scope, hard delete, purge, permission
 
 **Host Token**:
 The write-only secret that admits a delivery of samples to one **Host**. It
@@ -146,7 +173,7 @@ _Avoid_: API key, collector key, agent token, machine id, credential
 The non-secret part a token carries between its prefix and its secret, naming the
 row that holds it so that a presented token is found by one lookup rather than by
 trying every token in turn. It admits nothing on its own, it is not what tells
-the three token kinds apart — the prefix is — and it is not the name an agent
+the four token kinds apart — the prefix is — and it is not the name an agent
 token carries for the operator's list.
 _Avoid_: Key id, token name, project id, prefix, handle, public key
 
