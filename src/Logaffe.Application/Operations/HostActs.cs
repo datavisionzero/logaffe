@@ -35,9 +35,10 @@ public sealed record HostCreationAttempt(CreateHostOutcome Outcome, Host? Host);
 /// reaches for when they rotate.
 /// </para>
 /// <para>
-/// It is an operator act and is unreachable over MCP, which is a property of the
-/// interface rather than a permission: a log entry asking an agent to make a
-/// host has to find nothing to call (ADR 0018).
+/// It is the operator's act and an administering agent's, and it is unreachable
+/// from a reading token — a log entry asking the agent that read it to make a
+/// host has to find nothing to call, which is a property of the tool list that
+/// token is handed rather than a permission (ADR 0046).
 /// </para>
 /// </remarks>
 public sealed class CreateHost(IHosts hosts, TimeProvider clock)

@@ -52,9 +52,10 @@ public sealed record CreationAttempt(CreateProjectOutcome Outcome, Project? Proj
 /// settings to finish it is a second trip for something they already knew.
 /// </para>
 /// <para>
-/// It is an operator act and is unreachable over MCP, which is a property of
-/// the interface rather than a permission: a log entry asking an agent to make
-/// a project has to find nothing to call (ADR 0018).
+/// It is the operator's act and an administering agent's, and it is unreachable
+/// from a reading token — a log entry asking the agent that read it to make a
+/// project has to find nothing to call, which is a property of the tool list
+/// that token is handed rather than a permission (ADR 0046).
 /// </para>
 /// </remarks>
 public sealed class CreateProject(IProjects projects, IGroups groups, TimeProvider clock)

@@ -42,7 +42,9 @@ public sealed record HostTokenAttempt(IssueHostTokenOutcome Outcome, IssuedToken
 /// round every one of them.
 /// </para>
 /// <para>
-/// It is an operator act and is unreachable over MCP (ADR 0018).
+/// It is the operator's act and an administering agent's. A reading token
+/// reaches no tool over it, and no token of any kind reaches the act that issues
+/// an agent token (ADR 0046).
 /// </para>
 /// </remarks>
 public sealed class IssueHostToken(

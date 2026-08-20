@@ -104,11 +104,12 @@ public sealed record ListedProjectResponse(
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every one of these is behind the operator's session and none of them is
-/// reachable over MCP — not as a permission but as an absence from that
-/// interface, which offers five read tools and nothing else (ADR 0018). An
-/// agent reads entries and counts them; it cannot bring a project into
-/// existence or end one.
+/// Every one of these is behind the operator's session, and every one of them
+/// has a tool beside it on the administering half of MCP, which calls these same
+/// use cases and adds nothing to them. What reaches none of them is a reading
+/// token: it reads entries and counts them, and it cannot bring a project into
+/// existence or end one — not as a permission but as an absence from the list of
+/// five it is handed (ADR 0046).
 /// </para>
 /// <para>
 /// <b>Creating a project says which group it is listed under and not which host

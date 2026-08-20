@@ -95,8 +95,10 @@ public sealed record TurnOffSecondFactorRequest(
 /// <remarks>
 /// <para>
 /// All of it is behind the session and under the operator's rate limit, and none
-/// of it is reachable over MCP — as an absence from that interface rather than
-/// as a permission (ADR 0018). It is not behind the sign-in throttle: that
+/// of it is reachable over MCP on any token — as an absence from that interface
+/// rather than as a permission, and one of the three things no agent reaches at
+/// all, because an agent that can re-enrol a second factor owns the account
+/// (ADR 0046). It is not behind the sign-in throttle: that
 /// throttle exists because the sign-in is the one place a password can be
 /// guessed at by anyone who can reach the installation, and these routes are
 /// already behind a session that guessing cannot produce.

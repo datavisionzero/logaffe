@@ -235,7 +235,7 @@ about the project it is reading ([MCP](./mcp.md)).
 
 **Deleting a project and lowering a retention window are destructive**, and an
 administering token makes neither unless it was issued to
-([MCP](./mcp.md#destroying-is-a-second-thing-to-be-issued)). Revoking a token is
+([MCP](./mcp.md#destroying-is-four-tools)). Revoking a token is
 not: it stops a sender delivering, and nothing that is already stored is gone.
 
 **An agent token is never issued over MCP**, on any token — an agent that could

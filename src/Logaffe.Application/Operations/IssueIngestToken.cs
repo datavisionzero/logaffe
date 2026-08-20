@@ -42,10 +42,14 @@ public sealed record IssueAttempt(IssueOutcome Outcome, IssuedToken? Token);
 /// <see cref="ISecretCipher"/> made of it (ADR 0022).
 /// </para>
 /// <para>
-/// It is an operator act and is unreachable over MCP, which is a property of the
-/// interface rather than a permission: a log entry that asks an agent to mint a
-/// credential must find nothing to call
-/// (ADR 0018).
+/// It is the operator's act and an administering agent's, and it is unreachable
+/// from a reading token: a log entry that asks the agent reading it to mint a
+/// credential must find nothing to call, which is a property of the tool list
+/// that token is handed rather than a permission. What an administering agent
+/// can do with it is stated plainly rather than softened — a live write
+/// credential into a project the operator trusts — and what bounds it is that
+/// the token holding the tool reads no entry, so the sentence asking for the
+/// credential never reaches it (ADR 0046).
 /// </para>
 /// </remarks>
 public sealed class IssueIngestToken(

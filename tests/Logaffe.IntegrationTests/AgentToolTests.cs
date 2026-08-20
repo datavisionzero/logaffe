@@ -21,9 +21,11 @@ namespace Logaffe.IntegrationTests;
 /// Calling the tool methods directly would prove nothing worth starting a
 /// composition root for. What is asked here is what only the endpoint can
 /// answer: that <c>/mcp</c> is where <c>docs/mcp.md</c> promised every agent
-/// configuration it would be, that an agent token is what opens it and neither
-/// of the other three credentials is, that the tool list is five names long, and
-/// that the caps and the total are what an answer actually carries.
+/// configuration it would be, that a reading agent token is what opens it and
+/// none of the other three credentials is, that the tool list is five names
+/// long, and that the caps and the total are what an answer actually carries.
+/// The twenty-one an administering token earns are
+/// <c>AdministeringToolTests</c>'s.
 /// </para>
 /// <para>
 /// The rest is ADR 0012 read off the wire: entries arrive as named fields, the
@@ -121,9 +123,10 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
         using var client = _installation.CreateClient();
         client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_agentToken}");
 
-        // A read credential is not a session. Projects and tokens are absent
-        // from the agent's interface (ADR 0018), and this is the other half of
-        // that: the routes that reach them do not take this token either.
+        // A read credential is not a session. A reading token reaches no
+        // setting at all and no agent token is reachable on any token
+        // (ADR 0046), and this is the other half of that: the routes that reach
+        // them do not take this one either.
         foreach (var path in new[] { "/projects", "/agent-tokens", "/sessions" })
         {
             using var response = await client.GetAsync(path, TestContext.Current.CancellationToken);
@@ -140,9 +143,9 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
         var tools = await agent.ListToolsAsync(
             cancellationToken: TestContext.Current.CancellationToken);
 
-        // Not a subset check. The claim is that there is nothing here that
-        // writes, nothing that reaches a project, a token or a host, and nothing
-        // that follows the logs — which is a statement about the whole list.
+        // Not a subset check. The claim is that there is nothing on a reading
+        // token that writes, nothing that reaches a setting, and nothing that
+        // follows the logs — which is a statement about the whole list.
         Assert.Equal(
             [
                 "count_entries",
@@ -162,15 +165,26 @@ public sealed class AgentToolTests(PostgresFixture postgres) : IAsyncLifetime
         // Both kinds come to one endpoint, and the tool list is the token's
         // (`docs/mcp.md`): an MCP client is handed what its credential earns
         // rather than pointed at a second address. What an administering token
-        // earns is the settings surface, which is not built yet — so what it is
-        // offered today is nothing at all, and in particular not a reading tool.
+        // earns is the settings surface, and what it is never handed is one of
+        // the five — the half of ADR 0046 this file is responsible for.
+        // `AdministeringToolTests` is where the other list is asked about.
         using var operatorClient = await SignedInAsync();
         var administering = await IssueAdministeringTokenAsync(operatorClient);
 
         await using var agent = await ConnectAsync(administering);
 
-        Assert.Empty(await agent.ListToolsAsync(
-            cancellationToken: TestContext.Current.CancellationToken));
+        var offered = (await agent.ListToolsAsync(
+            cancellationToken: TestContext.Current.CancellationToken))
+            .Select(tool => tool.Name);
+
+        Assert.Empty(offered.Intersect(
+            [
+                "count_entries",
+                "get_entry",
+                "get_host_samples",
+                "list_projects",
+                "search_entries",
+            ]));
 
         // Absent from the list is not the whole of it: a tool named by a client
         // that read the other token's list is refused as well, so the two kinds

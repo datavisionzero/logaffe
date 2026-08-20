@@ -27,10 +27,12 @@ public sealed record ListedGroupResponse(Guid Id, string Name, DateTimeOffset Cr
 /// </summary>
 /// <remarks>
 /// <para>
-/// Every one of these is behind the operator's session and none of them is
-/// reachable over MCP (ADR 0018). An agent is told which group a project is in,
-/// because that is a fact about the project it is reading; it cannot make one,
-/// rename one, or move a project between them.
+/// Every one of these is behind the operator's session, and every one of them
+/// has a tool beside it on the administering half of MCP. What has neither is a
+/// reading token: it is told which group a project is in, because that is a fact
+/// about the project it is reading, and it cannot make one, rename one or move a
+/// project between them — as an absence from the list it is handed rather than
+/// as a permission (ADR 0046).
 /// </para>
 /// <para>
 /// <b>A group carries a name and nothing else</b> (ADR 0039). There is no

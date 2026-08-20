@@ -193,10 +193,11 @@ builder.Services.AddScoped<SweepExpiredEntries>();
 // whole installation, and the samples a deleted host left behind.
 builder.Services.AddScoped<SweepExpiredSamples>();
 
-// The operator's token acts. They are registered here and reachable from HTTP
-// and the command line; the agent token's stay unreachable over MCP, because an
-// agent that could issue one would grant itself the kind and the flag the
-// operator withheld (ADR 0046).
+// The token acts. The ingest and host ones are reachable from HTTP, from the
+// command line and from an administering agent's tools; the agent token's are
+// reachable from the first two and never over MCP, because an agent that could
+// issue one would grant itself the kind and the flag the operator withheld
+// (ADR 0046).
 builder.Services.AddScoped<IssueIngestToken>();
 builder.Services.AddScoped<ListIngestTokens>();
 builder.Services.AddScoped<IssueHostToken>();
@@ -249,7 +250,14 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(
         new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false)));
 
-// The second adapter over the reads above. It is registered beside them rather
+// What a tool call has to reach to write the address into an issued token's
+// snippet: the request it arrived on, so that an installation behind a reverse
+// proxy hands out the name the caller reached it by. The MCP transport is
+// stateless, so a tool runs inside the request that carried it and this finds
+// one (`docs/operations.md`).
+builder.Services.AddHttpContextAccessor();
+
+// The second adapter over the acts above. It is registered beside them rather
 // than inside them: what an agent may call is a fact about this composition
 // root, and which of the tools a given agent is offered is a fact about the
 // token it presented (ADR 0046).

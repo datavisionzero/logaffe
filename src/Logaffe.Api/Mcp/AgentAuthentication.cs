@@ -55,6 +55,28 @@ public static class AgentAuthentication
     /// </summary>
     public const string ReadingPolicy = "logaffe:agent-reads";
 
+    /// <summary>
+    /// What the seventeen tools every administering token earns ask for, and
+    /// what a reading token is refused. It is the mirror of
+    /// <see cref="ReadingPolicy"/> and not a superset of it: neither kind is
+    /// offered the other's list, so the two never meet on one token (ADR 0046).
+    /// </summary>
+    public const string AdministeringPolicy = "logaffe:agent-administers";
+
+    /// <summary>
+    /// What the four that remove stored data ask for: an administering token
+    /// that was issued saying so.
+    /// </summary>
+    /// <remarks>
+    /// It asks for the kind as well as the flag rather than for the flag alone.
+    /// Nothing writes <see cref="MayDestroyClaim"/> onto a reading token — the
+    /// domain refuses the combination at the moment of issue — but a policy that
+    /// only asked for the flag would be one line away from admitting one if that
+    /// ever stopped holding, and the sentence this surface rests on is that the
+    /// kinds do not meet.
+    /// </remarks>
+    public const string DestroyingPolicy = "logaffe:agent-destroys";
+
     public static IServiceCollection AddLogaffeAgentAuthentication(
         this IServiceCollection services)
     {
@@ -70,7 +92,16 @@ public static class AgentAuthentication
             .AddPolicy(ReadingPolicy, policy => policy
                 .AddAuthenticationSchemes(Scheme)
                 .RequireAuthenticatedUser()
-                .RequireClaim(KindClaim, nameof(AgentTokenKind.Reading)));
+                .RequireClaim(KindClaim, nameof(AgentTokenKind.Reading)))
+            .AddPolicy(AdministeringPolicy, policy => policy
+                .AddAuthenticationSchemes(Scheme)
+                .RequireAuthenticatedUser()
+                .RequireClaim(KindClaim, nameof(AgentTokenKind.Administering)))
+            .AddPolicy(DestroyingPolicy, policy => policy
+                .AddAuthenticationSchemes(Scheme)
+                .RequireAuthenticatedUser()
+                .RequireClaim(KindClaim, nameof(AgentTokenKind.Administering))
+                .RequireClaim(MayDestroyClaim, bool.TrueString));
 
         return services;
     }

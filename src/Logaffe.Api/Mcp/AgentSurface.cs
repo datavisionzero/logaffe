@@ -10,8 +10,8 @@ using ModelContextProtocol.Protocol;
 namespace Logaffe.Api.Mcp;
 
 /// <summary>
-/// The second adapter over the read use cases: five tools at <c>/mcp</c>, behind
-/// a reading agent token.
+/// The second adapter over the use cases: twenty-six tools at <c>/mcp</c>, of
+/// which an agent token is handed the five its kind earns or the twenty-one.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -24,16 +24,19 @@ namespace Logaffe.Api.Mcp;
 /// <b>Tools and nothing else.</b> No resources and no prompts: a log store
 /// answers parameterized questions, and exposing projects as readable resources
 /// would be a second way to ask the same thing with its own caching and its own
-/// surface. Nothing is registered here that writes, and nothing reaches a
-/// project or a token (ADR 0018).
+/// surface. Nothing here is scheduled, watched or delivered without a call, and
+/// nothing reaches an agent token, an operator credential or a session on any
+/// token at all (ADR 0046).
 /// </para>
 /// <para>
 /// <b>One endpoint, and the tool list is the token's.</b> Both kinds of agent
 /// token arrive at <c>/mcp</c> — an MCP client is handed the tools its
 /// credential earns, so how many servers an operator wires up is decided by how
-/// many tokens they hold rather than by how many addresses exist. The five below
-/// are the reading token's; the administering token's surface is not built yet,
-/// and until it is, what that token is offered is an empty list (ADR 0046).
+/// many tokens they hold rather than by how many addresses exist. A reading
+/// token is offered the five reads and no setting; an administering token the
+/// settings and no entry; and the four that destroy data only on one issued
+/// saying so. Neither list is a subset of the other and no token holds both,
+/// which is the sentence the whole of ADR 0046 rests on.
 /// </para>
 /// </remarks>
 public static class AgentSurface
@@ -61,20 +64,33 @@ public static class AgentSurface
                 // is no session for it to be remembered in.
                 transport.Stateless = true)
 
-            // Named one by one rather than swept out of the assembly. There are
-            // five tools and there are five here, and adding a sixth is a line
-            // in this file rather than a side effect of writing a method
-            // somewhere (ADR 0018).
+            // Named one by one rather than swept out of the assembly. Which
+            // tools this installation offers an agent is a decision, and adding
+            // one is a line in this file rather than a side effect of writing a
+            // method somewhere. The three above are the reading token's five;
+            // the six below are the administering token's twenty-one, and the
+            // last of them is the four that destroy.
             .WithTools(
-                [typeof(ProjectTools), typeof(EntryTools), typeof(HostTools)],
+                [
+                    typeof(ProjectTools),
+                    typeof(EntryTools),
+                    typeof(HostTools),
+                    typeof(SettingsTools),
+                    typeof(ProjectAdministration),
+                    typeof(GroupAdministration),
+                    typeof(HostAdministration),
+                    typeof(TokenAdministration),
+                    typeof(DestructiveTools),
+                ],
                 AgentJson.Options)
 
-            // What makes the `[Authorize]` on those three do anything: the tool
+            // What makes the `[Authorize]` on those nine do anything: the tool
             // list a client is handed is filtered by what the presented token
             // earns, and a tool it does not earn is missing from the list rather
-            // than present and refusing. Today that is one list and an empty
-            // one — an administering token authenticates here and is offered
-            // nothing at all until the surface it earns exists (ADR 0046).
+            // than present and refusing. It is what carries "absent from the
+            // interface" from a sentence in ADR 0046 into something the client
+            // can see — and it refuses a tool named by a client that read the
+            // other list, so the two kinds do not meet through a guess either.
             .AddAuthorizationFilters();
 
         return services;
@@ -126,7 +142,7 @@ public static class AgentSurface
 }
 
 /// <summary>
-/// How the five tools are written on the wire.
+/// How the tools are written on the wire.
 /// </summary>
 /// <remarks>
 /// <para>

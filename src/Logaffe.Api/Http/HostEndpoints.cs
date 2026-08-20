@@ -136,7 +136,8 @@ public sealed record SamplesOutsideWindowResponse(int RetentionDays, long Sample
 /// Every one of these is behind the operator's session. An agent is given a
 /// host's samples and the identity of the host a project sits on, because those
 /// are facts it reads; it cannot make a host, name one, end one, mint its token
-/// or say where a project runs (ADR 0018).
+/// or say where a project runs. Those are the administering half of MCP and are
+/// absent from the reading token's list rather than forbidden on it (ADR 0046).
 /// </para>
 /// <para>
 /// <b>Creating a host does not hand back the command that starts its

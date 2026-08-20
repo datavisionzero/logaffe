@@ -82,8 +82,9 @@ token readable ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rathe
 and the rolling file log ([ADR 0002](./adr/0002-logaffe-logs-to-files-not-into-itself.md)).
 
 **`Logaffe.Api` is the adapters and the composition root.** One binary that is
-the server and the CLI both: the HTTP endpoints, the five MCP tools
-([MCP](./mcp.md)), the `backup`, `restore` and `recover` verbs that
+the server and the CLI both: the HTTP endpoints, the MCP tools — five for a
+reading agent token and twenty-one for an administering one
+([MCP](./mcp.md)) — the `backup`, `restore` and `recover` verbs that
 [Operations](./operations.md) and [Setup](./setup.md) document, the
 authentication of three different credentials, the rate limits every public
 surface carries, and the static files of the built SPA. Its name understates it
@@ -199,9 +200,11 @@ builds it.
 
 - **No shared types across the two languages.** Settled in ADR 0001; the contract
   is `docs/api/openapi.json` and it is checked.
-- **No second read path.** The MCP adapter and the HTTP endpoints call the same
-  use cases, which is what [Querying](./querying.md) promises and what ADR 0030
-  makes structural.
+- **No second read path, and no second write path.** The MCP adapter and the
+  HTTP endpoints call the same use cases, which is what
+  [Querying](./querying.md) promises and what ADR 0030 makes structural. The
+  administering tools add no act of their own either: what they decide is a
+  shape and a refusal.
 - **No context split.** This is a single-context repository — one `CONTEXT.md`
   and one `docs/adr/` at the root — and `src/` is laid out by layer rather than
   by bounded context.
