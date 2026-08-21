@@ -423,7 +423,7 @@ in [`docs/adr/`](./docs/adr/), and how the repository is laid out around them is
   [`docs/metrics.md`](./docs/metrics.md)
 - **Alerting:** three named conditions evaluated on the closed hour against a
   tally the ingestion path keeps, delivered to ntfy and to nothing else, carrying
-  no log content. The area document is `docs/alerts.md`
+  no log content. See [`docs/alerts.md`](./docs/alerts.md)
 - **Agent interface:** MCP, exposed publicly and authenticated
 - **Live updates:** polling on the order of five seconds, no push streaming
 - **Deployment:** containerized, runnable with Docker Compose as the standard

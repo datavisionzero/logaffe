@@ -386,10 +386,19 @@ the operator the whole of it is in that log, and the sentence has to be true.
   [Metrics](./metrics.md), which is what the operator's *machines* report to this
   installation, pushed by their collectors, and never anything this installation
   exposes about itself for somebody else to scrape.
-- **No sweep of a machine that stopped reporting.** A host with no recent samples
-  is left exactly as it is. Nothing removes it, renames it, marks it stale or
-  says anything about it, because deciding that a quiet machine is a problem is
-  alerting and `VISION.md` refuses it.
+- **No sweep of a machine that stopped reporting, and no alert about one.** A
+  host with no recent samples is left exactly as it is: nothing removes it,
+  renames it, marks it stale or says anything about it.
+  This used to be a sentence about alerting, which the product refused
+  altogether. It is now a sentence about hosts. A **project** going quiet is one
+  of the three conditions ([Alerts](./alerts.md#a-project-has-gone-quiet)) and a
+  host going quiet is not, and the difference is the whole reason the set is
+  named rather than general: a project that stops delivering means an application
+  stopped, which is what a self-hoster most wants to be told, while a collector
+  that stops reporting usually means a collector — a container that was not
+  restarted, a machine deliberately switched off, an upgrade in progress. The
+  same sentence about the two would be right about one of them
+  ([ADR 0050](./adr/0050-the-alert-conditions-are-a-closed-set.md)).
 - **No self-update.** logaffe does not check for versions, announce them, or
   update itself. `docker compose pull` is the operator's to run — on a schedule
   if they want one, since a timer they wrote is still them running it. What is

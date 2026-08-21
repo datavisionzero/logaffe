@@ -116,18 +116,39 @@ because the service name in the published Compose file is the same in each. Give
 each one an alias on the shared network — `aliases: [logaffe-staging]` under
 `edge:` — and let the proxy use that.
 
-### The variable
+### The variables
 
 In the `.env` file beside the Compose file:
 
 ```
 LOGAFFE_TRUSTED_PROXIES=172.30.0.0/24
+LOGAFFE_PUBLIC_URL=https://logs.example.com
 ```
 
-The published Compose file maps it into `Logaffe__TrustedProxies`. It is the
-network's range and not the proxy's single address, because the address inside
-that network is Docker's to hand out and is handed out again when the container
-is recreated.
+The published Compose file maps them into `Logaffe__TrustedProxies` and
+`Logaffe__PublicUrl`.
+
+The first is the network's range and not the proxy's single address, because the
+address inside that network is Docker's to hand out and is handed out again when
+the container is recreated.
+
+The second is the address this installation is reached at, and it is **only**
+used to build the link in an alert ([Alerts](./alerts.md#the-link-and-the-address-it-is-built-from)).
+Everywhere else the address comes free from the three headers above: the delivery
+snippet and an agent's MCP configuration are composed inside a request, so
+`X-Forwarded-Host` and `X-Forwarded-Proto` already say what the operator reached
+the installation by. **An alert has no request behind it** — it is composed by a
+background pass on the hour — which is why this one fact has to be written down
+rather than observed.
+
+It is deliberately not derived from whatever last called, either. That value is
+chosen by a header, so a link built from it is a link an outsider could pick, and
+it would arrive inside a notification the operator trusts and clicks. An address
+that came from the deployment cannot be moved by traffic.
+
+**Leaving it unset is a supported state**: alerts are sent without a link rather
+than with a wrong one, and an installation with no notifier configured never
+needed it in the first place.
 
 ## Why not publish on loopback
 

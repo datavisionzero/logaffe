@@ -103,7 +103,9 @@ _Avoid_: Folder, tag, label, namespace, team, workspace, environment, category
 The machine an operator runs projects on, created and named by them, holding its
 samples and its token. A project sits on at most one, a host holds any number of
 projects, and it is where samples come from rather than a way of asking about
-entries — no query takes one.
+entries — no query takes one. The **Installation** sits on at most one as well,
+naming a mount on it, which is how it reads whether its own disk is filling up
+and is the only thing that relation does.
 _Avoid_: Server, node, machine, environment, instance, installation
 
 **Collector**:

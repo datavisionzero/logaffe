@@ -228,7 +228,12 @@ guessing is slow rather than that guessing cannot succeed
 - **No external identity.** No SSO, no OAuth, no "sign in with" anything —
   `VISION.md` makes enterprise identity a non-goal, and a single self-hosted
   account has nothing to federate with.
-- **No sign-in notification.** There is no channel to send one on, and the
-  session list is what serves the purpose instead.
+- **No sign-in notification.** There is a channel now
+  ([Alerts](./alerts.md)) and this still does not go down it. The reason was
+  never only that there was nowhere to send it: an installation has one account,
+  so a sign-in the operator is told about is a sign-in the operator just made,
+  and a message that is right every time until the one time it is not is a
+  message nobody reads by then. The session list is what serves the purpose
+  instead, and it serves it by being looked at deliberately.
 - **No second account**, not even a read-only or break-glass one. Settled in
   `VISION.md`.
