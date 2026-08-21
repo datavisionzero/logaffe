@@ -52,7 +52,7 @@ public sealed class BackupTests(PostgresFixture postgres)
                 "agent_token", "backup_code", "claim_guard", "filesystem_reading",
                 "host", "host_sample", "host_token", "ingest_token",
                 "installation_settings", "log_entry", "operator", "project",
-                "project_group", "session",
+                "project_group", "project_tally", "session",
             ],
             names.Order(StringComparer.Ordinal));
 

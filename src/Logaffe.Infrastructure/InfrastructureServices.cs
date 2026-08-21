@@ -47,6 +47,12 @@ public static class InfrastructureServices
         services.AddScoped<ISamples, Samples>();
         services.AddScoped<IEntries, Entries>();
 
+        // What the entries were counted into on their way past. It is an
+        // ordinary store because the volume is ordinary — a row per project per
+        // hour — and it is beside the two above because the act that writes it
+        // runs on a timer rather than in a request (ADR 0047).
+        services.AddScoped<ITallies, Tallies>();
+
         // The other half of it, and the one this layer takes Dapper for: the
         // write and the sweep had nothing to map, and a filtered page does.
         services.AddScoped<IEntryReader, EntryReader>();

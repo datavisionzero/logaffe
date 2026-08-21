@@ -64,7 +64,8 @@ public sealed record BatchReceipt(
 /// throws through it.
 /// </para>
 /// </remarks>
-public sealed class IngestBatch(IEntries entries, IEntryIds ids, TimeProvider clock)
+public sealed class IngestBatch(
+    IEntries entries, IEntryIds ids, RunningTally tally, TimeProvider clock)
 {
     /// <summary>
     /// How many reasons come back. It is "the first few" of
@@ -207,6 +208,12 @@ public sealed class IngestBatch(IEntries entries, IEntryIds ids, TimeProvider cl
     /// gap a failed write leaves is the smallest it can be — and gaps are
     /// irrelevant anyway (<c>docs/storage.md</c>).
     /// </summary>
+    /// <remarks>
+    /// The tally is moved last, after the write, and it is an interlocked add
+    /// against a number in memory (ADR 0047) — no second write, no read, and
+    /// nothing this path waits for. What it counts is what the table took, so a
+    /// store that threw counts for nothing.
+    /// </remarks>
     private async Task StoreAsync(
         Guid projectId,
         DateTimeOffset receiptTime,
@@ -216,9 +223,18 @@ public sealed class IngestBatch(IEntries entries, IEntryIds ids, TimeProvider cl
         var first = await ids.ReserveAsync(read.Count, cancellationToken);
 
         var batch = new List<LogEntry>(read.Count);
+        var atErrorOrAbove = 0L;
+
         for (var index = 0; index < read.Count; index++)
         {
             var entry = read[index];
+
+            if (entry.Level >= Level.Error)
+            {
+                // Counted here rather than by a second pass over the batch: the
+                // entries are already in hand and it is one comparison.
+                atErrorOrAbove++;
+            }
 
             batch.Add(new LogEntry
             {
@@ -241,6 +257,8 @@ public sealed class IngestBatch(IEntries entries, IEntryIds ids, TimeProvider cl
         }
 
         await entries.WriteAsync(batch, cancellationToken);
+
+        tally.Record(projectId, receiptTime, batch.Count, atErrorOrAbove);
     }
 
     /// <summary>

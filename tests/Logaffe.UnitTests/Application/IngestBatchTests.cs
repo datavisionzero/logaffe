@@ -1,6 +1,7 @@
 using System.Text;
 using Logaffe.Application.Operations;
 using Logaffe.Domain.Entries;
+using Logaffe.Domain.Projects;
 
 namespace Logaffe.UnitTests.Application;
 
@@ -19,6 +20,7 @@ public sealed class IngestBatchTests
 
     private readonly RecordingEntries _entries = new();
     private readonly HandingOutIds _ids = new();
+    private readonly RunningTally _tally = new();
     private readonly StoppedClock _clock = new(Arrived);
 
     [Fact]
@@ -144,7 +146,7 @@ public sealed class IngestBatchTests
     public async Task The_identities_are_a_block_taken_once_for_what_is_being_stored()
     {
         var ids = new HandingOutIds(from: 4_000);
-        var ingest = new IngestBatch(_entries, ids, _clock);
+        var ingest = new IngestBatch(_entries, ids, _tally, _clock);
 
         await ingest.ExecuteAsync(
             Guid.CreateVersion7(),
@@ -161,7 +163,7 @@ public sealed class IngestBatchTests
     public async Task Every_row_carries_the_project_its_token_named()
     {
         var projectId = Guid.CreateVersion7();
-        var ingest = new IngestBatch(_entries, _ids, _clock);
+        var ingest = new IngestBatch(_entries, _ids, _tally, _clock);
 
         await ingest.ExecuteAsync(
             projectId, Body(Line("first"), Line("second")), TestContext.Current.CancellationToken);
@@ -199,7 +201,7 @@ public sealed class IngestBatchTests
     [Fact]
     public async Task A_body_ending_without_a_newline_still_delivers_its_last_line()
     {
-        var ingest = new IngestBatch(_entries, _ids, _clock);
+        var ingest = new IngestBatch(_entries, _ids, _tally, _clock);
 
         var receipt = await ingest.ExecuteAsync(
             Guid.CreateVersion7(),
@@ -212,7 +214,7 @@ public sealed class IngestBatchTests
     [Fact]
     public async Task A_body_written_with_carriage_returns_is_the_same_delivery()
     {
-        var ingest = new IngestBatch(_entries, _ids, _clock);
+        var ingest = new IngestBatch(_entries, _ids, _tally, _clock);
 
         var receipt = await ingest.ExecuteAsync(
             Guid.CreateVersion7(),
@@ -222,8 +224,67 @@ public sealed class IngestBatchTests
         Assert.Equal(2, receipt.Accepted);
     }
 
+    [Fact]
+    public async Task What_was_stored_is_counted_into_the_hour_the_batch_arrived_in()
+    {
+        await TakeAsync(Line("first"), "{ not json", Line("third"));
+
+        var increment = Assert.Single(_tally.Take());
+
+        // What was stored rather than what arrived: the count is the table's
+        // history, and a line that was never a row is not part of it.
+        Assert.Equal(2, increment.Entries);
+        Assert.Equal(Tallying.HourOf(Arrived), increment.Hour);
+    }
+
+    [Fact]
+    public async Task The_hour_is_the_receipt_and_never_what_the_sender_said()
+    {
+        // A sender a year out, on the one clock retention already refuses to
+        // count from (ADR 0007). The tally follows the same clock, because a
+        // history keyed on a wrong clock is a history of a machine nobody has.
+        await TakeAsync("""{"@t":"2025-01-01T03:00:00Z","@mt":"long ago"}""");
+
+        Assert.Equal(Tallying.HourOf(Arrived), Assert.Single(_tally.Take()).Hour);
+    }
+
+    [Fact]
+    public async Task Error_and_fatal_are_counted_apart_and_nothing_below_them_is()
+    {
+        await TakeAsync(
+            Line("plain"),
+            Levelled("Warning", "nearly"),
+            Levelled("Error", "broken"),
+            Levelled("Fatal", "over"));
+
+        var increment = Assert.Single(_tally.Take());
+
+        Assert.Equal(4, increment.Entries);
+        Assert.Equal(2, increment.AtErrorOrAbove);
+    }
+
+    [Fact]
+    public async Task A_store_that_cannot_be_reached_counts_nothing()
+    {
+        _entries.Refusing = new InvalidOperationException("no connection");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => TakeAsync(Line("first")));
+
+        // The tally is a count of what the table took, so a delivery that was
+        // never stored is not one of them.
+        Assert.Empty(_tally.Take());
+    }
+
+    [Fact]
+    public async Task A_batch_with_nothing_in_it_counts_nothing()
+    {
+        await TakeAsync();
+
+        Assert.Empty(_tally.Take());
+    }
+
     private Task<BatchReceipt> TakeAsync(params string[] lines) =>
-        new IngestBatch(_entries, _ids, _clock).ExecuteAsync(
+        new IngestBatch(_entries, _ids, _tally, _clock).ExecuteAsync(
             Guid.CreateVersion7(), Body(lines), TestContext.Current.CancellationToken);
 
     private static Stream Body(params string[] lines) =>
@@ -231,6 +292,9 @@ public sealed class IngestBatchTests
 
     private static string Line(string message) =>
         $$"""{"@t":"2026-08-07T09:15:00Z","@mt":{{JsonString(message)}}}""";
+
+    private static string Levelled(string level, string message) =>
+        $$"""{"@t":"2026-08-07T09:15:00Z","@l":"{{level}}","@mt":{{JsonString(message)}}}""";
 
     private static string JsonString(string value) =>
         System.Text.Json.JsonSerializer.Serialize(value);

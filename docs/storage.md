@@ -9,10 +9,10 @@ SQL through Dapper.
 
 This document is the log entry table — what each column is for, which indexes
 exist and why, and what the whole thing costs — and, at the end, the two small
-tables that hold samples ([Metrics](./metrics.md)), which are here because their
-shape was decided rather than because their size demands it. The operator
-account, the projects, the tokens and the settings are ordinary relational rows
-and need no document of their own.
+tables that hold samples ([Metrics](./metrics.md)) and the smaller one that holds
+the tally, which are here because their shape was decided rather than because
+their size demands it. The operator account, the projects, the tokens and the
+settings are ordinary relational rows and need no document of their own.
 
 The numbers quoted below were measured on a containerised Postgres capped at two
 cores and 4 GB, holding ten million entries across twenty projects — the shape of
@@ -373,6 +373,63 @@ exists because a fifth of a six-gigabyte table is a great deal of dead space to
 wait for; a fifth of a table this size is not, and a vacuum over it is cheap
 enough that the default cadence never becomes the problem ADR 0023 describes.
 
+## The tally table
+
+The third thing this database holds, and the smallest. It is what each project
+received in each hour, counted as the deliveries arrived rather than by asking
+`log_entry` afterwards
+([ADR 0047](./adr/0047-the-volume-history-is-tallied-as-it-arrives.md)) — because
+a count over the largest table in the database is what
+[The web UI](./ui.md) refuses a home screen for, and a history is the shape a
+count is worst at.
+
+```sql
+create table project_tally (
+    project_id        uuid        not null,
+    hour              timestamptz not null,   -- whole, at UTC, on the receipt clock
+
+    entries           bigint      not null,
+    at_error_or_above bigint      not null,
+
+    primary key (project_id, hour)
+);
+```
+
+**Two numbers, and the set is closed.** Not per logger name, per instance, per
+level or per host: each of those is the labelled series
+[ADR 0044](./adr/0044-a-sample-has-a-closed-schema.md) refused for samples,
+arriving by the back door on the table with the highest cardinality in the
+product. A third is a change to ADR 0047 and a migration.
+
+**The key is natural, for the sample table's reason** — nothing here is written
+with binary `COPY` and nothing here is paged with a cursor, so a synthetic
+identity would have no work to do. What it buys is that one project's hour is one
+row by the database's doing rather than by the flush being careful.
+
+**There is no foreign key to the project, for the entry table's reason.** A
+project is deleted at once and what counted it follows in the background
+([ADR 0019](./adr/0019-a-project-is-deleted-at-once-and-its-entries-follow.md)),
+and the rows it leaves are unreachable on their way out — nothing reads this
+table except by naming a project.
+
+**It is written once a minute and never per entry.** The counter lives in memory,
+which the single writer of [the identity above](#the-identity-is-a-number-the-installation-hands-out)
+already makes sufficient, and the flush is one transaction reading the hours it
+is about to add to and writing them back. A restart loses up to a minute and
+nothing reconciles it: this is not the record of what arrived, `log_entry` is.
+
+**It outlives the entries it counted.** Rows are kept for 400 days whatever a
+project's retention window is, because a project keeping entries for a week still
+needs a fortnight of history to have a baseline — and that is the project most
+likely to be busy. The sweep is one statement on the retention pass, not a walk
+and not a portion, because the whole table expires on one clock.
+
+**What it costs**, arithmetic rather than measured, as with the samples: a row is
+a uuid, a timestamp and two bigints, so twenty projects for 400 days is about
+192 000 rows and on the order of **ten mebibytes** with its key. Against the
+11.84 GiB above that is under a thousandth, which is why it gets a period of its
+own without an argument about what it costs.
+
 ## What is deliberately not here
 
 - **No partitioning.** Settled in ADR 0023: per-project retention means a
@@ -393,3 +450,7 @@ enough that the default cadence never becomes the problem ADR 0023 describes.
   correction, no reprocessing, and no backfill.
 - **No second copy for the agent.** MCP reads the same table through the same
   query surface as the web UI ([Querying](./querying.md)).
+- **No index on the tally beyond its key, and no query surface over it.** One
+  project over a range of hours is the whole of what is asked, which is the key's
+  leading column and then a range on the second. Nothing takes a filter here and
+  nothing above it is reachable from HTTP, from MCP or from the interface.
