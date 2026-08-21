@@ -211,6 +211,45 @@ public sealed class TallyStoreTests(PostgresFixture postgres)
         Assert.Empty(await ReadAsync(context, api));
     }
 
+    [Fact]
+    public async Task The_oldest_hour_is_how_much_history_there_is()
+    {
+        await using var context = await MigratedAsync();
+        var api = await ProjectAsync(context, "api");
+        var tallies = new Tallies(context);
+
+        await tallies.AddAsync(
+            [
+                Increment(api, Hour.AddDays(-20), 5, 0),
+                Increment(api, Hour.AddDays(-1), 5, 0),
+                Increment(api, Hour, 5, 0),
+            ],
+            TestContext.Current.CancellationToken);
+
+        // What decides whether a rate may be extrapolated at all: the fortnight
+        // is measured from the first row there is, not from the ones inside it.
+        Assert.Equal(
+            Hour.AddDays(-20),
+            await tallies.OldestHourAsync(api, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_project_with_no_hours_has_no_oldest_one()
+    {
+        await using var context = await MigratedAsync();
+        var api = await ProjectAsync(context, "api");
+        var web = await ProjectAsync(context, "web");
+        var tallies = new Tallies(context);
+
+        await tallies.AddAsync(
+            [Increment(web, Hour, 5, 0)], TestContext.Current.CancellationToken);
+
+        // A project that has never received anything, and a project created five
+        // minutes ago, look the same here and are answered the same way: there
+        // is nothing to say about their rate.
+        Assert.Null(await tallies.OldestHourAsync(api, TestContext.Current.CancellationToken));
+    }
+
     private static TallyIncrement Increment(
         Guid projectId, DateTimeOffset hour, long entries, long atErrorOrAbove) =>
         new()

@@ -22,6 +22,20 @@ public static class Tallying
     public static readonly TimeSpan FlushInterval = TimeSpan.FromMinutes(1);
 
     /// <summary>
+    /// How far back the two things that read this look, and how much history a
+    /// project needs before either of them will say anything about it.
+    /// </summary>
+    /// <remarks>
+    /// A fortnight is what makes a rate a rate rather than an extrapolation from
+    /// two days: it holds ten working days and two weekends, so a project that
+    /// is quiet at weekends is described by it rather than caught out by it. A
+    /// project whose oldest tally row is younger than this has no normal — the
+    /// footprint of ADR 0048 says so instead of multiplying up what it has, and
+    /// the conditions of ADR 0050 do not fire at all (<c>docs/alerts.md</c>).
+    /// </remarks>
+    public static readonly TimeSpan Baseline = TimeSpan.FromDays(14);
+
+    /// <summary>
     /// How long a tally row is kept, which is deliberately not any project's
     /// retention window.
     /// </summary>

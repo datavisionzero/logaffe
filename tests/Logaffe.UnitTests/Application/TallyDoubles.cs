@@ -76,6 +76,19 @@ internal sealed class RecordingTallies : ITallies
                 .OrderBy(row => row.Hour),
         ]);
 
+    /// <remarks>
+    /// The oldest row there is, which is what the real store's walk to the start
+    /// of the project's key finds — and <c>null</c> for a project with none,
+    /// which is how a project younger than its first flush looks.
+    /// </remarks>
+    public Task<DateTimeOffset?> OldestHourAsync(
+        Guid projectId, CancellationToken cancellationToken) =>
+        Task.FromResult(_rows.Values
+            .Where(row => row.ProjectId == projectId)
+            .OrderBy(row => row.Hour)
+            .Select(row => (DateTimeOffset?)row.Hour)
+            .FirstOrDefault());
+
     public Task<IReadOnlyList<Guid>> ProjectsWithTalliesAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<Guid>>([.. Holding]);
 

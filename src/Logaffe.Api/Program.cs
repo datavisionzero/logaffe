@@ -143,6 +143,11 @@ builder.Services.AddScoped<ReadProject>();
 builder.Services.AddScoped<RenameProject>();
 builder.Services.AddScoped<ChangeRetentionWindow>();
 builder.Services.AddScoped<CountEntriesOutsideWindow>();
+
+// What a window costs, beside what lowering one destroys. It serves both
+// screens that set a window — the project's and the installation's samples —
+// because the three numbers are the same three (ADR 0048).
+builder.Services.AddScoped<ReadTheFootprint>();
 builder.Services.AddScoped<DeleteProject>();
 
 // The heading a project is listed under, which carries a name and nothing else

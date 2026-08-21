@@ -161,6 +161,56 @@ public sealed class SampleReaderTests(PostgresFixture postgres)
         Assert.False(reported.ContainsKey(_other));
     }
 
+    [Fact]
+    public async Task The_newest_report_is_the_last_sample_and_the_readings_taken_with_it()
+    {
+        var reader = await ReadingAsync(Sample(Ten), Sample(Ten.AddMinutes(5)));
+
+        await WriteFilesystemsAsync(
+            Filesystem(Ten, "/", used: 10, total: 1_000),
+            Filesystem(Ten.AddMinutes(5), "/", used: 700, total: 1_000),
+            Filesystem(Ten.AddMinutes(5), "/data", used: 40, total: 4_000));
+
+        var report = Assert.Single(await reader.NewestReportsAsync(
+            [_host], TestContext.Current.CancellationToken));
+
+        // The newest and not an average: how full a disk is is a level, and the
+        // reading five minutes ago is what the operator is deciding against.
+        Assert.Equal(Ten.AddMinutes(5), report.ReceiptTime);
+        Assert.Equal(
+            [("/", 700L), ("/data", 40L)],
+            report.Filesystems
+                .OrderBy(reading => reading.MountPath.Value)
+                .Select(reading => (reading.MountPath.Value, reading.Used)));
+    }
+
+    [Fact]
+    public async Task A_host_that_never_reported_is_left_out_of_the_newest_reports()
+    {
+        var reader = await ReadingAsync(Sample(Ten));
+
+        var reports = await reader.NewestReportsAsync(
+            [_host, _other], TestContext.Current.CancellationToken);
+
+        // A machine between being created and its collector being started. It is
+        // absent rather than present and empty, because it has said nothing at
+        // all — where a machine reporting no filesystems has.
+        Assert.Equal(_host, Assert.Single(reports).HostId);
+    }
+
+    [Fact]
+    public async Task A_host_reporting_no_filesystem_is_in_the_answer_with_none()
+    {
+        var reader = await ReadingAsync(Sample(Ten));
+
+        var report = Assert.Single(await reader.NewestReportsAsync(
+            [_host], TestContext.Current.CancellationToken));
+
+        // A collector configured to watch no mounts still writes a row a minute,
+        // which is what the sample window's arithmetic is counting.
+        Assert.Empty(report.Filesystems);
+    }
+
     private string _connectionString = null!;
 
     private async Task<SampleReader> ReadingAsync(params Sample[] samples)

@@ -136,6 +136,53 @@ public sealed class SampleReader(LogaffeDbContext context) : ISampleReader
             .Select(host => new { HostId = host.Key, Last = host.Max(s => s.ReceiptTime) })
             .ToDictionaryAsync(row => row.HostId, row => row.Last, cancellationToken);
 
+    /// <remarks>
+    /// <para>
+    /// One host at a time, two statements each, rather than one statement over
+    /// all of them. Both are the key doing what it was shaped for — a backwards
+    /// walk to the newest instant, then the readings sitting at it — where a
+    /// single grouped statement over every host would be the scan of the whole
+    /// table that <c>docs/storage.md</c> keeps the leading column to avoid. An
+    /// installation has a handful of machines, so the loop is the cheaper half
+    /// of that trade, which is the retention sweep's reasoning exactly.
+    /// </para>
+    /// <para>
+    /// A host with no sample is not in the answer at all. A host whose newest
+    /// sample carried no filesystem is, with an empty list: a machine reporting
+    /// nothing about its disks is still a machine writing a row a minute.
+    /// </para>
+    /// </remarks>
+    public async Task<IReadOnlyList<NewestReport>> NewestReportsAsync(
+        IReadOnlyList<Guid> hostIds, CancellationToken cancellationToken)
+    {
+        var reports = new List<NewestReport>(hostIds.Count);
+
+        foreach (var hostId in hostIds.Distinct())
+        {
+            var newest = await context.Samples
+                .AsNoTracking()
+                .Where(sample => sample.HostId == hostId)
+                .OrderByDescending(sample => sample.ReceiptTime)
+                .Select(sample => (DateTimeOffset?)sample.ReceiptTime)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (newest is null)
+            {
+                continue;
+            }
+
+            var filesystems = await context.FilesystemReadings
+                .AsNoTracking()
+                .Where(reading =>
+                    reading.HostId == hostId && reading.ReceiptTime == newest.Value)
+                .ToListAsync(cancellationToken);
+
+            reports.Add(new NewestReport(hostId, newest.Value, filesystems));
+        }
+
+        return reports;
+    }
+
     /// <summary>
     /// A span's start as an instant.
     /// </summary>

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using Logaffe.Domain.Projects;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Logaffe.IntegrationTests;
@@ -67,6 +68,7 @@ public sealed class HostEndpointTests(PostgresFixture postgres) : IAsyncLifetime
     [InlineData("GET", "/samples/retention")]
     [InlineData("PUT", "/samples/retention")]
     [InlineData("GET", "/samples/retention/outside?retentionDays=7")]
+    [InlineData("GET", "/samples/retention/footprint?retentionDays=7")]
     public async Task Every_host_endpoint_is_behind_the_operator_s_session(
         string method, string path)
     {
@@ -331,8 +333,8 @@ public sealed class HostEndpointTests(PostgresFixture postgres) : IAsyncLifetime
 
         // Refused where every other window is: a settings box without a ceiling
         // is how a product that is not a multi-year archive becomes one
-        // (ADR 0020).
-        foreach (var days in new[] { 0, 91, 365 })
+        // (ADR 0020, at the year ADR 0048 moved it to).
+        foreach (var days in new[] { 0, RetentionWindow.MaximumDays + 1, 400 })
         {
             using var refused = await client.PutAsJsonAsync(
                 "/samples/retention",
@@ -341,6 +343,43 @@ public sealed class HostEndpointTests(PostgresFixture postgres) : IAsyncLifetime
 
             Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
         }
+    }
+
+    [Fact]
+    public async Task The_sample_window_says_what_it_will_cost()
+    {
+        using var client = await SignedInAsync();
+
+        var footprint = await ReadAsync<FootprintBody>(await client.GetAsync(
+            "/samples/retention/footprint?retentionDays=90",
+            TestContext.Current.CancellationToken));
+
+        Assert.Equal(90, footprint.RetentionDays);
+
+        // What the installation holds is the store's own number and is there
+        // whatever else is not.
+        Assert.True(footprint.HeldBytes > 0);
+
+        // Nothing has reported to this installation and it names no host, so
+        // two of the three are absent — and the field shows the first alone
+        // rather than refusing to render (ADR 0048).
+        Assert.Null(footprint.ImpliedBytes);
+        Assert.Null(footprint.DiskFreeBytes);
+        Assert.Null(footprint.DiskTotalBytes);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(RetentionWindow.MaximumDays + 1)]
+    public async Task A_sample_window_that_could_not_be_applied_has_no_cost(int retentionDays)
+    {
+        using var client = await SignedInAsync();
+
+        using var response = await client.GetAsync(
+            $"/samples/retention/footprint?retentionDays={retentionDays}",
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]
@@ -507,6 +546,13 @@ public sealed class HostEndpointTests(PostgresFixture postgres) : IAsyncLifetime
     private sealed record SampleRetentionBody(int RetentionDays);
 
     private sealed record SamplesOutsideBody(int RetentionDays, long Samples);
+
+    private sealed record FootprintBody(
+        int RetentionDays,
+        long HeldBytes,
+        long? ImpliedBytes,
+        long? DiskFreeBytes,
+        long? DiskTotalBytes);
 
     /// <summary>
     /// Only what a read of an empty host answers with. The buckets themselves

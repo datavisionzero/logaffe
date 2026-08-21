@@ -297,7 +297,7 @@ public static class ProjectEndpoints
                 CancellationToken cancellationToken) =>
             {
                 // Refused where every other window is. There is no answering
-                // "and this is what a year would keep", because that is not a
+                // "and this is what two years would keep", because that is not a
                 // window an installation has (ADR 0020).
                 if (!RetentionWindow.TryOfDays(retentionDays, out var proposed))
                 {
@@ -313,6 +313,36 @@ public static class ProjectEndpoints
             .WithName("CountEntriesOutsideWindow")
             .WithSummary("How many entries a retention window would remove, before it is applied.")
             .Produces<EntriesOutsideWindowResponse>()
+            .Produces(StatusCodes.Status404NotFound)
+            .ProducesValidationProblem();
+
+        operatorSurface.MapGet("/{id:guid}/retention/footprint", async (
+                Guid id,
+                int retentionDays,
+                ReadTheFootprint footprint,
+                CancellationToken cancellationToken) =>
+            {
+                // Refused where every other window is, for the reason the count
+                // beside it is: what a window costs is asked about windows this
+                // installation has.
+                if (!RetentionWindow.TryOfDays(retentionDays, out var proposed))
+                {
+                    return NotAWindow();
+                }
+
+                // Asked on every keystroke, and it stays cheap on purpose: one
+                // call for the size of the store, a handful of tally rows, and
+                // the newest report of one host. Nothing here grows with the
+                // entries (ADR 0048).
+                var cost = await footprint.OfProjectAsync(id, proposed, cancellationToken);
+
+                return cost is null
+                    ? Results.NotFound()
+                    : Results.Ok(FootprintResponse.Of(retentionDays, cost));
+            })
+            .WithName("ReadProjectFootprint")
+            .WithSummary("What a retention window will cost, before it is applied.")
+            .Produces<FootprintResponse>()
             .Produces(StatusCodes.Status404NotFound)
             .ProducesValidationProblem();
 

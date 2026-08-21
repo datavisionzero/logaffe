@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using Logaffe.Domain.Projects;
+using Logaffe.Domain.Storage;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Npgsql;
 
@@ -66,6 +67,7 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : IAsyncLifet
     [InlineData("PATCH", $"/projects/{NoSuchProject}")]
     [InlineData("PUT", $"/projects/{NoSuchProject}/retention")]
     [InlineData("GET", $"/projects/{NoSuchProject}/retention/outside?retentionDays=7")]
+    [InlineData("GET", $"/projects/{NoSuchProject}/retention/footprint?retentionDays=7")]
     [InlineData("DELETE", $"/projects/{NoSuchProject}")]
     public async Task Every_project_endpoint_is_behind_the_operator_s_session(
         string method, string path)
@@ -180,9 +182,95 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : IAsyncLifet
             TestContext.Current.CancellationToken);
 
         // Refused where every other window is (ADR 0020). There is no answering
-        // "and this is what a year would keep", because that is not a window an
+        // "and this is what two years would keep", because that is not a window an
         // installation has.
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_window_says_what_it_will_cost_before_it_is_applied()
+    {
+        using var client = await SignedInAsync();
+
+        var project = await ReadAsync<ProjectBody>(await client.PostAsJsonAsync(
+            "/projects",
+            new { name = "api", retentionDays = 30 },
+            TestContext.Current.CancellationToken));
+
+        var hour = Tallying.HourOf(DateTimeOffset.UtcNow);
+
+        // A fortnight and a day of history, of which only what falls inside the
+        // fortnight is the rate: 1 400 entries over fourteen days is a hundred a
+        // day, and the day before the window is not in it.
+        await StoreTallyAsync(project.Id, hour.AddDays(-15), 999_999);
+        await StoreTallyAsync(project.Id, hour.AddDays(-1), 1_400);
+
+        var footprint = await ReadAsync<FootprintBody>(await client.GetAsync(
+            $"/projects/{project.Id}/retention/footprint?retentionDays=365",
+            TestContext.Current.CancellationToken));
+
+        Assert.Equal(365, footprint.RetentionDays);
+        Assert.Equal(100L * 365 * Footprint.BytesPerEntry, footprint.ImpliedBytes);
+
+        // The other two are the installation's: it holds what it holds, and it
+        // names no host, so there is no disk to read.
+        Assert.True(footprint.HeldBytes > 0);
+        Assert.Null(footprint.DiskFreeBytes);
+    }
+
+    [Fact]
+    public async Task A_project_without_a_fortnight_behind_it_says_so_rather_than_guessing()
+    {
+        using var client = await SignedInAsync();
+
+        var project = await ReadAsync<ProjectBody>(await client.PostAsJsonAsync(
+            "/projects",
+            new { name = "api", retentionDays = 30 },
+            TestContext.Current.CancellationToken));
+
+        await StoreTallyAsync(
+            project.Id, Tallying.HourOf(DateTimeOffset.UtcNow).AddDays(-2), 100_000);
+
+        var footprint = await ReadAsync<FootprintBody>(await client.GetAsync(
+            $"/projects/{project.Id}/retention/footprint?retentionDays=365",
+            TestContext.Current.CancellationToken));
+
+        // Two days multiplied up by a year is a guess with a number on it, and
+        // the first fortnight of a project is exactly when somebody is choosing
+        // its window (ADR 0048).
+        Assert.Null(footprint.ImpliedBytes);
+        Assert.True(footprint.HeldBytes > 0);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(RetentionWindow.MaximumDays + 1)]
+    public async Task A_window_that_could_not_be_applied_has_no_cost(int retentionDays)
+    {
+        using var client = await SignedInAsync();
+
+        var project = await ReadAsync<ProjectBody>(await client.PostAsJsonAsync(
+            "/projects",
+            new { name = "api", retentionDays = 30 },
+            TestContext.Current.CancellationToken));
+
+        using var response = await client.GetAsync(
+            $"/projects/{project.Id}/retention/footprint?retentionDays={retentionDays}",
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_project_that_is_gone_has_no_footprint()
+    {
+        using var client = await SignedInAsync();
+
+        using var response = await client.GetAsync(
+            $"/projects/{NoSuchProject}/retention/footprint?retentionDays=7",
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
@@ -444,10 +532,36 @@ public sealed class ProjectEndpointTests(PostgresFixture postgres) : IAsyncLifet
         await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
+    private async Task StoreTallyAsync(Guid projectId, DateTimeOffset hour, long entries)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+
+        await using var command = new NpgsqlCommand(
+            """
+            insert into project_tally (project_id, hour, entries, at_error_or_above)
+            values (@project_id, @hour, @entries, 0)
+            """,
+            connection);
+
+        command.Parameters.AddWithValue("project_id", projectId);
+        command.Parameters.AddWithValue("hour", hour);
+        command.Parameters.AddWithValue("entries", entries);
+
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+    }
+
     private sealed record Enrolment(
         string SecondFactorSecret, IReadOnlyList<string> BackupCodes, string Ticket);
 
     private sealed record EntriesOutsideBody(int RetentionDays, long Entries);
+
+    private sealed record FootprintBody(
+        int RetentionDays,
+        long HeldBytes,
+        long? ImpliedBytes,
+        long? DiskFreeBytes,
+        long? DiskTotalBytes);
 
     private sealed record ProjectBody(
         Guid Id, string Name, int RetentionDays, DateTimeOffset CreatedAt);

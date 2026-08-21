@@ -16,10 +16,12 @@ namespace Logaffe.Application.Ports;
 /// </para>
 /// <para>
 /// <b>This is not a query surface.</b> Nothing here takes a filter, a cursor or
-/// a page, and nothing above it is reachable from HTTP, from MCP or from the
-/// interface. What an operator or an agent asks for a number is still the count
-/// of <c>docs/querying.md</c>, over the entries themselves — that one takes
-/// filters and this holds none.
+/// a page, and no count from this table reaches anybody: the one thing above it
+/// an operator sees is the footprint a retention window implies (ADR 0048),
+/// which is these rows turned into bytes and never handed over as themselves,
+/// and no agent reaches even that. What an operator or an agent asks for a
+/// number is still the count of <c>docs/querying.md</c>, over the entries
+/// themselves — that one takes filters and this holds none.
 /// </para>
 /// </remarks>
 public interface ITallies
@@ -66,6 +68,29 @@ public interface ITallies
         DateTimeOffset fromHour,
         DateTimeOffset toHour,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The oldest hour this project has a row for, or <c>null</c> when it has
+    /// none at all.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// How much history there is, which is a different question from what is in
+    /// it and is asked first. A project whose oldest row is younger than
+    /// <see cref="Tallying.Baseline"/> has no rate worth extrapolating from —
+    /// two days multiplied up by a year is not a footprint, it is a guess with a
+    /// number on it — and the rate conditions of ADR 0050 will not fire for it
+    /// either.
+    /// </para>
+    /// <para>
+    /// It cannot be read off <see cref="ReadAsync"/>: a project that was quiet
+    /// for the first week of a fortnight has no row in it, and absent rows are
+    /// how this table says nothing arrived. This is one backwards walk to the
+    /// start of the project's own stretch of the key, which is the same lookup
+    /// the newest sample of a host is.
+    /// </para>
+    /// </remarks>
+    Task<DateTimeOffset?> OldestHourAsync(Guid projectId, CancellationToken cancellationToken);
 
     /// <summary>
     /// Every project identity the table still holds rows for.

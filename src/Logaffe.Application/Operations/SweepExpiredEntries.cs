@@ -17,7 +17,8 @@ namespace Logaffe.Application.Operations;
 /// <b>Rows, in bounded portions, rather than dropped partitions.</b> Retention
 /// is configured per project, so a partition could only be dropped once
 /// everything inside it had expired and a project keeping entries for seven days
-/// would keep them for up to ninety (ADR 0023). Deleting rows is the cost of
+/// would keep them for as long as the longest window in the installation, which
+/// may be a year (ADR 0023, ADR 0048). Deleting rows is the cost of
 /// that promise, and the portion is what keeps it from being one long
 /// transaction across a table other projects are still being written to.
 /// </para>

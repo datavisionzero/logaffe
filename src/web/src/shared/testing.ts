@@ -168,6 +168,32 @@ export function aHost(host: {
   };
 }
 
+/**
+ * What a window costs, as either of the two screens that set one reads it.
+ *
+ * Two of the three numbers are absent by default, because that is the ordinary
+ * installation: a project with less than a fortnight of history has no rate to
+ * extrapolate, and an installation that names no host has no disk to read
+ * (ADR 0048).
+ */
+export function aFootprint(footprint: {
+  retentionDays: number;
+  heldBytes?: number;
+  impliedBytes?: number | null;
+  diskFreeBytes?: number | null;
+  diskTotalBytes?: number | null;
+}): Answer {
+  return {
+    body: {
+      retentionDays: footprint.retentionDays,
+      heldBytes: footprint.heldBytes ?? 12_000_000_000,
+      impliedBytes: footprint.impliedBytes ?? null,
+      diskFreeBytes: footprint.diskFreeBytes ?? null,
+      diskTotalBytes: footprint.diskTotalBytes ?? null,
+    },
+  };
+}
+
 /** An installation holding no hosts, which is what every project starts on. */
 export const noHosts: Answer = { body: [] };
 

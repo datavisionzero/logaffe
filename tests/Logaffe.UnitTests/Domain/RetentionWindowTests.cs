@@ -5,11 +5,11 @@ namespace Logaffe.UnitTests.Domain;
 public sealed class RetentionWindowTests
 {
     [Fact]
-    public void The_ceiling_is_ninety_days()
+    public void The_ceiling_is_a_year()
     {
-        Assert.Equal(90, RetentionWindow.MaximumDays);
-        Assert.True(RetentionWindow.TryOfDays(90, out _));
-        Assert.False(RetentionWindow.TryOfDays(91, out _));
+        Assert.Equal(365, RetentionWindow.MaximumDays);
+        Assert.True(RetentionWindow.TryOfDays(365, out _));
+        Assert.False(RetentionWindow.TryOfDays(366, out _));
     }
 
     [Theory]
@@ -20,9 +20,11 @@ public sealed class RetentionWindowTests
 
     [Fact]
     public void No_installation_can_raise_the_ceiling() =>
-        // The assumptions the rest of the product rests on — index sizes, the
-        // volume storage is tuned for — stop being true above this.
-        Assert.Throws<ArgumentOutOfRangeException>(() => RetentionWindow.OfDays(365));
+        // A year is where this product ends and a different one begins, and
+        // moving the line is a change to ADR 0048 rather than a setting. What
+        // stands between the operator and a window they cannot afford below it
+        // is the footprint they are shown, not this.
+        Assert.Throws<ArgumentOutOfRangeException>(() => RetentionWindow.OfDays(366));
 
     [Fact]
     public void Two_windows_of_the_same_length_are_the_same_window() =>

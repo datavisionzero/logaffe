@@ -329,10 +329,24 @@ destroys data and cannot be undone should be arrived at rather than scrolled
 past. The three credentials stay together on one area, because they are three
 acts on one account rather than three subjects.
 
+**The retention field states the cost of the number in it**, live, as three
+figures beside the box: what the installation holds today, what this window
+implies at the project's own rate, and what the disk has left
+([Projects and tokens](./projects.md#the-field-says-what-the-window-will-cost)).
+It is the ceiling's old job done properly
+([ADR 0048](./adr/0048-retentions-ceiling-is-a-year-and-the-setting-says-what-it-costs.md)),
+and it is **advisory**: no threshold, no colour that means too much, and no
+button that stops working. Two of the three are absent on installations that
+cannot answer them — a project with less than a fortnight of history, an
+installation that names no host — and the field shows the numbers it has rather
+than refusing to render, because a screen that goes blank over a missing figure
+is worse than one that shows two.
+
 Per project: the name, the group it is in — one of the installation's, or none —
-the retention window with its warning about what lowering it removes, the ingest
-tokens with when each was last used, and deletion confirmed by typing the
-project's name ([Projects and tokens](./projects.md)). The group is chosen here —
+the retention window with its warning about what lowering it removes and what the
+window in the box will cost, the ingest tokens with when each was last used, and
+deletion confirmed by typing the project's name
+([Projects and tokens](./projects.md)). The group is chosen here —
 and at the creation, which offers the same choice so that putting a project where
 it belongs is part of making it rather than a second trip — but it is **made**
 elsewhere: a screen about one project is the wrong place to bring into existence
@@ -443,7 +457,9 @@ question is about the machine rather than about a project — the same band, wit
 a span to pick and nothing else to arrange. The **retention window for samples**
 is on the list rather than on a host, because it is one number for the
 installation ([Metrics](./metrics.md#retention)), and it carries the same warning
-about what lowering it removes that a project's does.
+about what lowering it removes that a project's does — and the same three figures
+about what it will cost, worked out from what the collectors are reporting rather
+than from a tally.
 
 ## The interface asks for nothing unasked
 

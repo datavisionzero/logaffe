@@ -164,6 +164,23 @@ internal sealed class InMemoryInstallation : IInstallation
 
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// The machine the installation names, which is none until something names
+    /// one — the ordinary state of every installation.
+    /// </summary>
+    public InstallationHost? Host { get; private set; }
+
+    public Task<InstallationHost?> ReadHostAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(Host);
+
+    public Task RecordHostAsync(InstallationHost? host, CancellationToken cancellationToken)
+    {
+        Host = host;
+        Writes++;
+
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>

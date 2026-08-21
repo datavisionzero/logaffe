@@ -26,6 +26,10 @@ public static class InfrastructureServices
             ?? throw new InvalidOperationException("ConnectionStrings:Postgres is not configured.")));
 
         services.AddScoped<IDatabaseProbe, DatabaseProbe>();
+
+        // What the store occupies, which is a different question from whether it
+        // can be reached and is asked by a different screen (ADR 0048).
+        services.AddScoped<IStoreFootprint, StoreFootprint>();
         services.AddScoped<ISealedSecrets, SealedSecrets>();
         services.AddScoped<IProjects, Projects>();
         services.AddScoped<IGroups, Groups>();

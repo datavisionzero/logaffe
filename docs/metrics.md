@@ -280,13 +280,26 @@ is the projects' behaviour and for the projects' reason.
 ## Retention
 
 Samples are kept for a period **set once for the installation**, counted from
-receipt, up to the same **maximum of ninety days** every retention window here
-has ([ADR 0020](./adr/0020-retention-has-a-maximum.md)).
+receipt, up to the same **maximum of 365 days** every retention window here has
+([ADR 0020](./adr/0020-retention-has-a-maximum.md), at the ceiling
+[ADR 0048](./adr/0048-retentions-ceiling-is-a-year-and-the-setting-says-what-it-costs.md)
+moved it to).
 
 It is one number rather than one per host because there is no reason to keep one
 machine's numbers longer than another's, and it is capped for the reason the
 project's is: a settings box without a ceiling is how a product that is not a
 multi-year archive becomes one without anyone deciding it should.
+
+**The field says what the window will cost**, exactly as a project's does
+([Projects](./projects.md#the-field-says-what-the-window-will-cost)) — what the
+installation holds today, what the disk has left, and what this window implies.
+The middle number is the only one that differs: the sample tables are not the
+entries, so what is multiplied is what the collectors write. A machine reports a
+row a minute and one beside it for each filesystem it was told to watch, so the
+rate is the product's rather than a thing to be measured, and the arithmetic is
+the one [Storage](./storage.md#what-the-samples-cost) does for these tables with
+this installation's own machines in it. An installation nothing has reported to
+says so rather than saying nought.
 
 **Lowering it removes samples**, and the operator is told how many before it takes
 effect. Raising it again brings nothing back.

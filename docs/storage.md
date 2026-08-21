@@ -218,13 +218,21 @@ trace index, measured:
 | **Total** | **11.84 GiB**, about 1.2 KiB per entry |
 
 **The indexes together are larger than the table.** That is the shape of a store
-whose entire purpose is being searched from several directions, and it is
-affordable only because volume is moderate and retention is capped at ninety days
-([ADR 0020](./adr/0020-retention-has-a-maximum.md)).
+whose entire purpose is being searched from several directions, and what makes it
+affordable is that volume is moderate and that a window is chosen against what it
+costs
+([ADR 0048](./adr/0048-retentions-ceiling-is-a-year-and-the-setting-says-what-it-costs.md)).
+It used to be the ninety-day ceiling of
+[ADR 0020](./adr/0020-retention-has-a-maximum.md) that was named here, and the
+ceiling is now a year: days were never a bound on what this table costs, because
+a week of a noisy project is more of it than a year of a quiet one.
 
 For sizing an installation, 1.2 KiB per entry is the number to multiply — and it
 is the number to give the operator, because disk is the limit this design meets
-first.
+first. **The product multiplies it for them**: the retention field states what
+the window in it implies, from the project's own rate over the last fortnight,
+beside what the database holds today and what the disk has left
+([Projects](./projects.md#the-field-says-what-the-window-will-cost)).
 
 Ingestion sustained 11 051 entries per second on the same host with every index
 in place, which is far above anything this product's traffic implies.
@@ -331,10 +339,11 @@ the sweep asks each of them in turn and the loop is cheaper than the index.
 
 ### The buckets are computed when they are read
 
-A host's ninety days are 129 600 rows. Aggregating that into two hundred buckets
-is one grouped scan of a fraction of one key, so there are **no rollup tables and
-no downsampling on write** — a second write path and a backfill story bought for
-a saving that does not exist at this size.
+A host's ninety days are 129 600 rows, and its year at the ceiling of ADR 0048 is
+525 600. Aggregating either into two hundred buckets is one grouped scan of a
+fraction of one key, so there are **no rollup tables and no downsampling on
+write** — a second write path and a backfill story bought for a saving that does
+not exist at this size.
 
 That grouped statement is the one part of samples that is **hand-written SQL**,
 and it sits with the sample store rather than in the folder the log path's
@@ -367,6 +376,12 @@ Five hosts watching three filesystems each, at ninety days:
 Against 11.84 GiB of entries that is two per cent, and it is the reason samples
 get a retention window without an argument about what it costs. Twenty hosts
 would be four times that and still under a twentieth of the log store.
+
+Per row that is **126 bytes for a sample and 94 for a filesystem reading**, key
+included, and those are the two figures the sample window's footprint multiplies
+([Metrics](./metrics.md#retention)): a machine writes one of the first a minute
+and one of the second per mount it was told to watch, so what a window costs is
+the shape of what is reporting rather than a rate anything has to measure.
 
 **Autovacuum is left at its defaults here**, unlike `log_entry`. The tuning above
 exists because a fifth of a six-gigabyte table is a great deal of dead space to
@@ -419,10 +434,11 @@ is about to add to and writing them back. A restart loses up to a minute and
 nothing reconciles it: this is not the record of what arrived, `log_entry` is.
 
 **It outlives the entries it counted.** Rows are kept for 400 days whatever a
-project's retention window is, because a project keeping entries for a week still
-needs a fortnight of history to have a baseline — and that is the project most
-likely to be busy. The sweep is one statement on the retention pass, not a walk
-and not a portion, because the whole table expires on one clock.
+project's retention window is — a year and a month, which covers a window at the
+ceiling of ADR 0048 with slack — because a project keeping entries for a week
+still needs a fortnight of history to have a baseline, and that is the project
+most likely to be busy. The sweep is one statement on the retention pass, not a
+walk and not a portion, because the whole table expires on one clock.
 
 **What it costs**, arithmetic rather than measured, as with the samples: a row is
 a uuid, a timestamp and two bigints, so twenty projects for 400 days is about
@@ -452,5 +468,8 @@ own without an argument about what it costs.
   query surface as the web UI ([Querying](./querying.md)).
 - **No index on the tally beyond its key, and no query surface over it.** One
   project over a range of hours is the whole of what is asked, which is the key's
-  leading column and then a range on the second. Nothing takes a filter here and
-  nothing above it is reachable from HTTP, from MCP or from the interface.
+  leading column and then a range on the second — plus the oldest hour one
+  project has, which is the same key walked to the other end. Nothing takes a
+  filter here and no count from it reaches anybody: what an operator sees is the
+  fortnight turned into a footprint in bytes (ADR 0048), and no agent sees even
+  that.

@@ -27,4 +27,19 @@ public sealed class InstallationSettings
     /// machine's numbers longer than another's (<c>docs/metrics.md</c>).
     /// </summary>
     public int SampleRetentionDays { get; set; }
+
+    /// <summary>
+    /// The machine logaffe is itself on, or <c>null</c> for an installation that
+    /// names none — which is every installation until the operator says
+    /// otherwise (<c>docs/metrics.md</c>).
+    /// </summary>
+    public Guid? HostId { get; set; }
+
+    /// <summary>
+    /// Which of that machine's filesystems holds the database, as the mount its
+    /// collector reports it under. The pair is written and cleared together, and
+    /// read as a pair: deleting the host sets <see cref="HostId"/> to null and
+    /// leaves this behind, and a mount without a machine names nothing.
+    /// </summary>
+    public string? MountPath { get; set; }
 }

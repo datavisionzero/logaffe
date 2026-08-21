@@ -25,7 +25,7 @@ data.
 holds nothing but data and every rule lives a layer up. The guard is a rule that
 can be checked by reading: **anything the documents already state as a rule
 belongs in Domain.** The three-character minimum of
-[ADR 0025](./0025-a-search-text-is-at-least-three-characters.md), the ninety-day
+[ADR 0025](./0025-a-search-text-is-at-least-three-characters.md), the retention
 ceiling of [ADR 0020](./0020-retention-has-a-maximum.md), the substitution rule
 that is deliberately narrower than Serilog's
 ([ADR 0004](./0004-the-ingestion-format-is-clef-and-the-server-renders.md)), the

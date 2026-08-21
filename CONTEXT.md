@@ -335,10 +335,14 @@ the **Footprint** and the **Baseline**.
 _Avoid_: Metric, count, statistic, rollup, aggregate, series
 
 **Footprint**:
-What an installation's entries occupy on disk — held today, and implied by a
-**Retention Window** at the rate a project is currently delivering. It is what a
-window is stated in when the operator changes one, and it is the quantity the
-ceiling was always a poor stand-in for.
+What an installation occupies on disk — held today, and implied by a
+**Retention Window** at the rate a project is currently delivering. Held today is
+the whole store rather than the entries alone, because a disk does not
+distinguish a table from its indexes; implied is that project's **Tally** turned
+into bytes, or, for the sample window, what the collectors write. It is what a
+window is stated in when the operator changes one, it is shown beside what the
+disk has left where a **Host** is named onto the installation, and it is the
+quantity the ceiling was always a poor stand-in for. It refuses nothing.
 _Avoid_: Size, usage, quota, limit, disk space, capacity
 
 **Alert Condition**:

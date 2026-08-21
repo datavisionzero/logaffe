@@ -998,3 +998,29 @@ button.grave {
   color: var(--refusal);
   border-color: var(--refusal);
 }
+
+/* What a retention window will cost, beside the field that sets one. Three
+   figures the operator reads across rather than a sentence they read through:
+   what is held now, what the window in the box comes to, and what the disk has
+   left (ADR 0048). Nothing here is a threshold and nothing here is coloured —
+   it states the arithmetic and refuses nothing. */
+.footprint {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  background: var(--raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+}
+
+.footprint dt {
+  color: var(--quiet);
+  font-size: 0.85rem;
+}
+
+.footprint dd {
+  margin: 0.15rem 0 0;
+  font-variant-numeric: tabular-nums;
+}

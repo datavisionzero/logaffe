@@ -23,7 +23,7 @@ namespace Logaffe.Application.Operations;
 /// <para>
 /// The window it is asked for is one that already exists, so a number above the
 /// ceiling of ADR 0020 is refused where every other window is — there is no
-/// answering "and this is what 365 days would keep", because that is not a
+/// answering "and this is what two years would keep", because that is not a
 /// window an installation has.
 /// </para>
 /// <para>

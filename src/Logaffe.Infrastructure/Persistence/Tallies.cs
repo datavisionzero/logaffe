@@ -62,6 +62,20 @@ public sealed class Tallies(LogaffeDbContext context) : ITallies
             .OrderBy(t => t.Hour)
             .ToListAsync(cancellationToken);
 
+    /// <remarks>
+    /// One walk to the start of this project's stretch of the key and no
+    /// further: the rows are ordered by hour within the project, so the oldest
+    /// is the first one the index reaches.
+    /// </remarks>
+    public async Task<DateTimeOffset?> OldestHourAsync(
+        Guid projectId, CancellationToken cancellationToken) =>
+        await context.Tallies
+            .AsNoTracking()
+            .Where(t => t.ProjectId == projectId)
+            .OrderBy(t => t.Hour)
+            .Select(t => (DateTimeOffset?)t.Hour)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public async Task<IReadOnlyList<Guid>> ProjectsWithTalliesAsync(
         CancellationToken cancellationToken) =>
         await context.Tallies

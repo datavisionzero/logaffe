@@ -51,10 +51,14 @@ they actually are, the caps and the truncation, the project with its retention
 window and the group it is listed under, the two tokens with the identifier and
 the alphabet they are written in,
 the operator with the session, the backup code, the claim window and the claim
-secret, and the
-filters with the cursor. The test of whether something belongs here is stated
+secret, the
+filters with the cursor, and what a retention window costs — the per-entry and
+per-row figures [Storage](./storage.md) measured, and the arithmetic that turns a
+rate into bytes
+([ADR 0048](./adr/0048-retentions-ceiling-is-a-year-and-the-setting-says-what-it-costs.md)).
+The test of whether something belongs here is stated
 in ADR 0030: **anything the documents already state as a rule.** A retention
-window that can be constructed above ninety days, or a search text that can be
+window that can be constructed above a year, or a search text that can be
 constructed with two characters, is a rule that escaped.
 
 **`Logaffe.Application` holds the use cases and the ports.** Authenticating a
@@ -65,8 +69,9 @@ adapter or is a candidate to become so, and none of them knows what it is being
 called by — the first is called by both public endpoints and is the plainest
 case. Beside them sit the ports — a writer and a reader for entries, stores for
 the small relational rows, the cipher for whatever is sealed under the key on the
-host volume, the id source, the password hasher, the TOTP — which is the whole of
-what this layer asks the world for. The clock is not among them:
+host volume, the id source, the password hasher, the TOTP, and what the store
+says it occupies — which is the whole of what this layer asks the world for. The
+clock is not among them:
 `TimeProvider` is in the base class libraries, and a port over it would be an
 abstraction over an abstraction.
 

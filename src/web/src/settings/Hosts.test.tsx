@@ -6,6 +6,7 @@ import { GroupsProvider } from "../projects/groups";
 import { ProjectsProvider } from "../projects/projects";
 import { InstallationSettings } from "./InstallationSettings";
 import {
+  aFootprint,
   aHost,
   aProject,
   aSampleBucket,
@@ -42,6 +43,10 @@ function open(routes: Record<string, Answer | Answer[]> = {}, at = "/settings/ho
     "GET /second-factor": { body: { isEnrolled: true, enrolledAt: "2026-08-01T09:00:00Z" } },
     "GET /hosts": noHosts,
     "GET /samples/retention": RETENTION,
+
+    // What the window in the box costs, which this area states while it is
+    // being chosen (ADR 0048).
+    "GET /samples/retention/footprint": aFootprint({ retentionDays: 30 }),
     ...routes,
   });
 
@@ -260,6 +265,29 @@ describe("the window samples are kept for", () => {
     await waitFor(() =>
       expect(installation.sentTo("PUT /samples/retention")).toEqual([{ retentionDays: 7 }]),
     );
+  });
+
+  it("says what the window will cost, worked out from what reports", async () => {
+    open({
+      "GET /samples/retention/footprint": aFootprint({
+        retentionDays: 30,
+        heldBytes: 12_000_000_000,
+        impliedBytes: 260_000_000,
+      }),
+    });
+
+    // The arithmetic here is the sample tables rather than the entries: a row a
+    // minute per machine and one beside it per filesystem (ADR 0048).
+    expect(await screen.findByText("260 MB")).toBeInTheDocument();
+    expect(screen.getByText("12.0 GB")).toBeInTheDocument();
+  });
+
+  it("says nothing rather than nought when no machine has reported", async () => {
+    open({
+      "GET /samples/retention/footprint": aFootprint({ retentionDays: 30 }),
+    });
+
+    expect(await screen.findByText(/no machine has reported/i)).toBeInTheDocument();
   });
 
   it("raises without counting, because nothing leaves and nothing comes back", async () => {

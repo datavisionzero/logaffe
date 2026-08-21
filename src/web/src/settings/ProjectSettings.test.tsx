@@ -6,6 +6,7 @@ import { GroupsProvider } from "../projects/groups";
 import { ProjectsProvider } from "../projects/projects";
 import { ProjectSettings } from "./ProjectSettings";
 import {
+  aFootprint,
   aGroup,
   aHost,
   aProject,
@@ -41,6 +42,10 @@ function open(routes: Record<string, Answer | Answer[]>, at = "/project/p1/setti
     "GET /hosts": noHosts,
     "GET /projects": { body: [aProject({ id: "p1", name: "checkout", retentionDays: 30 })] },
     "GET /projects/p1/ingest-tokens": ONE_TOKEN,
+
+    // The window in the box costs something, and the field says what while it
+    // is being chosen. Every opening of this area asks it.
+    "GET /projects/p1/retention/footprint": aFootprint({ retentionDays: 30 }),
     ...routes,
   });
 
@@ -145,6 +150,96 @@ describe("the retention window", () => {
 
     expect(await screen.findByText(/kept for 60 days now/i)).toBeInTheDocument();
     expect(installation.asked).not.toContain("GET /projects/p1/retention/outside");
+  });
+
+  it("says what the window in the box will cost, without refusing it", async () => {
+    open({
+      "GET /projects/p1/retention/footprint": aFootprint({
+        retentionDays: 30,
+        heldBytes: 12_000_000_000,
+        impliedBytes: 43_000_000_000,
+        diskFreeBytes: 220_000_000_000,
+        diskTotalBytes: 500_000_000_000,
+      }),
+    });
+
+    // What the ceiling used to do: three numbers and the operator's own
+    // decision (ADR 0048). Nothing here is a threshold and nothing is refused —
+    // the window implies four times what the installation holds and the button
+    // still works.
+    expect(await screen.findByText("12.0 GB")).toBeInTheDocument();
+    expect(screen.getByText("43.0 GB")).toBeInTheDocument();
+    expect(screen.getByText(/220 GB of 500 GB/)).toBeInTheDocument();
+
+    // Three numbers and no fourth thing: no threshold, no warning and nothing
+    // that says the window is too large — the arithmetic is advisory.
+    expect(screen.queryByText(/too (large|much)/i)).toBeNull();
+  });
+
+  it("says nothing rather than guessing for a project without a fortnight behind it", async () => {
+    open({
+      "GET /projects/p1/retention/footprint": aFootprint({
+        retentionDays: 30,
+        impliedBytes: null,
+      }),
+    });
+
+    // Two days multiplied up by a year is a guess with a number on it, and the
+    // first fortnight is exactly when somebody is choosing the window.
+    expect(await screen.findByText(/less than a fortnight of history/i)).toBeInTheDocument();
+  });
+
+  it("shows the first two numbers when the installation names no host", async () => {
+    open({
+      "GET /projects/p1/retention/footprint": aFootprint({
+        retentionDays: 30,
+        impliedBytes: 43_000_000_000,
+      }),
+    });
+
+    expect(await screen.findByText("43.0 GB")).toBeInTheDocument();
+
+    // Absent rather than refusing to render: an installation on no host is the
+    // ordinary one, not a degraded one.
+    expect(screen.queryByText(/free on the disk/i)).toBeNull();
+  });
+
+  it("costs the window in the field rather than the one in force", async () => {
+    open({
+      "GET /projects/p1/retention/footprint": aFootprint({
+        retentionDays: 365,
+        impliedBytes: 48_000_000_000,
+      }),
+    });
+
+    const operator = userEvent.setup();
+    const field = await screen.findByLabelText(/kept for/i);
+
+    await operator.clear(field);
+    await operator.type(field, "365");
+
+    // It follows the field and not the change: a year is what the operator is
+    // considering, and what it costs is the thing they are deciding on.
+    expect(await screen.findByText("48.0 GB")).toBeInTheDocument();
+  });
+
+  it("drops a cost about a window the operator has since moved on from", async () => {
+    open({
+      // The window that was asked about, echoed back — and it is not the one in
+      // the field any more.
+      "GET /projects/p1/retention/footprint": aFootprint({
+        retentionDays: 30,
+        impliedBytes: 4_000_000_000,
+      }),
+    });
+
+    const operator = userEvent.setup();
+    const field = await screen.findByLabelText(/kept for/i);
+
+    await operator.clear(field);
+    await operator.type(field, "365");
+
+    await waitFor(() => expect(screen.queryByText("4.00 GB")).toBeNull());
   });
 
   it("drops a count about a window the operator has since moved on from", async () => {

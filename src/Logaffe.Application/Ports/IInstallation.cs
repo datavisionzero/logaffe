@@ -1,3 +1,4 @@
+using Logaffe.Domain.Hosts;
 using Logaffe.Domain.Operators;
 using Logaffe.Domain.Projects;
 
@@ -75,4 +76,29 @@ public interface IInstallation
     /// <summary>Writes back the window the operator just set.</summary>
     Task RecordSampleRetentionAsync(
         RetentionWindow window, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The machine this installation runs on and the mount holding its database,
+    /// or <c>null</c> when it names none — which is every installation until the
+    /// operator says otherwise.
+    /// </summary>
+    /// <remarks>
+    /// It is on the installation's own row rather than a flag on a host, because
+    /// it is a fact about logaffe and not about the machine: the host named here
+    /// is an ordinary host, created and named the way any other is
+    /// (<c>docs/metrics.md</c>).
+    /// </remarks>
+    Task<InstallationHost?> ReadHostAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Names the machine and the mount, or clears both by being given
+    /// <c>null</c>.
+    /// </summary>
+    /// <remarks>
+    /// The pair goes together: a mount without a machine is a string, and a
+    /// machine without a mount does not say which of its filesystems the
+    /// database is on. Deleting the host clears it, which is the projects'
+    /// behaviour and for the projects' reason.
+    /// </remarks>
+    Task RecordHostAsync(InstallationHost? host, CancellationToken cancellationToken);
 }

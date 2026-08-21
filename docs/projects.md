@@ -114,18 +114,58 @@ A project keeps its entries for a number of days, counted from **receipt time**,
 and time is the only limit there is — no size cap, no row quota, no interaction
 between limits.
 
-The number is the operator's, up to a **maximum of 90 days**
-([ADR 0020](./adr/0020-retention-has-a-maximum.md)). Without a ceiling, a setting
-box quietly turns logaffe into the multi-year archive `VISION.md` says it is
-not, and the assumptions the rest of the product rests on — index sizes, the
-volume the storage is tuned for, the self-repairing window in
-[ADR 0005](./adr/0005-the-rendered-message-is-stored-not-recomputed.md) — stop
-being true without anyone deciding that they should.
+The number is the operator's, up to a **maximum of 365 days**
+([ADR 0020](./adr/0020-retention-has-a-maximum.md), at the ceiling
+[ADR 0048](./adr/0048-retentions-ceiling-is-a-year-and-the-setting-says-what-it-costs.md)
+moved it to). Without a ceiling, a settings box quietly turns logaffe into the
+multi-year archive `VISION.md` says it is not — so there is one, no installation
+can raise it, and moving it again is a change to that decision rather than a
+setting.
+
+**Moving it was not a number change.** What a ceiling holds up is the rest of the
+product's assumptions — index sizes, the volume the storage is tuned for, and the
+rendering inconsistency in
+[ADR 0005](./adr/0005-the-rendered-message-is-stored-not-recomputed.md) that
+repairs itself only because old rows age out. ADR 0048 revisited all three before
+raising it: the first two grow with entries rather than with days, and the third
+is the price that was paid — at a year, an installation that has raised a project
+to the ceiling holds two generations of rendered text for that long, and a search
+will mix them.
+
+**A new project keeps entries for 30 days**, and that is unchanged by the
+ceiling being a year: the ceiling is what may be chosen and the default is what
+is recommended, and raising one is not advice about the other.
+
+### The field says what the window will cost
+
+What keeps a window sensible below the ceiling is not the ceiling. Days are not
+the axis anything is paid for — ninety of them permit one noisy project ninety
+gibibytes and refuse a quiet one a year that costs two — so the field states the
+cost of the number in it, live, while it is being chosen:
+
+- **What this installation holds today**, exact, read off the database itself.
+  It is every table and every index rather than the entries alone, because the
+  disk does not distinguish them.
+- **What the window implies**, from this project's own rate: the entries a day
+  it received over the last fourteen days, times the 1.2 KiB an entry costs
+  ([Storage](./storage.md)), times the days asked for. A project with less than a
+  fortnight of history behind it says so rather than multiplying up two days.
+- **What the disk has left**, when the installation names the host it runs on
+  ([Metrics](./metrics.md#the-installation-sits-on-at-most-one-host-too)). Most
+  installations name none, and the field shows the first two numbers rather than
+  refusing to render.
+
+**It refuses nothing.** There is no quota, no size cap and no drop-oldest: the
+operator sees three numbers and decides, and a window that will not fit is
+theirs to choose anyway. The same three appear on the installation's sample
+window, where the arithmetic is the sample tables rather than the entries.
 
 **Lowering it removes entries.** Before the change takes effect the operator is
 told how many entries it will put outside the new window, because a settings
-field that silently destroys data is a bad settings field. Raising it again
-brings nothing back — what was swept is gone.
+field that silently destroys data is a bad settings field. That count is a
+different thing from the cost above — one says what the change destroys, the
+other says what the window holds — and both are said before anything is applied.
+Raising it again brings nothing back: what was swept is gone.
 
 ## The group
 

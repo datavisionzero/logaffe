@@ -49,4 +49,27 @@ public interface ISampleReader
     /// </remarks>
     Task<IReadOnlyDictionary<Guid, DateTimeOffset>> LastReportedAsync(
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The newest sample each of the named hosts reported, with the filesystem
+    /// readings taken with it. Hosts that never reported are left out.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The hosts are named rather than found, because the caller is holding the
+    /// list already and because it is what keeps this a walk of a handful of
+    /// keys: one backwards scan to each host's newest instant, then the readings
+    /// at it. Finding them here instead would be a grouped statement over the
+    /// whole of the larger table, which is the plan
+    /// <c>docs/storage.md</c> keeps this key's shape to avoid.
+    /// </para>
+    /// <para>
+    /// <b>It is the newest reading and not an average of recent ones.</b> How
+    /// full a disk is is a level rather than a rate: what the operator wants to
+    /// know is how much room is left now, and an average over the last hour is
+    /// an answer to a question nobody asked.
+    /// </para>
+    /// </remarks>
+    Task<IReadOnlyList<NewestReport>> NewestReportsAsync(
+        IReadOnlyList<Guid> hostIds, CancellationToken cancellationToken);
 }

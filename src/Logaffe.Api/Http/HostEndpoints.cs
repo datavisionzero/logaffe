@@ -332,7 +332,7 @@ public static class HostEndpoints
                 CancellationToken cancellationToken) =>
             {
                 // Refused where every other window is. There is no answering
-                // "and this is what a year would keep", because that is not a
+                // "and this is what two years would keep", because that is not a
                 // window an installation has (ADR 0020).
                 if (!RetentionWindow.TryOfDays(retentionDays, out var proposed))
                 {
@@ -346,6 +346,30 @@ public static class HostEndpoints
             .WithName("CountSamplesOutsideWindow")
             .WithSummary("How many samples a retention window would remove, before it is applied.")
             .Produces<SamplesOutsideWindowResponse>()
+            .ProducesValidationProblem();
+
+        samples.MapGet("/footprint", async (
+                int retentionDays,
+                ReadTheFootprint footprint,
+                CancellationToken cancellationToken) =>
+            {
+                if (!RetentionWindow.TryOfDays(retentionDays, out var proposed))
+                {
+                    return NotAWindow();
+                }
+
+                // The project's three numbers, with the middle one worked out
+                // from what the collectors report rather than from a tally: a
+                // machine writes a row a minute and its filesystems' rows beside
+                // it, so the rate is the product's and not a thing to measure
+                // (ADR 0048).
+                var cost = await footprint.OfSamplesAsync(proposed, cancellationToken);
+
+                return Results.Ok(FootprintResponse.Of(retentionDays, cost));
+            })
+            .WithName("ReadSampleFootprint")
+            .WithSummary("What a sample retention window will cost, before it is applied.")
+            .Produces<FootprintResponse>()
             .ProducesValidationProblem();
 
         samples.MapPut(string.Empty, async (

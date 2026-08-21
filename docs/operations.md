@@ -77,8 +77,9 @@ restore.
 **Not everything is equally worth saving.** Entries are expendable: they are
 short-lived by design, they are additive to the applications' own local files,
 and losing them costs little. **Samples are expendable for the same reason** —
-they age out inside ninety days, they describe a machine that is still there to
-be asked, and a gap in a band costs an operator nothing they cannot get by
+they age out inside a year at the very longest and inside a month on an
+installation that never changed the window, they describe a machine that is
+still there to be asked, and a gap in a band costs an operator nothing they cannot get by
 looking now. The operator's account, the configuration, the projects, the hosts
 and the tokens are not — losing those means losing the installation. An operator
 who backs up only the small, slow-changing part is making a legitimate choice,
@@ -258,10 +259,13 @@ nothing on either surface can name one that no longer exists.
 Deleting rows rather than dropping time partitions is the deliberate choice, and
 the reason is that **retention is per project**. A partition can only be dropped
 once everything inside it has expired, so a project keeping entries for seven days
-would hold them for up to ninety while sharing partitions with a project that
-keeps them that long — a broken promise rather than a tuning detail. Fixing that
-means partitioning by project *and* time, which for thirty projects across ninety
-days is a great deal of machinery for a product whose case is being small.
+would hold them for as long as the longest window in the installation while
+sharing partitions with the project that has it — a broken promise rather than a
+tuning detail, and a worse one now that the longest window may be a year
+([ADR 0048](./adr/0048-retentions-ceiling-is-a-year-and-the-setting-says-what-it-costs.md)).
+Fixing it means partitioning by project *and* time, which for thirty projects
+across a year is a great deal of machinery for a product whose case is being
+small.
 
 Two consequences follow, and both are operational rather than theoretical.
 
@@ -335,6 +339,13 @@ which the documentation states with the indexes counted, because the trigram
 index of [ADR 0010](./adr/0010-search-is-a-substring-match-not-a-full-text-query.md)
 is the second-largest thing in the database and leaving it out of the estimate
 would understate it badly.
+
+**The product does that arithmetic where a window is set**, from the project's
+own rate rather than from a number the operator has to know
+([Projects](./projects.md#the-field-says-what-the-window-will-cost)), and shows
+it beside what the installation holds today and what the disk has left. Sizing a
+disk before there is an installation is still this arithmetic done by hand; after
+there is one, the settings field has already done it.
 
 **Samples do not enter that arithmetic in any meaningful way.** A handful of hosts
 at ninety days is a couple of hundred megabytes against a log store measured in

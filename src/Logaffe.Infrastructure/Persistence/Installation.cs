@@ -111,6 +111,50 @@ public sealed class Installation(LogaffeDbContext context) : IInstallation
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    /// <remarks>
+    /// The pair is read as a pair: the set-null on
+    /// <c>fk_installation_settings_host</c> can take the machine away without
+    /// taking the mount with it, and a mount naming no machine names nothing.
+    /// </remarks>
+    public async Task<InstallationHost?> ReadHostAsync(CancellationToken cancellationToken)
+    {
+        var settings = await context.InstallationSettings
+            .AsNoTracking()
+            .SingleOrDefaultAsync(cancellationToken);
+
+        return settings is { HostId: { } hostId, MountPath: { } mount }
+            ? new InstallationHost(hostId, MountPath.Create(mount))
+            : null;
+    }
+
+    public async Task RecordHostAsync(
+        InstallationHost? host, CancellationToken cancellationToken)
+    {
+        var settings = await context.InstallationSettings.SingleOrDefaultAsync(
+            cancellationToken);
+
+        if (settings is null)
+        {
+            // The row is written for this alone, carrying the window the product
+            // recommends: an installation that names a host before it has ever
+            // touched the sample window has still not set that window, and
+            // writing the default down is what the row not existing said.
+            context.InstallationSettings.Add(new InstallationSettings
+            {
+                SampleRetentionDays = Sampling.RetentionDaysByDefault,
+                HostId = host?.HostId,
+                MountPath = host?.Mount.Value,
+            });
+        }
+        else
+        {
+            settings.HostId = host?.HostId;
+            settings.MountPath = host?.Mount.Value;
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public Task RecordClaimAsync(ClaimGuard guard, CancellationToken cancellationToken)
     {
         // Attached already on every path that gets here — the guard being written

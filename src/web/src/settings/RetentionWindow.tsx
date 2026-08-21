@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import { api, asNumber, problemWith } from "../api/client";
 import type { HeldProject } from "../projects/projects";
 import { RETENTION_MAXIMUM, RETENTION_MINIMUM } from "../projects/retention";
+import { Footprint, type ReadFootprint } from "./Footprint";
 
 /**
  * What the field is waiting on. Only one of these is a screen the operator has
@@ -27,6 +28,13 @@ type Asked =
  * nothing to bring back — what the sweep has taken is gone — and asking the
  * installation to count the entries outside a wider window would be a query over
  * the largest table in the database to answer *nothing*.
+ *
+ * **What a window costs is beside the field, live**
+ * ([ADR 0048](docs/adr/0048-retentions-ceiling-is-a-year-and-the-setting-says-what-it-costs.md)):
+ * the ceiling is a year and it is no longer what keeps this sensible, so the
+ * field says what the number in it implies before it is applied. It is advisory
+ * and it refuses nothing — the count above is what destroys data, this is what
+ * costs money.
  */
 export function RetentionWindow({
   project,
@@ -41,6 +49,31 @@ export function RetentionWindow({
   const [changed, setChanged] = useState<number>();
 
   const wanted = Number(days);
+
+  // Reached through the generated client rather than by a URL, which is what
+  // keeps the contract load-bearing — and held steady across renders so that
+  // typing a digit is what asks again, not the component drawing itself.
+  const readFootprint: ReadFootprint = useCallback(
+    async (windowDays, signal) => {
+      const { data } = await api.GET("/projects/{id}/retention/footprint", {
+        params: { path: { id: project.id }, query: { retentionDays: windowDays } },
+        signal,
+      });
+
+      return data === undefined
+        ? undefined
+        : {
+            retentionDays: asNumber(data.retentionDays),
+            heldBytes: asNumber(data.heldBytes),
+            impliedBytes: data.impliedBytes === null ? null : asNumber(data.impliedBytes),
+            diskFreeBytes:
+              data.diskFreeBytes === null ? null : asNumber(data.diskFreeBytes),
+            diskTotalBytes:
+              data.diskTotalBytes === null ? null : asNumber(data.diskTotalBytes),
+          };
+    },
+    [project.id],
+  );
 
   async function ask(event: FormEvent) {
     event.preventDefault();
@@ -119,7 +152,8 @@ export function RetentionWindow({
       <p>
         Counted from receipt time, and time is the only limit there is — no size cap, no
         row quota. The number is yours up to {RETENTION_MAXIMUM} days, which is a ceiling
-        no installation can raise.
+        no installation can raise. What a window will cost is below, and it is there to
+        be read rather than to refuse anything.
       </p>
       <p>
         <b>Lowering it removes entries</b>, and you are told how many before it takes
@@ -144,6 +178,8 @@ export function RetentionWindow({
           days
         </label>
         {problem !== undefined && <p className="refusal">{problem}</p>}
+
+        <Footprint read={readFootprint} days={wanted} counting="entries" />
 
         {changed !== undefined && (
           <p className="quiet">
