@@ -43,6 +43,15 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
 
     public DbSet<FilesystemReading> FilesystemReadings => Set<FilesystemReading>();
 
+    /// <summary>
+    /// What each project received in each hour, counted as the deliveries
+    /// arrived rather than by asking the entry table afterwards (ADR 0047). It
+    /// is declared and served here for the sample tables' reason: twenty
+    /// projects writing a row an hour each is nowhere near what makes ADR 0003
+    /// go around EF Core.
+    /// </summary>
+    public DbSet<Tally> Tallies => Set<Tally>();
+
     public DbSet<IngestToken> IngestTokens => Set<IngestToken>();
 
     public DbSet<AgentToken> AgentTokens => Set<AgentToken>();

@@ -32,8 +32,14 @@ namespace Logaffe.Api.Hosting;
 /// timer would be a third thing to reason about for it.
 /// </para>
 /// <para>
-/// The samples go second because the entries are the pass that matters: an hour
-/// that ran late has already spent its time where the rows are.
+/// <b>The tally rides on it too</b>, for the same reason and with less of a case
+/// to answer: it is one statement across a table of a few hundred thousand rows,
+/// against a period of its own rather than any project's window (ADR 0047).
+/// </para>
+/// <para>
+/// The samples and the tally go second and third because the entries are the
+/// pass that matters: an hour that ran late has already spent its time where the
+/// rows are.
 /// </para>
 /// <para>
 /// Registered after the migrations, whose hosted service has finished before
@@ -57,6 +63,9 @@ public sealed class RetentionService(
             .ExecuteAsync(cancellationToken);
 
         await services.GetRequiredService<SweepExpiredSamples>()
+            .ExecuteAsync(cancellationToken);
+
+        await services.GetRequiredService<SweepExpiredTallies>()
             .ExecuteAsync(cancellationToken);
     }
 }

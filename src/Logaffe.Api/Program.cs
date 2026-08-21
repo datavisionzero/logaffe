@@ -189,6 +189,17 @@ builder.Services.AddScoped<TailEntries>();
 // triggers.
 builder.Services.AddScoped<SweepExpiredEntries>();
 
+// The same concern over the tally, on the same timer: one period for every
+// project, and the hours a deleted project left behind (ADR 0047).
+builder.Services.AddScoped<SweepExpiredTallies>();
+
+// The other end of the tally: the counter the delivery path moves, and the act
+// that writes it down once a minute. The counter is a singleton because what it
+// holds is the installation's rather than a request's — an installation is a
+// single writer, and one per scope would be one per delivery.
+builder.Services.AddSingleton<RunningTally>();
+builder.Services.AddScoped<FlushTheTally>();
+
 // The same concern over the sample tables, on the same timer: one window for the
 // whole installation, and the samples a deleted host left behind.
 builder.Services.AddScoped<SweepExpiredSamples>();
@@ -232,6 +243,11 @@ builder.Services.AddHostedService<ClaimService>();
 // over the largest table in the database.
 builder.Services.AddHostedService<ExpiredSessionService>();
 builder.Services.AddHostedService<RetentionService>();
+
+// A third, on a minute rather than a day or an hour: what the delivery path
+// counted in memory, written down (ADR 0047). It is the shortest interval in the
+// product and the smallest write.
+builder.Services.AddHostedService<TallyService>();
 
 builder.Services.AddLogaffeRequestSource(builder.Configuration);
 builder.Services.AddLogaffeSessionAuthentication();
