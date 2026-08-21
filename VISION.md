@@ -241,10 +241,16 @@ quotas, no "drop oldest when full", and no interaction between different limits.
 Keeping this logic trivially simple is a deliberate choice — retention is a
 detail the operator should be able to reason about in one sentence.
 
-The period is the operator's to set **up to a ceiling the installation cannot
-raise**, so that "not a multi-year archive" stays a property of the product
-rather than a hope about how it is configured. See
-[`docs/projects.md`](./docs/projects.md).
+The period is the operator's to set **up to a ceiling of one year that the
+installation cannot raise**, so that "not a multi-year archive" stays a property
+of the product rather than a hope about how it is configured. Below that ceiling
+the operator is not argued with, they are **told what it costs**: the field says
+what the window will hold at this project's own measured rate, beside what the
+installation holds today and what its disk has left. A number of days was never a
+bound on disk — a week of a noisy project is more store than a year of a quiet
+one — so the arithmetic does the work the ceiling used to do badly
+([ADR 0048](./docs/adr/0048-retentions-ceiling-is-a-year-and-the-setting-says-what-it-costs.md)).
+See [`docs/projects.md`](./docs/projects.md).
 
 ### 4. Web UI
 
@@ -288,6 +294,53 @@ that is the real cost of this capability. It is paid because an application
 cannot see the machine it shares with four others, and a number that is wrong in
 a way nobody notices is worse than no number.
 
+### 6. Saying so when something is wrong
+
+Everything above waits to be asked, and for reading what the logs say that is
+right. But three things can be true of an installation that nobody will go
+looking for, precisely because the whole point of them is that the operator does
+not yet know: the store is filling up, an application has stopped delivering, and
+a project is suddenly writing far more than it does. The first ends in a database
+that stops accepting writes, the second is usually how a self-hoster finds out
+that a service died, and the third is what fills the disk while nobody is
+watching.
+
+logaffe therefore **sends the operator a notification**, on **three conditions
+and no others** — the store filling up, a project going quiet, and a project
+flooding. They are named in the product rather than written by the operator:
+there is no rule language, no threshold to type in, and no alert on a saved
+query, and every threshold is derived from the project's own recent history so
+that nothing has to be guessed at
+([ADR 0050](./docs/adr/0050-the-alert-conditions-are-a-closed-set.md)). Each is
+off until it is switched on.
+
+**A late true alarm beats a false one**, and the design spends real sensitivity
+to buy that: no condition fires before a project has a fortnight of history, every
+rate has an absolute floor beneath it, only closed hours are judged, a normal is a
+median by hour of the day rather than an average over it, and one notification is
+followed by six hours of silence. Nothing is sent when a condition clears, because
+silence is not information.
+
+**A notification carries numbers and names — never log content.** The project, the
+condition, the numbers behind it, and a link into the log view with the filters
+already set. No message, no exception, no property value. It is the one thing in
+this product that travels outward on its own, to a service the operator does not
+run, and log content is untrusted text that would arrive there rendered as prose
+([ADR 0049](./docs/adr/0049-a-notification-carries-numbers-and-names-never-log-content.md)).
+The reading happens behind the session, one click away, which is where the
+operator wanted to be anyway.
+
+**One notifier is supported, and it is ntfy** — it pushes, it needs no inbound
+port, it is self-hostable, and it reaches a phone. A notification that is a name,
+three numbers and a URL formats identically everywhere, so there is nothing a
+second integration would render better. Email in particular stays absent for the
+reason it was always absent: this product has no address to send anything to.
+
+None of this reads an entry. The conditions run on a small tally the installation
+keeps as deliveries arrive — how many entries a project received in an hour —
+which is also what tells the operator what a retention window will cost
+([ADR 0047](./docs/adr/0047-the-volume-history-is-tallied-as-it-arrives.md)).
+
 ## Non-goals
 
 - **No content filtering or scrubbing before ingestion.** logaffe does not
@@ -310,12 +363,22 @@ a way nobody notices is worse than no number.
 - **No reliance on network-level protection.** logaffe does not assume it sits
   behind a VPN, Tailscale, or an authenticating reverse proxy, and it will not
   treat "run it on a private network" as a security answer.
-- **No alerting.** logaffe does not send notifications, evaluate alert rules, or
-  page anyone, and no agent watches the logs in the background to do it either.
-  Looking into the logs always starts with the operator. Alerting may be
-  revisited later; it is not part of the initial product. The samples of
-  capability 5 do not reopen this — they only mean that the day it is revisited,
-  there is something to evaluate.
+- **No alert an operator defines, and no alerting beyond the three conditions.**
+  Capability 6 is a closed set, and the shape refused with it is the usual one:
+  no rule language, no threshold to type, no alert attached to a saved query or a
+  filter, no severity model, no incident, no acknowledging, no escalation, no
+  on-call rota, and no second notifier. Adding a fourth condition is a change to
+  [ADR 0050](./docs/adr/0050-the-alert-conditions-are-a-closed-set.md) rather
+  than a field in a form.
+- **No notification carrying log content.** No message text, no exception, no
+  property value, no digest of the day's errors, and nothing that groups alerts
+  by what the entries say. A notification is a reason to open a screen, and the
+  screen is behind the session
+  ([ADR 0049](./docs/adr/0049-a-notification-carries-numbers-and-names-never-log-content.md)).
+- **No agent that watches.** Nothing analyses entries in the background, no agent
+  is handed a log stream to keep an eye on, and no notification is written by a
+  model. A condition counts rows it was handed as they arrived. Every look into
+  what the logs actually *say* still starts with the operator or their agent.
 - **No metrics system, and no metric an operator defines.** The set of numbers a
   host reports is closed: no custom counters, gauges or histograms, no labels, no
   query language, and no dashboard. Wanting those is a reason to run a tool that
@@ -358,6 +421,9 @@ in [`docs/adr/`](./docs/adr/), and how the repository is laid out around them is
 - **Metrics:** a closed set of host readings, pushed once a minute by a separate
   containerized collector against a write-only host token. See
   [`docs/metrics.md`](./docs/metrics.md)
+- **Alerting:** three named conditions evaluated on the closed hour against a
+  tally the ingestion path keeps, delivered to ntfy and to nothing else, carrying
+  no log content. The area document is `docs/alerts.md`
 - **Agent interface:** MCP, exposed publicly and authenticated
 - **Live updates:** polling on the order of five seconds, no push streaming
 - **Deployment:** containerized, runnable with Docker Compose as the standard
@@ -419,5 +485,8 @@ documentation should say so.
 7. **Additive, not authoritative.** logaffe sits on top of the applications'
    existing local logging instead of replacing it. That keeps delivery
    fire-and-forget and keeps the cost of losing log data low.
-8. **Nothing happens unasked.** Every look into the logs — by the operator or by
-   their agent — is initiated by the operator.
+8. **Nothing reads unasked.** Every look into what the logs say — by the operator
+   or by their agent — is initiated by the operator, and nothing watches, analyses
+   or summarizes in the background. The three conditions of capability 6 are not
+   an exception to this: they count rows as they arrive, they never read an entry,
+   and the operator asked for them once, when they switched them on.

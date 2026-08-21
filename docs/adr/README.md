@@ -43,7 +43,7 @@ material value to understanding the decision.
 - [0017 – A wrong password never locks the account](./0017-a-wrong-password-never-locks-the-account.md)
 - [0018 – Projects and tokens are never reachable over MCP](./0018-projects-and-tokens-are-never-reachable-over-mcp.md) — superseded by 0046
 - [0019 – A project is deleted at once and its entries follow](./0019-a-project-is-deleted-at-once-and-its-entries-follow.md)
-- [0020 – Retention has a maximum](./0020-retention-has-a-maximum.md)
+- [0020 – Retention has a maximum](./0020-retention-has-a-maximum.md) — the ceiling it set is raised by 0048
 - [0021 – An agent token is a copied secret](./0021-an-agent-token-is-a-copied-secret.md)
 - [0022 – A token is recoverable, and encrypted rather than hashed](./0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)
 - [0023 – Retention deletes rows rather than dropping partitions](./0023-retention-deletes-rows-rather-than-dropping-partitions.md)
@@ -70,3 +70,7 @@ material value to understanding the decision.
 - [0044 – A sample has a closed schema](./0044-a-sample-has-a-closed-schema.md)
 - [0045 – A sample is not an entry, and may be read across projects](./0045-a-sample-is-not-an-entry-and-may-be-read-across-projects.md)
 - [0046 – Administration is reachable over MCP, on a token that reads no entries](./0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)
+- [0047 – The volume history is tallied as it arrives, not counted when it is asked](./0047-the-volume-history-is-tallied-as-it-arrives.md)
+- [0048 – Retention's ceiling is a year, and the setting says what it costs](./0048-retentions-ceiling-is-a-year-and-the-setting-says-what-it-costs.md)
+- [0049 – A notification carries numbers and names, never log content](./0049-a-notification-carries-numbers-and-names-never-log-content.md)
+- [0050 – The alert conditions are a closed set](./0050-the-alert-conditions-are-a-closed-set.md)

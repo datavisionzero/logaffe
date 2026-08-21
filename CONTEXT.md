@@ -314,9 +314,57 @@ _Avoid_: Metric, measurement, data point, gauge, series, reading
 
 **Retention Window**:
 The period a project keeps its entries, counted from receipt time, after which
-they are removed. The operator sets it up to a ceiling no installation can raise,
-and time is the only limit a project has — there is no size cap, no row quota,
-and no interaction between limits. Samples have a window of their own, set once
-for the installation and under the same ceiling, because they belong to a
-**Host** rather than to a project.
+they are removed. The operator sets it up to a ceiling of one year that no
+installation can raise, and time is the only limit a project has — there is no
+size cap, no row quota, and no interaction between limits. Below the ceiling the
+operator is told what a window will cost rather than argued with, in the
+**Footprint** it implies. Samples have a window of their own, set once for the
+installation and under the same ceiling, because they belong to a **Host** rather
+than to a project.
 _Avoid_: Retention policy, TTL, expiry, archive, quota
+
+**Tally**:
+How many entries a project received in one hour, and how many of those were
+`Error` or worse, counted as the deliveries arrive rather than by asking the
+entries afterwards. It is two numbers per project per hour, it is closed as a
+**Sample** is closed, it is kept far longer than the entries it counted, and it
+is exact to within whatever a restart lost. Nothing queries it: what it feeds is
+the **Footprint** and the **Baseline**.
+_Avoid_: Metric, count, statistic, rollup, aggregate, series
+
+**Footprint**:
+What an installation's entries occupy on disk — held today, and implied by a
+**Retention Window** at the rate a project is currently delivering. It is what a
+window is stated in when the operator changes one, and it is the quantity the
+ceiling was always a poor stand-in for.
+_Avoid_: Size, usage, quota, limit, disk space, capacity
+
+**Alert Condition**:
+One of the three things an installation will say something about unasked: its
+store filling up, a project going quiet, and a project delivering far more than
+it does. The set is closed and named in the product — there is no rule to write,
+no threshold to type and nothing to attach to a **Filter** — and each is off
+until the operator switches it on. A fourth is a decision, not a setting.
+_Avoid_: Rule, threshold, trigger, policy, monitor, check, watch
+
+**Baseline**:
+What a project's own recent history says is normal for it, against which an
+**Alert Condition** measures the hour just closed — a median by hour of the day
+over a fortnight, and never an average over the whole of one. It is derived from
+the **Tally** and never entered by the operator, which is the whole reason the
+conditions can be closed.
+_Avoid_: Threshold, limit, average, normal, budget, expectation
+
+**Alert**:
+The one notification an **Alert Condition** sends when it fires, carrying the
+project, the condition, the numbers behind it and a link into the **Log View** —
+and no log content of any kind. One is followed by six hours of silence, nothing
+is sent when the condition clears, and it is a reason to open a screen rather
+than a thing to read instead of one.
+_Avoid_: Incident, page, alarm, event, warning, ticket, notification of record
+
+**Notifier**:
+Where an **Alert** is delivered: one ntfy target, set once for the installation.
+There is one, it is the operator's own or a public server they chose, and a
+second kind of destination is not a setting the product has.
+_Avoid_: Channel, integration, webhook, destination, sink, provider, route
