@@ -25,8 +25,10 @@ typed in, so nothing is typed in wrong.
   staying quiet.
 - **A project has gone quiet.** Nothing received for more than three times the
   project's longest quiet stretch of the last fourteen days, and never sooner
-  than an hour. A project that delivers continuously is missed within the hour; a
-  project that is silent every night is not woken for it.
+  than an hour. A project that delivers continuously is therefore noticed on its
+  second silent hour, which the hourly evaluation makes two to three hours after
+  it stopped; a project that is silent every night is not woken for it.
+  [Alerts](../alerts.md#a-project-has-gone-quiet) has the arithmetic.
 - **A project is delivering far more than it does.** A closed hour above ten
   times the median of that hour of the day across the last fourteen days, and
   above a floor of a thousand entries.

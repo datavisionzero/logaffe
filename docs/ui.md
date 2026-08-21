@@ -11,9 +11,12 @@ project is empty.
 Two things are settled elsewhere and shape every screen below. There is **one
 operator and no user model**, so the interface carries none of the furniture that
 exists to tell people apart — no avatars, no sharing, no "assigned to", no
-notification bell. And **nothing happens unasked**: the only request this
-interface repeats on its own is the poll of the view the operator is currently
-looking at.
+notification bell. The bell stays gone now that the installation does send
+notifications ([Alerts](./alerts.md)), and for a second reason on top of the
+first: an alert leaves the installation and reaches a phone, so a copy waiting on
+a screen would be an inbox for messages that were already delivered somewhere
+better. And **nothing happens unasked**: the only request this interface repeats
+on its own is the poll of the view the operator is currently looking at.
 
 ## Three surfaces
 
@@ -307,8 +310,8 @@ true of every project at once.
 Both screens are their **areas**, listed beside what is being read and marked
 while it is: a project's are *the project*, *ingest tokens* and *delete this
 project*; the installation's are *signed-in browsers*, *agent tokens*, *your
-credentials*, *groups* and *hosts*. One is on the screen at a time. Stacked, the answer to
-*where is the retention window* was to read the page.
+credentials*, *groups*, *hosts* and *alerts*. One is on the screen at a time.
+Stacked, the answer to *where is the retention window* was to read the page.
 
 **An area is an address**, so a reload comes back to it and the back button walks
 the ones just opened — the same thing the log view does with a filter set. The
@@ -371,6 +374,35 @@ token cannot be given the settings, so changing what a token may do is issuing
 another and revoking this one. That is said where someone would otherwise look
 for the switch, because there is no switch and nothing here edits a kind or a
 flag. Renaming stays what it always was, a label for the list.
+
+The **alerts** area is the notifier, the three conditions and what each of them
+is currently doing ([Alerts](./alerts.md)). It is small on purpose: a server, a
+topic and a token; three switches, all off until they are not; and — for the
+condition about the disk — which host the installation sits on and which of that
+host's mounts holds the database.
+
+**Each switch says what it will actually do, in this installation's own
+numbers.** What "gone quiet" currently works out to for the busiest project and
+for the quietest one, and that a project with less than a fortnight of history
+cannot fire yet. A switch whose behaviour has to be looked up in a document is a
+switch that gets turned on once and then distrusted, and distrust is the failure
+mode the whole feature is designed against.
+
+**A condition that cannot be evaluated says so where it is switched on**, rather
+than sitting there on and silent — no host named on the installation, or the
+named mount missing from what that host reports. An operator who believes a disk
+is being watched when it is not is worse off than one who was never offered the
+switch.
+
+**Sending a test notification is here**, beside the notifier, because a notifier
+nobody has proved is one that gets discovered broken on the night it mattered.
+**When each condition last fired** is here too, per project: it is the only
+history there is, and it is what answers "is this working?" without waiting for
+something to go wrong.
+
+**Whether a project is muted is on the project's own screen**, beside its group
+and its host, for the reason the group is there — it is a fact about that project
+and about nothing else.
 
 The configuration block carries the token that was issued and **suggests a server
 name that differs by kind** — an operator wiring up both puts two servers into
@@ -460,7 +492,15 @@ nobody asked.
   ([Storage](./storage.md)).
 - **No editing or deleting a single entry.** An entry is written once and is
   never updated.
-- **No alerting, and nothing that watches on the operator's behalf.** Settled in
-  `VISION.md`.
+- **No alert an operator writes, and nothing in the interface that watches.** The
+  installation has three conditions and they are named in the product
+  ([Alerts](./alerts.md)); what is absent here is any way to make a fourth — no
+  threshold field, no rule builder, and nothing that turns a filter set or a
+  count into something that fires ([Querying](./querying.md)). Nothing in the
+  browser evaluates anything either: the conditions run on the hour in the
+  installation, whether or not anyone has the interface open.
+- **No alert list, nothing to acknowledge, and nothing to dismiss.** An alert is
+  a message that left; it is not an object with a lifecycle, and there is no
+  screen on which one waits.
 - **No mobile application.** The UI is readable on a phone, because an operator
   is not always at a desk, and the working surface is a desktop browser.

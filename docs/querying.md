@@ -201,5 +201,12 @@ case rather than an edge case, and this is the mechanism that claim rests on.
   when it is needed. Saving them is a surface that grows names, management and
   staleness for a single operator.
 - **No total alongside every page.** Counting is its own request.
-- **No alerting on a query.** Settled in `VISION.md`: nothing watches, and
-  nothing fires.
+- **No alerting on a query.** No filter set is watched, nothing fires from one,
+  and there is nothing to attach a threshold to — which is not softened by the
+  installation having gained three conditions of its own
+  ([Alerts](./alerts.md)). "Notify me when this filter matches more than N in an
+  hour" is precisely the alternative
+  [ADR 0050](./adr/0050-the-alert-conditions-are-a-closed-set.md) rejected, and
+  this refusal is what that decision rests on: the three conditions can derive
+  their own thresholds because they are named in the product, and a rule over a
+  query could only ever take a number the operator guessed.

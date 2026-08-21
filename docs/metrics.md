@@ -12,8 +12,11 @@ machine as it is now. What this adds is the two things `htop` cannot give —
 reach**, because the agent has no shell on the host and MCP is its only window.
 
 It is deliberately not a metrics system. There is no metric to define, no label to
-choose, no query language, and no alert
-([ADR 0044](./adr/0044-a-sample-has-a-closed-schema.md)).
+choose, no query language, and no threshold anyone writes
+([ADR 0044](./adr/0044-a-sample-has-a-closed-schema.md)). One thing here is read
+unasked — how full the filesystem under the installation's own database is — and
+it is a condition named in the product rather than a rule over a sample
+([Alerts](./alerts.md)).
 
 ## The sample
 
@@ -247,6 +250,33 @@ naming two projects onto one machine does not make them askable together — the
 rule a group already carries ([Querying](./querying.md)). A host is where samples
 come from, never a way of asking about entries.
 
+## The installation sits on at most one host too
+
+The installation names **the host it runs on, or none** — the sentence above,
+about the machine logaffe is itself on rather than the machines its projects are.
+It is what lets the installation read how full its own disk is off numbers that
+already exist, and it exists for that and nothing else
+([Alerts](./alerts.md#the-store-is-filling-up)).
+
+**It names a mount as well**, chosen from the ones that host reports, because a
+machine has several filesystems and only one of them holds the database. The
+mounts a host reports are named in its collector's configuration
+([Deployment](./deployment.md#the-collector-on-a-machine)), so the newest sample
+already knows which strings are real ones and the operator picks rather than
+types.
+
+**It is the ordinary case for this to be unset**, and an installation with no
+host on it is not a degraded one: it is every installation until the operator
+decides they want to be told when the disk fills. Nothing else in the product
+reads this relation, and nothing about the samples changes because of it — the
+host is still not a scope, and the installation appears in no query.
+
+**It is a relation and not a second kind of thing.** The host named here is an
+ordinary host, created and named the way any other is, and it usually already
+exists: the machine logaffe runs on is a machine the operator was likely
+collecting from anyway. Deleting that host leaves the installation on none, which
+is the projects' behaviour and for the projects' reason.
+
 ## Retention
 
 Samples are kept for a period **set once for the installation**, counted from
@@ -326,9 +356,19 @@ nothing to hold apart.
   depth are not collected, and the client packages do not sample the process they
   live in
   ([ADR 0043](./adr/0043-metrics-come-from-the-host-not-from-the-application.md)).
-- **No alerting.** No rule, no threshold, no notification, and nothing that
-  watches. `VISION.md` settles it, and the data existing here does not reopen it —
-  it only means that the day it is revisited, there is something to evaluate.
+- **No threshold on a sample that the operator chooses.** There is exactly one
+  thing that reads a sample and says something about it unasked — how full the
+  filesystem under the installation's own database is
+  ([Alerts](./alerts.md#the-store-is-filling-up)) — and it is a condition named
+  in the product, at figures the product fixed. There is no rule to write over
+  the processor, the memory or the load, no threshold to type on any of them, and
+  no alert an operator defines here or anywhere
+  ([ADR 0050](./adr/0050-the-alert-conditions-are-a-closed-set.md)).
+- **No quiet host.** A machine that stops reporting is left exactly as it is:
+  nothing marks it stale, nothing removes it, and nothing says anything about it.
+  A project going quiet does fire, and the difference is deliberate — a silent
+  project means an application stopped, while a silent collector usually means a
+  collector ([Operations](./operations.md)).
 - **No OTLP, no Prometheus scrape, no `/metrics` endpoint.** The collector pushes,
   for the reason ingestion pushes: an installation on the public internet that
   reaches back into the operator's machines to pull is a different security

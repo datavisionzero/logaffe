@@ -143,7 +143,10 @@ identifies which of one is decoration. There is **no email address**, because th
 product sends no mail at all — no verification, no notification, no password
 reset — and storing an address that is never written to would be inviting the
 feature that reads it
-([ADR 0015](./adr/0015-the-operator-has-no-username-and-no-email.md)).
+([ADR 0015](./adr/0015-the-operator-has-no-username-and-no-email.md)). The
+notifier an operator may configure for alerts is not a way round this: it is a
+topic on a push service, it belongs to the installation rather than to the
+account, and nothing about the account is ever sent to it.
 
 Consequently there is **no password reset over the network**. Forgetting the
 password has the same answer as losing the second factor and the backup codes
@@ -275,7 +278,10 @@ where the throttle is the whole of what stands in front of a guess.
   licence, or a service to ask.
 - **No email, anywhere.** No verification, no reset link, no notification that a
   claim happened. There is nothing to notify: the account that would be told is
-  the one being created.
+  the one being created. The installation can be given somewhere to send an alert
+  ([Alerts](./alerts.md)), and that changes nothing here — it is not mail, it is
+  never about the account, and nothing that happens to the claim, the password or
+  the second factor produces one.
 - **No second account, no invitation, no delegation.** Settled in `VISION.md`:
   one operator, no user model.
 - **No account recovery over the network**, by any mechanism, for any reason.
