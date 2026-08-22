@@ -3,8 +3,9 @@ using Logaffe.Application.Operations;
 namespace Logaffe.Api.Hosting;
 
 /// <summary>
-/// Removes the entries that have outlived their project's window, and the
-/// samples that have outlived the installation's.
+/// The hourly pass: what the three conditions of ADR 0050 make of the hour that
+/// has just closed, then the entries that have outlived their project's window
+/// and the samples and tally hours that have outlived the installation's.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -37,9 +38,18 @@ namespace Logaffe.Api.Hosting;
 /// against a period of its own rather than any project's window (ADR 0047).
 /// </para>
 /// <para>
-/// The samples and the tally go second and third because the entries are the
-/// pass that matters: an hour that ran late has already spent its time where the
-/// rows are.
+/// The samples and the tally go after the entries because the entries are the
+/// sweep that matters: an hour that ran late has already spent its time where
+/// the rows are.
+/// </para>
+/// <para>
+/// <b>The conditions go before all three</b>, which is the one place this pass
+/// puts something ahead of the entries. It is the only duty here that cannot be
+/// caught up: a sweep that runs an hour late deletes the same rows an hour
+/// later, while the hour that has just closed is evaluated once or never, and a
+/// pass that threw halfway through a portioned delete would take the evaluation
+/// with it. It costs the sweeps nothing worth measuring — a few hundred small
+/// rows against a table of millions.
 /// </para>
 /// <para>
 /// Registered after the migrations, whose hosted service has finished before
@@ -59,6 +69,9 @@ public sealed class RetentionService(
     protected override async Task RunOnceAsync(
         IServiceProvider services, CancellationToken cancellationToken)
     {
+        await services.GetRequiredService<EvaluateTheConditions>()
+            .ExecuteAsync(cancellationToken);
+
         await services.GetRequiredService<SweepExpiredEntries>()
             .ExecuteAsync(cancellationToken);
 

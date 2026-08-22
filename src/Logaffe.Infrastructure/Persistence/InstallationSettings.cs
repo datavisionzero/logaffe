@@ -29,6 +29,24 @@ public sealed class InstallationSettings
     public int SampleRetentionDays { get; set; }
 
     /// <summary>
+    /// Whether the store filling up is watched for, which is off until the
+    /// operator switches it on (<c>docs/alerts.md</c>).
+    /// </summary>
+    /// <remarks>
+    /// Three columns rather than one set of flags, because they are three
+    /// switches on a screen and the set is closed: a fourth is a change to
+    /// ADR 0050 and a migration, which is the friction that decision was built
+    /// with.
+    /// </remarks>
+    public bool AlertOnFillingUp { get; set; }
+
+    /// <summary>Whether a project going quiet is watched for.</summary>
+    public bool AlertOnGoneQuiet { get; set; }
+
+    /// <summary>Whether a project flooding is watched for.</summary>
+    public bool AlertOnFlooding { get; set; }
+
+    /// <summary>
     /// The machine logaffe is itself on, or <c>null</c> for an installation that
     /// names none — which is every installation until the operator says
     /// otherwise (<c>docs/metrics.md</c>).

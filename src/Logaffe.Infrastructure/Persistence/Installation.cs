@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Alerts;
 using Logaffe.Domain.Hosts;
 using Logaffe.Domain.Operators;
 using Logaffe.Domain.Projects;
@@ -151,6 +152,50 @@ public sealed class Installation(LogaffeDbContext context) : IInstallation
             settings.HostId = host?.HostId;
             settings.MountPath = host?.Mount.Value;
         }
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<AlertSwitches> ReadAlertSwitchesAsync(CancellationToken cancellationToken)
+    {
+        var settings = await context.InstallationSettings
+            .AsNoTracking()
+            .SingleOrDefaultAsync(cancellationToken);
+
+        // An installation nobody has asked has all three off, and the row is not
+        // written to say so: a switch nobody has touched is the absence of a
+        // row, not a row repeating what the product already says.
+        return settings is null
+            ? AlertSwitches.AllOff
+            : new AlertSwitches(
+                settings.AlertOnFillingUp,
+                settings.AlertOnGoneQuiet,
+                settings.AlertOnFlooding);
+    }
+
+    public async Task RecordAlertSwitchesAsync(
+        AlertSwitches switches, CancellationToken cancellationToken)
+    {
+        var settings = await context.InstallationSettings.SingleOrDefaultAsync(
+            cancellationToken);
+
+        if (settings is null)
+        {
+            // Written for this alone, carrying the window the product
+            // recommends, for the reason RecordHostAsync writes it: an
+            // installation that switches a condition on before it has ever
+            // touched the sample window has still not touched it.
+            settings = new InstallationSettings
+            {
+                SampleRetentionDays = Sampling.RetentionDaysByDefault,
+            };
+
+            context.InstallationSettings.Add(settings);
+        }
+
+        settings.AlertOnFillingUp = switches.FillingUp;
+        settings.AlertOnGoneQuiet = switches.GoneQuiet;
+        settings.AlertOnFlooding = switches.Flooding;
 
         await context.SaveChangesAsync(cancellationToken);
     }

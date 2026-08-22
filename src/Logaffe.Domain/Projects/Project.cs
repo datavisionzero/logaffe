@@ -64,6 +64,21 @@ public sealed class Project
     /// </remarks>
     public Guid? HostId { get; private set; }
 
+    /// <summary>
+    /// Whether this project's alert conditions are evaluated at all
+    /// (<c>docs/alerts.md</c>). A muted project is not judged quiet and not
+    /// judged flooding, and nothing about it is sent.
+    /// </summary>
+    /// <remarks>
+    /// One flag, deliberately, rather than a mute per condition: the two
+    /// conditions a project has are the two things that can be said about it,
+    /// and a project the operator does not want to hear about is one they do not
+    /// want to hear either of them about. It is beside the group and the host
+    /// because it is the same kind of fact — something the operator decides
+    /// about a project, which no sender notices.
+    /// </remarks>
+    public bool Muted { get; private set; }
+
     public RetentionWindow Retention { get; private set; } = null!;
 
     public DateTimeOffset CreatedAt { get; private init; }
@@ -89,6 +104,13 @@ public sealed class Project
     public void RunsOn(Guid? hostId) => HostId = hostId;
 
     public void KeepFor(RetentionWindow retention) => Retention = retention;
+
+    /// <summary>
+    /// Stops evaluating this project's conditions, or starts again. It changes
+    /// nothing else: what a muted project receives, keeps and answers is exactly
+    /// what it did before.
+    /// </summary>
+    public void Mute(bool muted) => Muted = muted;
 
     /// <summary>
     /// The name as it would be stored.

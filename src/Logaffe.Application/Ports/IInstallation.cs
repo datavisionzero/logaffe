@@ -1,3 +1,4 @@
+using Logaffe.Domain.Alerts;
 using Logaffe.Domain.Hosts;
 using Logaffe.Domain.Operators;
 using Logaffe.Domain.Projects;
@@ -6,7 +7,8 @@ namespace Logaffe.Application.Ports;
 
 /// <summary>
 /// What an installation knows about itself: when it last became claimable, the
-/// hash of the claim secret it drew, and how long it keeps samples.
+/// hash of the claim secret it drew, how long it keeps samples, the machine it
+/// sits on, and which conditions it has been switched on.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -101,4 +103,20 @@ public interface IInstallation
     /// behaviour and for the projects' reason.
     /// </remarks>
     Task RecordHostAsync(InstallationHost? host, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Which of the three conditions are switched on, which is none of them
+    /// until the operator switches one on (ADR 0050).
+    /// </summary>
+    /// <remarks>
+    /// Read before anything else on the hourly pass, and read here rather than
+    /// per project: the switch is the installation's and the mute is the
+    /// project's, so an installation with all three off evaluates nothing at all
+    /// and never walks the projects.
+    /// </remarks>
+    Task<AlertSwitches> ReadAlertSwitchesAsync(CancellationToken cancellationToken);
+
+    /// <summary>Writes back the switches as the operator left them.</summary>
+    Task RecordAlertSwitchesAsync(
+        AlertSwitches switches, CancellationToken cancellationToken);
 }

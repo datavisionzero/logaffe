@@ -247,6 +247,13 @@ installation's single one rather than a project's
 ([Metrics](./metrics.md#retention)), which is also why this part of the pass asks
 nothing about projects at all.
 
+**The same job evaluates the alert conditions**, before any of the sweeping
+rather than after it ([Alerts](./alerts.md)). It is the one duty on this pass
+that cannot be caught up: a sweep that runs an hour late deletes the same rows an
+hour later, while the hour that has just closed is evaluated once or never — so
+it goes first, and it costs a few hundred small rows against a table of millions.
+An installation with all three conditions switched off does nothing here at all.
+
 **The same job takes what a deleted project left behind.** A project goes at
 once and its entries follow in the background
 ([ADR 0019](./adr/0019-a-project-is-deleted-at-once-and-its-entries-follow.md)),

@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Alerts;
 using Logaffe.Domain.Hosts;
 using Logaffe.Domain.Operators;
 using Logaffe.Domain.Projects;
@@ -177,6 +178,24 @@ internal sealed class InMemoryInstallation : IInstallation
     public Task RecordHostAsync(InstallationHost? host, CancellationToken cancellationToken)
     {
         Host = host;
+        Writes++;
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Which conditions are switched on, which is none of them until something
+    /// switches one on — every installation's ordinary state.
+    /// </summary>
+    public AlertSwitches Switches { get; set; } = AlertSwitches.AllOff;
+
+    public Task<AlertSwitches> ReadAlertSwitchesAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(Switches);
+
+    public Task RecordAlertSwitchesAsync(
+        AlertSwitches switches, CancellationToken cancellationToken)
+    {
+        Switches = switches;
         Writes++;
 
         return Task.CompletedTask;

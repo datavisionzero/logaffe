@@ -1,3 +1,4 @@
+using Logaffe.Domain.Alerts;
 using Logaffe.Domain.Entries;
 using Logaffe.Domain.Hosts;
 using Logaffe.Domain.Operators;
@@ -51,6 +52,13 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
     /// go around EF Core.
     /// </summary>
     public DbSet<Tally> Tallies => Set<Tally>();
+
+    /// <summary>
+    /// What the installation remembers about the conditions that have already
+    /// fired: one row per subject per condition, and none at all on an
+    /// installation nothing has ever been said about (ADR 0050).
+    /// </summary>
+    public DbSet<ConditionState> ConditionStates => Set<ConditionState>();
 
     public DbSet<IngestToken> IngestTokens => Set<IngestToken>();
 

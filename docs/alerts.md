@@ -91,9 +91,12 @@ Precisely, on each closed hour:
 
 - **`quiet`** is how many whole closed hours have passed since the most recent
   hour this project has a tally row for.
-- **`tolerated`** is the longest run of consecutive hours with no row, anywhere
-  in the last fourteen days, multiplied by three — and at least one hour whatever
-  that comes to.
+- **`tolerated`** is the longest run of consecutive hours with no row that the
+  project has since come back from — a gap between two hours it delivered in,
+  anywhere in the last fourteen days — multiplied by three, and at least one hour
+  whatever that comes to. **The silence being judged is not one of them**:
+  counting the hours since the last delivery would make the tolerance grow with
+  the outage, and no project could ever be quiet enough to fire.
 - It fires when `quiet` is greater than `tolerated`.
 
 **What this means at the two ends.** A project that delivers something every hour
@@ -121,8 +124,11 @@ Precisely: for the closed hour, take the same hour of the day on each of the
 fourteen days before it — fourteen figures, counting an hour with no row as
 **nought**, because a project that is normally silent at three in the morning is
 normally silent rather than absent from the arithmetic. The median of those is
-the baseline. It fires when the closed hour is both above ten times it and at
-least a thousand entries.
+the baseline — fourteen figures have two in the middle, and the **lower** of the
+two is taken: it is multiplied by ten before it decides anything, so the half an
+average would add is noise on a number better left one the project actually had.
+It fires when the closed hour is both above ten times it and at least a thousand
+entries.
 
 **A median by hour of the day, not an average over the day.** The batch job that
 writes fifty thousand entries at three in the morning is normal at three in the
@@ -149,9 +155,16 @@ it and an operator who stops reading their notifications:
   and the first two weeks after an installation is restored.
 - **An absolute floor under every rate condition**, whatever the ratio says.
 - **Closed hours only.** Nothing is ever judged on the hour in progress.
-- **One notification per project per condition, then six hours of silence.** The
-  condition continuing to hold sends nothing more; it is one event, still
-  happening.
+- **A condition that is still holding says nothing more**, however long it
+  holds. It is one event, still happening, so a condition that holds for a day is
+  one notification and not twenty-four — and it arms itself again when it stops
+  holding, silently.
+- **Six hours of silence under a second event.** A condition that clears and
+  holds again inside six hours says nothing either, which is what stands between
+  the product and something sitting on a threshold and flapping across it every
+  hour. The one thing the silence does not hold back is the worse of the two disk
+  thresholds: 95 is said the moment it is reached, even if 85 was said an hour
+  ago.
 - **Nothing is sent when a condition clears.** There is no "resolved", no second
   message, and no record of one. A notification exists to make a person look, and
   something that has stopped needing a person is not worth a message that will be

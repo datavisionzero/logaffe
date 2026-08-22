@@ -21,6 +21,24 @@ public sealed class InstallationSettingsConfiguration
             .HasColumnName("sample_retention_days")
             .IsRequired();
 
+        // The three switches, off on every installation that has never been
+        // asked — which is what the row not existing says, and what the default
+        // keeps saying once the row exists for another reason.
+        builder.Property(s => s.AlertOnFillingUp)
+            .HasColumnName("alert_on_filling_up")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(s => s.AlertOnGoneQuiet)
+            .HasColumnName("alert_on_gone_quiet")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(s => s.AlertOnFlooding)
+            .HasColumnName("alert_on_flooding")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         // The machine the installation is on, and which of its filesystems holds
         // the database.
         builder.Property(s => s.HostId).HasColumnName("host_id");

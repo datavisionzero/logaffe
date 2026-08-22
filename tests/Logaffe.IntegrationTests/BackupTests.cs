@@ -49,10 +49,10 @@ public sealed class BackupTests(PostgresFixture postgres)
         // has and the artifact does not is a table an operator loses.
         Assert.Equal(
             [
-                "agent_token", "backup_code", "claim_guard", "filesystem_reading",
-                "host", "host_sample", "host_token", "ingest_token",
-                "installation_settings", "log_entry", "operator", "project",
-                "project_group", "project_tally", "session",
+                "agent_token", "alert_condition_state", "backup_code", "claim_guard",
+                "filesystem_reading", "host", "host_sample", "host_token",
+                "ingest_token", "installation_settings", "log_entry", "operator",
+                "project", "project_group", "project_tally", "session",
             ],
             names.Order(StringComparer.Ordinal));
 

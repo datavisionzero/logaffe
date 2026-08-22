@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Infrastructure.Alerts;
 using Logaffe.Infrastructure.Persistence;
 using Logaffe.Infrastructure.Persistence.Log;
 using Logaffe.Infrastructure.Secrets;
@@ -56,6 +57,15 @@ public static class InfrastructureServices
         // hour — and it is beside the two above because the act that writes it
         // runs on a timer rather than in a request (ADR 0047).
         services.AddScoped<ITallies, Tallies>();
+
+        // What the conditions of ADR 0050 remember between passes. It is a
+        // table for one reason: an installation that restarts hourly must not
+        // notify hourly.
+        services.AddScoped<IConditionStates, ConditionStates>();
+
+        // Where an alert goes on an installation that has no notifier: into the
+        // installation's own log, once, and no further.
+        services.AddScoped<IAlertNotifier, NoNotifier>();
 
         // The other half of it, and the one this layer takes Dapper for: the
         // write and the sweep had nothing to map, and a filtered page does.

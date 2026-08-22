@@ -74,6 +74,14 @@ public sealed class ProjectConfiguration : IEntityTypeConfiguration<Project>
                 days => RetentionWindow.OfDays(days))
             .IsRequired();
 
+        // Not evaluated rather than not notified: a muted project's conditions
+        // are never asked while it is muted, so nothing about it is written and
+        // nothing about it is sent (docs/alerts.md).
+        builder.Property(p => p.Muted)
+            .HasColumnName("muted")
+            .HasDefaultValue(false)
+            .IsRequired();
+
         builder.Property(p => p.CreatedAt).HasColumnName("created_at").IsRequired();
     }
 }

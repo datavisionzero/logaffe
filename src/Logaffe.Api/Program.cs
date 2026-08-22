@@ -209,6 +209,16 @@ builder.Services.AddScoped<FlushTheTally>();
 // whole installation, and the samples a deleted host left behind.
 builder.Services.AddScoped<SweepExpiredSamples>();
 
+// The three conditions of ADR 0050 and the pass that runs them, on the same
+// hourly timer as the sweeps above and reading the tally those keep. They are
+// three acts rather than one because they are three decisions — what is too
+// full, what is too quiet, what is too much — and one pass because at most one
+// thing is said about a project in an hour.
+builder.Services.AddScoped<CheckTheStoreIsFillingUp>();
+builder.Services.AddScoped<CheckAProjectHasGoneQuiet>();
+builder.Services.AddScoped<CheckAProjectIsFlooding>();
+builder.Services.AddScoped<EvaluateTheConditions>();
+
 // The token acts. The ingest and host ones are reachable from HTTP, from the
 // command line and from an administering agent's tools; the agent token's are
 // reachable from the first two and never over MCP, because an agent that could
