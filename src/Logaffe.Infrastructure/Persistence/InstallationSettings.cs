@@ -60,4 +60,27 @@ public sealed class InstallationSettings
     /// leaves this behind, and a mount without a machine names nothing.
     /// </summary>
     public string? MountPath { get; set; }
+
+    /// <summary>
+    /// The ntfy server notifications are posted to, or <c>null</c> on an
+    /// installation that has no notifier (<c>docs/alerts.md</c>).
+    /// </summary>
+    /// <remarks>
+    /// Three columns rather than one, for the reason the switches are three:
+    /// they are three fields on a screen. They are written and cleared together
+    /// and read as a set — a topic naming no server addresses nothing, and a
+    /// token belonging to neither is a secret held for nothing.
+    /// </remarks>
+    public string? NotifierServer { get; set; }
+
+    /// <summary>The topic on that server.</summary>
+    public string? NotifierTopic { get; set; }
+
+    /// <summary>
+    /// The access token sealed under the key on the host volume (ADR 0022), or
+    /// <c>null</c> for the public topic that needs none. It is stored the way
+    /// every token in this product is, and for the same reason: the operator can
+    /// read it back rather than reissue it at the notifier.
+    /// </summary>
+    public byte[]? NotifierAccessToken { get; set; }
 }

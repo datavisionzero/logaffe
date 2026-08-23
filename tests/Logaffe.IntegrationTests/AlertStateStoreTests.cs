@@ -135,6 +135,79 @@ public sealed class AlertStateStoreTests(PostgresFixture postgres)
     }
 
     [Fact]
+    public async Task An_installation_nobody_has_asked_has_no_notifier()
+    {
+        await using var context = await MigratedAsync();
+
+        Assert.Null(await new Installation(context).ReadNotifierAsync(
+            TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task The_notifier_is_read_back_as_it_was_left()
+    {
+        await using var context = await MigratedAsync();
+        var sealedToken = new byte[] { 7, 8, 9 };
+
+        await new Installation(context).RecordNotifierAsync(
+            Notifier.Create("https://ntfy.example.com/push", "logaffe", sealedToken),
+            TestContext.Current.CancellationToken);
+
+        await using var restarted = await ContextAsync(context);
+
+        var notifier = await new Installation(restarted).ReadNotifierAsync(
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("https://ntfy.example.com/push/", notifier?.Server.ToString());
+        Assert.Equal("logaffe", notifier?.Topic);
+        Assert.Equal(sealedToken, notifier?.EncryptedAccessToken);
+    }
+
+    /// <summary>
+    /// The token is in the row as the cipher made it, which is the whole of
+    /// ADR 0022 as far as this table is concerned: a database taken without the
+    /// key on the volume yields nothing that can publish anywhere.
+    /// </summary>
+    [Fact]
+    public async Task The_token_is_in_the_row_as_bytes()
+    {
+        await using var context = await MigratedAsync();
+
+        await new Installation(context).RecordNotifierAsync(
+            Notifier.Create("https://ntfy.example.com", "logaffe", [7, 8, 9]),
+            TestContext.Current.CancellationToken);
+
+        await using var restarted = await ContextAsync(context);
+
+        var row = await restarted.InstallationSettings.SingleAsync(
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(new byte[] { 7, 8, 9 }, row.NotifierAccessToken);
+    }
+
+    [Fact]
+    public async Task Clearing_the_notifier_leaves_the_installation_with_none()
+    {
+        await using var context = await MigratedAsync();
+        var installation = new Installation(context);
+
+        await installation.RecordNotifierAsync(
+            Notifier.Create("https://ntfy.example.com", "logaffe", [7, 8, 9]),
+            TestContext.Current.CancellationToken);
+        await installation.RecordNotifierAsync(null, TestContext.Current.CancellationToken);
+
+        await using var restarted = await ContextAsync(context);
+
+        Assert.Null(await new Installation(restarted).ReadNotifierAsync(
+            TestContext.Current.CancellationToken));
+
+        // And it took the token with it: an installation with no notifier holds
+        // no credential for one.
+        Assert.Null((await restarted.InstallationSettings.SingleAsync(
+            TestContext.Current.CancellationToken)).NotifierAccessToken);
+    }
+
+    [Fact]
     public async Task A_project_is_not_muted_until_it_is_muted()
     {
         await using var context = await MigratedAsync();

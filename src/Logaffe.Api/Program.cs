@@ -219,6 +219,14 @@ builder.Services.AddScoped<CheckAProjectHasGoneQuiet>();
 builder.Services.AddScoped<CheckAProjectIsFlooding>();
 builder.Services.AddScoped<EvaluateTheConditions>();
 
+// The operator's side of the same feature: the one notifier those three send
+// through, read back the way a token is (ADR 0022), and the test send that is
+// theirs rather than any condition's. Nothing here is reachable over MCP —
+// neither kind of agent token reaches the notifier (docs/mcp.md).
+builder.Services.AddScoped<ChangeTheNotifier>();
+builder.Services.AddScoped<ReadTheNotifier>();
+builder.Services.AddScoped<SendATestNotification>();
+
 // The token acts. The ingest and host ones are reachable from HTTP, from the
 // command line and from an administering agent's tools; the agent token's are
 // reachable from the first two and never over MCP, because an agent that could

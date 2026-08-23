@@ -200,6 +200,54 @@ public sealed class Installation(LogaffeDbContext context) : IInstallation
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<Notifier?> ReadNotifierAsync(CancellationToken cancellationToken)
+    {
+        var settings = await context.InstallationSettings
+            .AsNoTracking()
+            .SingleOrDefaultAsync(cancellationToken);
+
+        // Read as a set, the way the host and its mount are: a topic naming no
+        // server addresses nothing. A row whose two strings no longer make a
+        // notifier is an installation with none, which is what the sending
+        // adapter says one line about rather than posting somewhere it guessed.
+        return settings is { NotifierServer: { } server, NotifierTopic: { } topic }
+            && Notifier.TryCreate(server, topic, settings.NotifierAccessToken, out var notifier)
+                ? notifier
+                : null;
+    }
+
+    public async Task RecordNotifierAsync(
+        Notifier? notifier, CancellationToken cancellationToken)
+    {
+        var settings = await context.InstallationSettings.SingleOrDefaultAsync(
+            cancellationToken);
+
+        if (settings is null)
+        {
+            if (notifier is null)
+            {
+                // Clearing what was never set. A setting nobody has set is the
+                // absence of a row rather than a row saying nothing.
+                return;
+            }
+
+            // Written for this alone, carrying the window the product
+            // recommends, for the reason RecordHostAsync writes it.
+            settings = new InstallationSettings
+            {
+                SampleRetentionDays = Sampling.RetentionDaysByDefault,
+            };
+
+            context.InstallationSettings.Add(settings);
+        }
+
+        settings.NotifierServer = notifier?.Server.ToString();
+        settings.NotifierTopic = notifier?.Topic;
+        settings.NotifierAccessToken = notifier?.EncryptedAccessToken;
+
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public Task RecordClaimAsync(ClaimGuard guard, CancellationToken cancellationToken)
     {
         // Attached already on every path that gets here — the guard being written

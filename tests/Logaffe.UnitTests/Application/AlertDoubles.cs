@@ -44,11 +44,24 @@ internal sealed class RecordingNotifier : IAlertNotifier
 {
     public List<Alert> Sent { get; } = [];
 
+    /// <summary>How many test notifications the operator asked for.</summary>
+    public int Tests { get; private set; }
+
+    /// <summary>What the notifier answers the operator with.</summary>
+    public NotifierProof Proof { get; set; } = NotifierProof.Sent;
+
     public Task SendAsync(Alert alert, CancellationToken cancellationToken)
     {
         Sent.Add(alert);
 
         return Task.CompletedTask;
+    }
+
+    public Task<NotifierProof> SendTestAsync(CancellationToken cancellationToken)
+    {
+        Tests++;
+
+        return Task.FromResult(Proof);
     }
 }
 

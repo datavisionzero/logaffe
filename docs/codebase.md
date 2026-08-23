@@ -23,7 +23,7 @@ logaffe/
 ├─ src/
 │  ├─ Logaffe.Domain/         the rules
 │  ├─ Logaffe.Application/    the use cases and their ports
-│  ├─ Logaffe.Infrastructure/ Postgres, secrets, the file log
+│  ├─ Logaffe.Infrastructure/ Postgres, secrets, the file log, the notifier
 │  ├─ Logaffe.Api/            HTTP, MCP, CLI, and the composition root
 │  ├─ Logaffe.Collector/      the host collector, its own deployable
 │  ├─ clients/                the three NuGet packages
@@ -69,8 +69,9 @@ adapter or is a candidate to become so, and none of them knows what it is being
 called by — the first is called by both public endpoints and is the plainest
 case. Beside them sit the ports — a writer and a reader for entries, stores for
 the small relational rows, the cipher for whatever is sealed under the key on the
-host volume, the id source, the password hasher, the TOTP, and what the store
-says it occupies — which is the whole of what this layer asks the world for. The
+host volume, the id source, the password hasher, the TOTP, what the store says
+it occupies, and where an alert goes — which is the whole of what this layer asks
+the world for. The
 clock is not among them:
 `TimeProvider` is in the base class libraries, and a port over it would be an
 abstraction over an abstraction.
@@ -85,6 +86,13 @@ whose SQL is kept together in one folder because
 index. Here too are the things that touch the host volume — the key that makes a
 token readable ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md))
 and the rolling file log ([ADR 0002](./adr/0002-logaffe-logs-to-files-not-into-itself.md)).
+
+And the one adapter here that reaches **outward** rather than down: the ntfy
+notifier ([Alerts](./alerts.md)). It is where a notification is composed, which
+is what makes ADR 0049 checkable in one place — what composes takes a name, a
+condition and its numbers, and has no access to an entry at all. The link it
+carries is built from the address the deployment states, because an alert is the
+one thing in this product with no request behind it to read an address off.
 
 **`Logaffe.Api` is the adapters and the composition root.** One binary that is
 the server and the CLI both: the HTTP endpoints, the MCP tools — five for a

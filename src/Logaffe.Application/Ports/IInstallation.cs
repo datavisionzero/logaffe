@@ -8,7 +8,8 @@ namespace Logaffe.Application.Ports;
 /// <summary>
 /// What an installation knows about itself: when it last became claimable, the
 /// hash of the claim secret it drew, how long it keeps samples, the machine it
-/// sits on, and which conditions it has been switched on.
+/// sits on, which conditions it has been switched on, and where what they decide
+/// is sent.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -119,4 +120,28 @@ public interface IInstallation
     /// <summary>Writes back the switches as the operator left them.</summary>
     Task RecordAlertSwitchesAsync(
         AlertSwitches switches, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Where notifications go, or <c>null</c> on an installation that has not
+    /// been given a notifier — which is every installation until the operator
+    /// configures one, and any of them again after they clear it.
+    /// </summary>
+    /// <remarks>
+    /// The access token comes back sealed, because that is what the row holds
+    /// (ADR 0022). Opening it is the sending adapter's business and the
+    /// operator's read-back, and neither is a thing this port does on the way
+    /// past.
+    /// </remarks>
+    Task<Notifier?> ReadNotifierAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Writes the notifier down, or clears it by being given <c>null</c>.
+    /// </summary>
+    /// <remarks>
+    /// The three parts go together the way the host and its mount do: a topic
+    /// without a server is a word, and a token without either is a secret
+    /// belonging to nothing. Clearing takes all three, including the sealed
+    /// token — an installation with no notifier holds no credential for one.
+    /// </remarks>
+    Task RecordNotifierAsync(Notifier? notifier, CancellationToken cancellationToken);
 }

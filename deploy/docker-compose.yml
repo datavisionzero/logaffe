@@ -33,6 +33,13 @@ services:
       # an installation reached directly: the header is written by whoever sent
       # the request.
       Logaffe__TrustedProxies: "${LOGAFFE_TRUSTED_PROXIES:-}"
+      # The address this installation is reached at, used for one thing only:
+      # the link an alert carries (docs/alerts.md). Everywhere else the address
+      # comes free from the forwarded headers, because everywhere else there is
+      # a request to read them from — an alert is composed on the hour with
+      # nobody on the other end. Unset means an alert goes without a link
+      # rather than with a wrong one.
+      Logaffe__PublicUrl: "${LOGAFFE_PUBLIC_URL:-}"
     volumes:
       # Both stores are needed, and a database alone is not a backup: the key
       # that makes stored tokens readable lives here.

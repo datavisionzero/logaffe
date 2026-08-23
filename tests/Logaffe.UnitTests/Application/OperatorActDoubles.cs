@@ -200,6 +200,23 @@ internal sealed class InMemoryInstallation : IInstallation
 
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Where notifications go, which is nowhere until the operator says
+    /// otherwise.
+    /// </summary>
+    public Notifier? Notifier { get; set; }
+
+    public Task<Notifier?> ReadNotifierAsync(CancellationToken cancellationToken) =>
+        Task.FromResult(Notifier);
+
+    public Task RecordNotifierAsync(Notifier? notifier, CancellationToken cancellationToken)
+    {
+        Notifier = notifier;
+        Writes++;
+
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>

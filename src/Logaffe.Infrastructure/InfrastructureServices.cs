@@ -63,9 +63,18 @@ public static class InfrastructureServices
         // notify hourly.
         services.AddScoped<IConditionStates, ConditionStates>();
 
-        // Where an alert goes on an installation that has no notifier: into the
-        // installation's own log, once, and no further.
-        services.AddScoped<IAlertNotifier, NoNotifier>();
+        // Where an alert goes. The address it links to is deployment
+        // configuration and the rest of the notifier is a row, so this is read
+        // per send rather than bound once: an operator who fixes a topic at
+        // half past has it fixed on the hour.
+        services.AddSingleton(provider => AlertLinks.From(
+            configuration, provider.GetRequiredService<ILogger<AlertLinks>>()));
+
+        // The one timeout in the alerting path, and it is short on purpose: the
+        // hourly pass has other projects to evaluate, and a notifier that hangs
+        // must cost this alert rather than the pass (docs/alerts.md).
+        services.AddHttpClient<IAlertNotifier, NtfyNotifier>(
+            client => client.Timeout = TimeSpan.FromSeconds(10));
 
         // The other half of it, and the one this layer takes Dapper for: the
         // write and the sweep had nothing to map, and a filtered page does.

@@ -10,6 +10,13 @@ public sealed class InstallationSettingsConfiguration
     /// <inheritdoc cref="ClaimGuardConfiguration"/>
     private const string OnlySettings = "OnlySettings";
 
+    /// <summary>
+    /// Room for an address behind a proxy and under a path, and no room for
+    /// anything that is not one. The domain has already refused whatever is not
+    /// an absolute http address by the time a value reaches this column.
+    /// </summary>
+    private const int ServerMaxLength = 300;
+
     public void Configure(EntityTypeBuilder<InstallationSettings> builder)
     {
         builder.ToTable("installation_settings");
@@ -62,6 +69,20 @@ public sealed class InstallationSettingsConfiguration
         builder.Property(s => s.MountPath)
             .HasColumnName("mount_path")
             .HasMaxLength(Domain.Hosts.MountPath.MaxLength);
+
+        // Where an alert goes, which is one notifier for the installation and no
+        // second kind of one (ADR 0049). The token is bytes here exactly as a
+        // token's is: sealed by the act that wrote it, opened by the adapter
+        // that sends and by the operator reading it back.
+        builder.Property(s => s.NotifierServer)
+            .HasColumnName("notifier_server")
+            .HasMaxLength(ServerMaxLength);
+
+        builder.Property(s => s.NotifierTopic)
+            .HasColumnName("notifier_topic")
+            .HasMaxLength(Domain.Alerts.Notifier.TopicMaxLength);
+
+        builder.Property(s => s.NotifierAccessToken).HasColumnName("notifier_access_token");
 
         builder.Property<bool>(OnlySettings)
             .HasColumnName("only_settings")
