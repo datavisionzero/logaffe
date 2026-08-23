@@ -5,7 +5,7 @@ import type { components } from "../api/schema";
 /** Why the condition about the disk cannot be evaluated, and `none` when it can. */
 export type Blindness = components["schemas"]["Blindness"];
 
-/** One of the three things this installation will say something about unasked. */
+/** One of the four things this installation will say something about unasked. */
 export type AlertCondition = components["schemas"]["AlertCondition"];
 
 /** How the notification the operator asked for ended. */
@@ -25,7 +25,7 @@ export interface ToleratedSilence {
 export interface HeldAlerts {
   /** The one place notifications go, and `null` on an installation with none. */
   notifier: { server: string; topic: string; hasAccessToken: boolean } | null;
-  switches: { fillingUp: boolean; goneQuiet: boolean; flooding: boolean };
+  switches: { fillingUp: boolean; goneQuiet: boolean; flooding: boolean; failing: boolean };
   store: {
     blindness: Blindness;
     hostId: string | null;
@@ -46,6 +46,7 @@ export interface HeldAlerts {
     baselineDays: number;
   };
   flood: { multiple: number; floor: number; baselineDays: number };
+  failure: { multiple: number; floor: number; baselineDays: number; consecutiveHours: number };
   /** When each condition last fired, which is the only history there is. */
   fired: { subjectId: string; subject: string; condition: AlertCondition; at: Date }[];
 }
@@ -133,6 +134,12 @@ function held(alerts: components["schemas"]["AlertSettingsResponse"]): HeldAlert
       multiple: asNumber(alerts.flood.multiple),
       floor: asNumber(alerts.flood.floor),
       baselineDays: asNumber(alerts.flood.baselineDays),
+    },
+    failure: {
+      multiple: asNumber(alerts.failure.multiple),
+      floor: asNumber(alerts.failure.floor),
+      baselineDays: asNumber(alerts.failure.baselineDays),
+      consecutiveHours: asNumber(alerts.failure.consecutiveHours),
     },
     fired: alerts.fired.map((fired) => ({
       subjectId: fired.subjectId,

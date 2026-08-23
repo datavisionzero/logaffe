@@ -252,7 +252,7 @@ rather than after it ([Alerts](./alerts.md)). It is the one duty on this pass
 that cannot be caught up: a sweep that runs an hour late deletes the same rows an
 hour later, while the hour that has just closed is evaluated once or never — so
 it goes first, and it costs a few hundred small rows against a table of millions.
-An installation with all three conditions switched off does nothing here at all.
+An installation with all four conditions switched off does nothing here at all.
 
 **The same job takes what a deleted project left behind.** A project goes at
 once and its entries follow in the background
@@ -409,7 +409,7 @@ the operator the whole of it is in that log, and the sentence has to be true.
   renames it, marks it stale or says anything about it.
   This used to be a sentence about alerting, which the product refused
   altogether. It is now a sentence about hosts. A **project** going quiet is one
-  of the three conditions ([Alerts](./alerts.md#a-project-has-gone-quiet)) and a
+  of the four conditions ([Alerts](./alerts.md#a-project-has-gone-quiet)) and a
   host going quiet is not, and the difference is the whole reason the set is
   named rather than general: a project that stops delivering means an application
   stopped, which is what a self-hoster most wants to be told, while a collector

@@ -8,14 +8,14 @@ import { hours, type HeldAlerts } from "./alerting";
 const none = "";
 
 /**
- * The three conditions, each with the switch that turns it on and what it
+ * The four conditions, each with the switch that turns it on and what it
  * currently works out to in this installation's own numbers.
  *
  * **The set is closed.** There is no rule to write, no threshold to type,
- * nothing to attach to a filter and no fourth condition — what each of them
+ * nothing to attach to a filter and no fifth condition — what each of them
  * compares against is derived from this installation's own recent history rather
  * than from a number somebody guessed, which is the whole case for a closed set
- * (`docs/alerts.md`). All three are off until they are switched on.
+ * (`docs/alerts.md`). All four are off until they are switched on.
  *
  * **Each switch says what it will actually do**, in projects the operator can
  * name and hours they can picture, because a switch whose behaviour has to be
@@ -33,7 +33,7 @@ export function AlertConditions({
   alerts: HeldAlerts;
   onChanged: () => void;
 }) {
-  const { switches, store, quiet, flood } = alerts;
+  const { switches, store, quiet, flood, failure } = alerts;
   const { state: hostState } = useHosts();
 
   const [mounts, setMounts] = useState<string[]>([]);
@@ -70,12 +70,15 @@ export function AlertConditions({
     };
   }, [chosen]);
 
-  async function flip(which: "fillingUp" | "goneQuiet" | "flooding", on: boolean) {
+  async function flip(
+    which: "fillingUp" | "goneQuiet" | "flooding" | "failing",
+    on: boolean,
+  ) {
     setProblem(undefined);
     setBusy(true);
 
     try {
-      // All three every time, because they are one setting with three parts.
+      // All four every time, because they are one setting with four parts.
       const { response } = await api.PUT("/alerts/switches", {
         body: { ...switches, [which]: on },
       });
@@ -136,10 +139,10 @@ export function AlertConditions({
     <section>
       <h2>The conditions</h2>
       <p>
-        Three things this installation will say something about unasked, and no others.
+        Four things this installation will say something about unasked, and no others.
         There is no rule to write and no threshold to type: what each of them compares
         against comes from this installation's own recent history, which is why there is
-        nothing here to guess wrong. All three are off until you switch them on.
+        nothing here to guess wrong. All four are off until you switch them on.
       </p>
 
       {problem !== undefined && <p className="refusal">{problem}</p>}
@@ -286,8 +289,40 @@ export function AlertConditions({
         <Fortnight alerts={alerts} />
       </fieldset>
 
+      <fieldset>
+        <legend>A project is failing far more than it does</legend>
+
+        <label className="confirm">
+          <input
+            type="checkbox"
+            checked={switches.failing}
+            disabled={busy}
+            onChange={(e) => void flip("failing", e.target.checked)}
+          />
+          Say something when a project starts failing
+        </label>
+
+        <p className="quiet">
+          {failure.multiple} times the median of that hour of the day across the last{" "}
+          {failure.baselineDays} days, counted over entries at Error or above, with a
+          floor of {failure.floor.toLocaleString()} under it — and true of{" "}
+          {failure.consecutiveHours === 2 ? "two" : failure.consecutiveHours} closed hours
+          in a row. It is the condition above narrowed to what went wrong and slowed down.
+        </p>
+
+        <p className="quiet">
+          The second hour is what a deploy and a retry storm do not survive: both are over
+          inside one hour, so neither says anything. What that costs is the time —
+          something that starts failing at the top of an hour is said two hours later, and
+          up to three when it starts too late in an hour to reach the floor in what is
+          left of it. A late true alarm beats a false one.
+        </p>
+
+        <Fortnight alerts={alerts} />
+      </fieldset>
+
       <p className="quiet">
-        A project can be taken out of the last two on its own settings screen, beside its
+        A project can be taken out of the last three on its own settings screen, beside its
         group and its host. That is the whole of what varies per project: there is no
         threshold here, no schedule and no quiet hours — the conditions already learn a
         project's normal by hour of the day, which is the same idea and needs nothing

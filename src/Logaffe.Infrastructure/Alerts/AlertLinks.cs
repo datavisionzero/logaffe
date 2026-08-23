@@ -13,8 +13,9 @@ namespace Logaffe.Infrastructure.Alerts;
 /// The link is the better half of an alert (ADR 0049): what the operator wants
 /// at three in the morning is the view with its filters and the band above it,
 /// not a line of what a service said. So it lands where the alert is legible —
-/// the flooding hour on that project, the machine's own screen for the disk —
-/// rather than at the front door.
+/// the flooding hour on that project, that hour's errors for the one about
+/// failing, the machine's own screen for the disk — rather than at the front
+/// door.
 /// </para>
 /// <para>
 /// <b>It is deployment configuration, and it is the only place in this product
@@ -99,6 +100,16 @@ public sealed class AlertLinks(Uri? publicAddress)
             Alert.ProjectFlooding flood => At(
                 $"project/{flood.ProjectId}"
                 + $"?from={Instant(flood.Hour)}&until={Instant(flood.Hour.AddHours(1))}"),
+
+            // The same hour, narrowed to what the condition actually counted.
+            // The level is a threshold rather than a selection
+            // (`docs/querying.md`), so `Error` is Error and Fatal — which is the
+            // tally's second number exactly, and therefore the entries behind
+            // the figure in the notification rather than a wider view of them.
+            Alert.ProjectFailing failing => At(
+                $"project/{failing.ProjectId}"
+                + $"?from={Instant(failing.Hour)}&until={Instant(failing.Hour.AddHours(1))}"
+                + "&minimumLevel=Error"),
 
             _ => null,
         };

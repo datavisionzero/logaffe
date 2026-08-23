@@ -389,9 +389,9 @@ another and revoking this one. That is said where someone would otherwise look
 for the switch, because there is no switch and nothing here edits a kind or a
 flag. Renaming stays what it always was, a label for the list.
 
-The **alerts** area is the notifier, the three conditions and what each of them
+The **alerts** area is the notifier, the four conditions and what each of them
 is currently doing ([Alerts](./alerts.md)). It is small on purpose: a server, a
-topic and a token; three switches, all off until they are not; and — for the
+topic and a token; four switches, all off until they are not; and — for the
 condition about the disk — which host the installation sits on and which of that
 host's mounts holds the database.
 
@@ -401,6 +401,13 @@ for the quietest one, and that a project with less than a fortnight of history
 cannot fire yet. A switch whose behaviour has to be looked up in a document is a
 switch that gets turned on once and then distrusted, and distrust is the failure
 mode the whole feature is designed against.
+
+**The switch for a project failing says what its second hour costs**, in the same
+place and for the same reason. That a deploy and a retry storm do not survive two
+consecutive hours is the case for the condition; that a real failure is therefore
+said between one and three hours after it starts is the price, and an operator
+who finds that out from an incident rather than from the screen learns the wrong
+thing about the product.
 
 **A condition that cannot be evaluated says so where it is switched on**, rather
 than sitting there on and silent — no host named on the installation, or the
@@ -509,8 +516,8 @@ nobody asked.
 - **No editing or deleting a single entry.** An entry is written once and is
   never updated.
 - **No alert an operator writes, and nothing in the interface that watches.** The
-  installation has three conditions and they are named in the product
-  ([Alerts](./alerts.md)); what is absent here is any way to make a fourth — no
+  installation has four conditions and they are named in the product
+  ([Alerts](./alerts.md)); what is absent here is any way to make a fifth — no
   threshold field, no rule builder, and nothing that turns a filter set or a
   count into something that fires ([Querying](./querying.md)). Nothing in the
   browser evaluates anything either: the conditions run on the hour in the

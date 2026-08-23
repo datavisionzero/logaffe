@@ -43,7 +43,7 @@ public sealed record ToleratedSilence(Guid ProjectId, string Name, int Tolerated
 /// </param>
 /// <param name="WithoutAFortnight">
 /// How many projects have less than a fortnight of tally behind them and so
-/// cannot fire either rate condition however they behave. It covers the first
+/// cannot fire any rate condition however they behave. It covers the first
 /// two weeks of every project and the first two weeks after a restore.
 /// </param>
 public sealed record QuietAsItStands(

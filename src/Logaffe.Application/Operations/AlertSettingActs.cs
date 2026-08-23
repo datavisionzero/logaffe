@@ -5,7 +5,7 @@ using Logaffe.Domain.Hosts;
 namespace Logaffe.Application.Operations;
 
 /// <summary>
-/// The three switches, read and written.
+/// The four switches, read and written.
 /// </summary>
 /// <remarks>
 /// <para>

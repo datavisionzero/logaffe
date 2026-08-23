@@ -19,11 +19,11 @@ namespace Logaffe.Domain.Alerts;
 /// samples, and there is no route from either to <c>log_entry</c>.
 /// </para>
 /// <para>
-/// <b>The three shapes are the three conditions</b>, and they are separate
+/// <b>The four shapes are the four conditions</b>, and they are separate
 /// because their numbers are: "seven hours silent against five tolerated" and
 /// "twelve thousand entries against a usual three hundred" are not the same two
-/// figures under different names. A fourth shape is a fourth condition, which is
-/// a change to ADR 0050.
+/// figures under different names. A fifth shape is a fifth condition, which is a
+/// change to ADR 0050.
 /// </para>
 /// </remarks>
 public abstract record Alert
@@ -35,7 +35,7 @@ public abstract record Alert
         SubjectName = subjectName;
     }
 
-    /// <summary>Which of the three fired.</summary>
+    /// <summary>Which of the four fired.</summary>
     public AlertCondition Condition { get; }
 
     /// <summary>The project this is about, or the machine for the disk.</summary>
@@ -85,4 +85,28 @@ public abstract record Alert
         long Entries,
         long Baseline)
         : Alert(AlertCondition.Flooding, ProjectId, ProjectName);
+
+    /// <summary>
+    /// A project's entries at <c>Error</c> or above are far above what that hour
+    /// of the day normally holds for it, and were on the hour before it too.
+    /// </summary>
+    /// <param name="Hour">
+    /// The second of the two hours, which is the one it fired on and the one the
+    /// link's filters are set to — narrowed to <c>Error</c> and above, because
+    /// that is what the condition counted.
+    /// </param>
+    /// <param name="Errors">How many that hour held.</param>
+    /// <param name="Previous">
+    /// How many the hour before it held. It rides along for the reason
+    /// <see cref="ProjectGoneQuiet.Tolerated"/> does: it is the answer to the
+    /// question the alert provokes — why now, and not an hour ago?
+    /// </param>
+    public sealed record ProjectFailing(
+        Guid ProjectId,
+        string ProjectName,
+        DateTimeOffset Hour,
+        long Errors,
+        long Previous,
+        long Baseline)
+        : Alert(AlertCondition.Failing, ProjectId, ProjectName);
 }

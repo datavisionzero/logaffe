@@ -33,6 +33,26 @@ public sealed class AlertLinkTests
                 300))?.ToString());
 
     /// <summary>
+    /// The same hour as a flood's, narrowed to what the condition counted. The
+    /// level is a threshold rather than a selection, so <c>Error</c> is Error and
+    /// Fatal — the tally's second number exactly, and therefore the entries
+    /// behind the figure in the notification.
+    /// </summary>
+    [Fact]
+    public void A_failure_lands_on_that_hours_errors() =>
+        Assert.Equal(
+            $"https://logs.example.com/project/{Project}"
+            + "?from=2026-08-22T03%3A00%3A00Z&until=2026-08-22T04%3A00%3A00Z"
+            + "&minimumLevel=Error",
+            Links("https://logs.example.com").For(new Alert.ProjectFailing(
+                Project,
+                "shop / api",
+                new DateTimeOffset(2026, 8, 22, 3, 0, 0, TimeSpan.Zero),
+                4_000,
+                2_500,
+                2))?.ToString());
+
+    /// <summary>
     /// An hour of a project that has stopped delivering is a screen that says
     /// nothing, so the span is wide enough to hold the silence and the last
     /// thing that arrived before it.

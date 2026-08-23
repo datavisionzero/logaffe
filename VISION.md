@@ -297,17 +297,18 @@ a way nobody notices is worse than no number.
 ### 6. Saying so when something is wrong
 
 Everything above waits to be asked, and for reading what the logs say that is
-right. But three things can be true of an installation that nobody will go
+right. But four things can be true of an installation that nobody will go
 looking for, precisely because the whole point of them is that the operator does
-not yet know: the store is filling up, an application has stopped delivering, and
-a project is suddenly writing far more than it does. The first ends in a database
-that stops accepting writes, the second is usually how a self-hoster finds out
-that a service died, and the third is what fills the disk while nobody is
-watching.
+not yet know: the store is filling up, an application has stopped delivering, a
+project is suddenly writing far more than it does, and a project has started
+failing far more than it does. The first ends in a database that stops accepting
+writes, the second is usually how a self-hoster finds out that a service died,
+the third is what fills the disk while nobody is watching, and the fourth is what
+an operator would otherwise run a second piece of software to be told.
 
-logaffe therefore **sends the operator a notification**, on **three conditions
-and no others** — the store filling up, a project going quiet, and a project
-flooding. They are named in the product rather than written by the operator:
+logaffe therefore **sends the operator a notification**, on **four conditions
+and no others** — the store filling up, a project going quiet, a project
+flooding, and a project failing. They are named in the product rather than written by the operator:
 there is no rule language, no threshold to type in, and no alert on a saved
 query, and every threshold is derived from the project's own recent history so
 that nothing has to be guessed at
@@ -363,11 +364,11 @@ which is also what tells the operator what a retention window will cost
 - **No reliance on network-level protection.** logaffe does not assume it sits
   behind a VPN, Tailscale, or an authenticating reverse proxy, and it will not
   treat "run it on a private network" as a security answer.
-- **No alert an operator defines, and no alerting beyond the three conditions.**
+- **No alert an operator defines, and no alerting beyond the four conditions.**
   Capability 6 is a closed set, and the shape refused with it is the usual one:
   no rule language, no threshold to type, no alert attached to a saved query or a
   filter, no severity model, no incident, no acknowledging, no escalation, no
-  on-call rota, and no second notifier. Adding a fourth condition is a change to
+  on-call rota, and no second notifier. Adding a fifth condition is a change to
   [ADR 0050](./docs/adr/0050-the-alert-conditions-are-a-closed-set.md) rather
   than a field in a form.
 - **No notification carrying log content.** No message text, no exception, no
@@ -487,6 +488,6 @@ documentation should say so.
    fire-and-forget and keeps the cost of losing log data low.
 8. **Nothing reads unasked.** Every look into what the logs say — by the operator
    or by their agent — is initiated by the operator, and nothing watches, analyses
-   or summarizes in the background. The three conditions of capability 6 are not
+   or summarizes in the background. The four conditions of capability 6 are not
    an exception to this: they count rows as they arrive, they never read an entry,
    and the operator asked for them once, when they switched them on.

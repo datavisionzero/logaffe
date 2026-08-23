@@ -8,7 +8,7 @@ import type { HeldProject } from "../projects/projects";
  *
  * It is here rather than in the installation's settings for the reason the
  * group and the host are here: it is a fact about this project and about
- * nothing else. The three switches are the installation's — what it will say
+ * nothing else. The four switches are the installation's — what it will say
  * something about at all — and this is the one project taken out of them.
  *
  * **One checkbox and not one per condition.** The project a batch job writes
@@ -65,10 +65,11 @@ export function ProjectMute({
     <section>
       <h2>Alerts</h2>
       <p>
-        This installation says something unasked on three conditions and no others: its
-        store filling up, a project going quiet, and a project delivering far more than it
-        does. Muting takes this project out of the two that are about a project — they are
-        not evaluated for it at all, rather than evaluated and kept quiet.
+        This installation says something unasked on four conditions and no others: its
+        store filling up, a project going quiet, a project delivering far more than it
+        does, and a project failing far more than it does. Muting takes this project out
+        of the three that are about a project — they are not evaluated for it at all,
+        rather than evaluated and kept quiet.
       </p>
 
       <label className="confirm">

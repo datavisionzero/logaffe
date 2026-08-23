@@ -13,7 +13,12 @@ function aTolerance(name: string, toleratedHours: number) {
 /** The whole of the alerts area, with everything the contract requires on it. */
 function theAlerts(alerts: {
   notifier?: { server: string; topic: string; hasAccessToken: boolean } | null;
-  switches?: { fillingUp: boolean; goneQuiet: boolean; flooding: boolean };
+  switches?: {
+    fillingUp: boolean;
+    goneQuiet: boolean;
+    flooding: boolean;
+    failing: boolean;
+  };
   store?: {
     blindness: string;
     hostId?: string | null;
@@ -31,7 +36,8 @@ function theAlerts(alerts: {
   return {
     body: {
       notifier: alerts.notifier ?? null,
-      switches: alerts.switches ?? { fillingUp: false, goneQuiet: false, flooding: false },
+      switches: alerts.switches
+        ?? { fillingUp: false, goneQuiet: false, flooding: false, failing: false },
       store: {
         blindness: alerts.store?.blindness ?? "noHostNamed",
         hostId: alerts.store?.hostId ?? null,
@@ -50,6 +56,7 @@ function theAlerts(alerts: {
         baselineDays: 14,
       },
       flood: { multiple: 10, floor: 1000, baselineDays: 14 },
+      failure: { multiple: 10, floor: 10, baselineDays: 14, consecutiveHours: 2 },
       fired: alerts.fired ?? [],
     },
   };
@@ -122,7 +129,7 @@ describe("the alerts area", () => {
   it("says a condition that is switched on and cannot see, rather than staying silent", async () => {
     open({
       "GET /alerts": theAlerts({
-        switches: { fillingUp: true, goneQuiet: false, flooding: false },
+        switches: { fillingUp: true, goneQuiet: false, flooding: false, failing: false },
         store: { blindness: "mountAbsent", hostId: "h1", mount: "/var/lib/postgresql" },
       }),
     });
@@ -142,11 +149,15 @@ describe("the alerts area", () => {
     expect(screen.queryByText(/cannot see/)).not.toBeInTheDocument();
   });
 
-  it("writes all three switches whenever one of them moves", async () => {
+  it("writes all four switches whenever one of them moves", async () => {
     const installation = open({
       "GET /alerts": [
-        theAlerts({ switches: { fillingUp: false, goneQuiet: true, flooding: false } }),
-        theAlerts({ switches: { fillingUp: false, goneQuiet: true, flooding: true } }),
+        theAlerts({
+          switches: { fillingUp: false, goneQuiet: true, flooding: false, failing: false },
+        }),
+        theAlerts({
+          switches: { fillingUp: false, goneQuiet: true, flooding: true, failing: false },
+        }),
       ],
       "PUT /alerts/switches": {},
     });
@@ -155,11 +166,50 @@ describe("the alerts area", () => {
       await screen.findByLabelText("Say something when a project floods"),
     );
 
-    // They are one setting with three parts: a screen that saved them
-    // separately would have three ways to be half-applied.
+    // They are one setting with four parts: a screen that saved them
+    // separately would have four ways to be half-applied.
     await waitFor(() =>
       expect(installation.sentTo("PUT /alerts/switches")).toEqual([
-        { fillingUp: false, goneQuiet: true, flooding: true },
+        { fillingUp: false, goneQuiet: true, flooding: true, failing: false },
+      ]),
+    );
+  });
+
+  it("carries the fourth condition, and what its second hour costs", async () => {
+    open({ "GET /alerts": theAlerts({}) });
+
+    await screen.findByText("A project is failing far more than it does");
+
+    // The floor is the errors' own and not the flood's, and the latency the
+    // second hour buys is stated rather than left to be worked out.
+    // The flood condition states the same multiple and the same fortnight, so
+    // what identifies this one is its subject and its own floor.
+    expect(screen.getByText(/counted over entries at Error or above/)).toBeInTheDocument();
+    expect(screen.getByText(/with a floor of 10 under it/)).toBeInTheDocument();
+    expect(screen.getByText(/two closed hours in a row/)).toBeInTheDocument();
+    expect(screen.getByText(/up to three when it starts too late/)).toBeInTheDocument();
+  });
+
+  it("writes the fourth switch as part of the one setting", async () => {
+    const installation = open({
+      "GET /alerts": [
+        theAlerts({
+          switches: { fillingUp: true, goneQuiet: false, flooding: false, failing: false },
+        }),
+        theAlerts({
+          switches: { fillingUp: true, goneQuiet: false, flooding: false, failing: true },
+        }),
+      ],
+      "PUT /alerts/switches": {},
+    });
+
+    await userEvent.click(
+      await screen.findByLabelText("Say something when a project starts failing"),
+    );
+
+    await waitFor(() =>
+      expect(installation.sentTo("PUT /alerts/switches")).toEqual([
+        { fillingUp: true, goneQuiet: false, flooding: false, failing: true },
       ]),
     );
   });

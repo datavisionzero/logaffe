@@ -170,7 +170,8 @@ public sealed class Installation(LogaffeDbContext context) : IInstallation
             : new AlertSwitches(
                 settings.AlertOnFillingUp,
                 settings.AlertOnGoneQuiet,
-                settings.AlertOnFlooding);
+                settings.AlertOnFlooding,
+                settings.AlertOnFailing);
     }
 
     public async Task RecordAlertSwitchesAsync(
@@ -196,6 +197,7 @@ public sealed class Installation(LogaffeDbContext context) : IInstallation
         settings.AlertOnFillingUp = switches.FillingUp;
         settings.AlertOnGoneQuiet = switches.GoneQuiet;
         settings.AlertOnFlooding = switches.Flooding;
+        settings.AlertOnFailing = switches.Failing;
 
         await context.SaveChangesAsync(cancellationToken);
     }

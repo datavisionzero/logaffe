@@ -6,15 +6,17 @@ and `VISION.md` keeps that as a principle rather than a default — one that
 survives this document intact, because a condition here counts rows it was handed
 as they arrived and reads no entry at all.
 
-Three things do not fit under it, and they have one property in common: **the
+Four things do not fit under it, and they have one property in common: **the
 whole point of them is that the operator does not know.** The store is filling
-up, an application has stopped delivering, or a project is suddenly writing far
-more than it does. The first ends in a database that stops accepting writes; the
-second is usually how a self-hoster finds out that a service died; the third is
-what fills the disk while nobody is watching. None of them is discovered by
-looking, because looking is what is not happening.
+up, an application has stopped delivering, a project is suddenly writing far
+more than it does, or a project has started failing far more than it does. The
+first ends in a database that stops accepting writes; the second is usually how a
+self-hoster finds out that a service died; the third is what fills the disk while
+nobody is watching; the fourth is the one every operator otherwise runs a second
+piece of software for. None of them is discovered by looking, because looking is
+what is not happening.
 
-So the installation says something, unasked, on **three conditions and no
+So the installation says something, unasked, on **four conditions and no
 others**. This document is what those are, exactly what makes each of them fire,
 what the notification carries, and what happens when it cannot be sent.
 
@@ -25,7 +27,7 @@ notification to go
 
 ## The condition
 
-A **condition** is one of three things the installation checks about itself,
+A **condition** is one of four things the installation checks about itself,
 named in the product rather than written by the operator. Each is **off until it
 is switched on**, and each derives whatever it compares against from the
 installation's own recent history rather than from a number somebody guessed.
@@ -47,7 +49,7 @@ a property of the code's reach rather than a discipline it has to remember.
 the pass the retention sweep already runs. Never the hour in progress: a burst at
 five past would otherwise look like twelve times the hour it is a twelfth of.
 
-## The three
+## The four
 
 ### The store is filling up
 
@@ -144,6 +146,52 @@ every first entry of a quiet hour would fire.
 **The floor is absolute and it is not a ratio.** Two entries becoming twenty is a
 tenfold rise and is not an incident, in any project, ever.
 
+### A project is failing far more than it does
+
+**Ten times the median of that hour of the day across the last fourteen days**,
+counted over entries at `Error` or above, with a floor of **ten** under it — and
+true of **two closed hours in a row**.
+
+The first two clauses are the condition above with a different subject and a
+different floor: the same median by hour of the day, over the same fortnight,
+taken the same way, and an hour with no errors counted as nought. What is new is
+the third.
+
+**Each of the two hours is judged against its own hour of the day.** Nine in the
+morning and eight in the morning are different hours for a project, so this asks
+for two baselines and reaches an hour further back into the tally than the flood
+condition does. Holding the earlier hour up against the later one's normal would
+judge it by a figure that was never about it — and would fire on a project doing
+exactly what it does every day.
+
+**The second hour is the whole of the answer to why this was deferred.** A
+deployment's error spike is minutes long and lands inside one hour. A retry storm
+that resolves itself never reaches a second one. Neither fires — not because the
+burst was filtered, but because it stopped. What is left is the shape worth
+waking somebody for: a provider down, a webhook endpoint refusing everything for
+two hours, something that is still failing an hour after it started.
+
+**What that costs is time, and the arithmetic is worth stating.** A failure
+beginning at the top of an hour is said two hours later. One beginning at the end
+of an hour is said just over one hour later. One beginning too late in an hour to
+reach the floor in what is left of it does not qualify that hour at all, and is
+said up to three hours later. That is the same trade the condition above it makes
+and the same one a project going quiet makes: **a late true alarm beats a false
+one**.
+
+**A project that logs a handled exception per request has its own normal**, and
+the median is what makes that work. Such a project has a high median and ten
+times it is proportionally high; a healthy project has a median of nought and is
+carried by the floor. Those are the same two mechanisms that let the flood
+condition work across projects with wildly different volumes.
+
+**The floor of ten is a judgement and nothing derives it.** It is worth saying so
+plainly. A thousand is right for entries because entries are cheap; it is wrong
+for errors, because a project taking twenty payments a day would never reach it
+and the condition would be decorative. What mitigates it rather than solving it
+is where it applies: only after the ratio has already passed, and only where the
+hour before it passed too.
+
 ## What makes a closed set defensible is the guarding
 
 The arithmetic above is the smaller half. These are the rules that stand between
@@ -169,6 +217,20 @@ it and an operator who stops reading their notifications:
   message, and no record of one. A notification exists to make a person look, and
   something that has stopped needing a person is not worth a message that will be
   read at three in the morning.
+- **At most one thing is said about a project on a pass**, and the order is
+  fixed: gone quiet, then failing, then flooding. Failing outranks flooding
+  because it names what is wrong rather than how much of it there is — an
+  operator told both "twelve thousand entries" and "four thousand errors" about
+  one hour wanted the second sentence. The condition that loses is not evaluated
+  rather than evaluated and dropped, so it has no state to arm or latch that
+  hour.
+- **What that does not collapse is one incident said twice across two hours.** A
+  retry storm can flood on the hour it starts and fail on the hour after, because
+  failing needs two consecutive hours and flooding needs one — so the two fall in
+  different passes and no per-pass rule can see both. That is accepted rather
+  than worked around: they are two different facts about the same hour of the
+  same project, the second is the more specific one, and an hour apart is not the
+  burst this guarding exists to prevent.
 - **A project can be muted**, in its own settings, and a muted project is not
   evaluated at all.
 
@@ -197,7 +259,8 @@ with its filters and the band above it, not one line of it.
 ### The link, and the address it is built from
 
 The link lands in the log view of that project with the filters that make the
-alert legible already set — for a flood, the hour it fired on.
+alert legible already set — for a flood, the hour it fired on; for a failure, the
+same hour narrowed to `Error and above`, which is what that condition counted.
 
 **The installation has to be told the address it is reachable at**, and this is
 the one thing about alerting that is deployment configuration rather than a
@@ -223,7 +286,7 @@ There is **one, and it is ntfy**: a server, a topic, and an optional access
 token, set once for the installation. It pushes, it needs no inbound port, it is
 self-hostable, and it reaches a phone.
 
-A notification that is a name, three numbers and a URL formats identically
+A notification that is a name, a few numbers and a URL formats identically
 everywhere, so the case for a second integration is not that the first renders
 poorly. Email in particular stays absent for the reason it was always absent —
 this product has no address to send anything to
@@ -263,7 +326,7 @@ file.
 
 ## What the operator sets, and where
 
-- **In the installation's settings**: the notifier, the three switches, and — for
+- **In the installation's settings**: the notifier, the four switches, and — for
   the first condition — which host the installation sits on and which of that
   host's mounts holds the database.
 - **In the project's settings**: whether it is muted, beside the group and the
@@ -278,16 +341,20 @@ working?" answerable without waiting for an incident.
 
 ## What is deliberately not here
 
-- **No rule an operator writes, and no fourth condition.** No threshold to type,
+- **No rule an operator writes, and no fifth condition.** No threshold to type,
   no expression, no alert attached to a filter or a saved search — that last one
   is refused in [Querying](./querying.md) and is exactly the alternative ADR 0050
-  rejected. A fourth condition is a change to that document.
-- **No error-burst condition, yet.** Entries at `Error` or above are in the tally
-  and the arithmetic is a few lines away. It is left out because it is the least
-  stable baseline in the set — a deploy produces errors, a retry storm produces
-  thousands and resolves itself, and a project that logs a handled exception per
-  request has a normal nothing like one that does not. It comes back once the
-  three above have been quiet in a real installation for a season.
+  rejected. A fifth condition is a change to that document, exactly as the fourth
+  one was.
+- **No grouping of failures, and no issue.** The condition about a project
+  failing counts errors and says how many; nothing is fingerprinted, nothing has
+  a lifecycle, and there is nothing to resolve, acknowledge or mark as regressed.
+  `@x` is stored as text and never parsed
+  ([ADR 0028](./adr/0028-the-exception-is-its-own-filter.md)), so there is
+  nothing to group on and deliberately so — at fifteen payments a day an issue
+  lifecycle is a luxury and the notification is not.
+- **No release dimension.** Nothing here says "introduced in 0.2.0", because the
+  product holds no such thing to say it with.
 - **No notification carrying log content**, in any form: no message, no
   exception, no property value, no digest of the day's errors, and no grouping of
   alerts by what entries say.

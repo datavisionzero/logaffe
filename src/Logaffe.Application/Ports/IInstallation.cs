@@ -106,7 +106,7 @@ public interface IInstallation
     Task RecordHostAsync(InstallationHost? host, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Which of the three conditions are switched on, which is none of them
+    /// Which of the four conditions are switched on, which is none of them
     /// until the operator switches one on (ADR 0050).
     /// </summary>
     /// <remarks>

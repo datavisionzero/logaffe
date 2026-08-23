@@ -346,19 +346,22 @@ quantity the ceiling was always a poor stand-in for. It refuses nothing.
 _Avoid_: Size, usage, quota, limit, disk space, capacity
 
 **Alert Condition**:
-One of the three things an installation will say something about unasked: its
-store filling up, a project going quiet, and a project delivering far more than
-it does. The set is closed and named in the product — there is no rule to write,
-no threshold to type and nothing to attach to a **Filter** — and each is off
-until the operator switches it on. A fourth is a decision, not a setting.
+One of the four things an installation will say something about unasked: its
+store filling up, a project going quiet, a project delivering far more than it
+does, and a project failing far more than it does. The set is closed and named in
+the product — there is no rule to write, no threshold to type and nothing to
+attach to a **Filter** — and each is off until the operator switches it on. At
+most one is said about a project at a time, and a fifth is a decision, not a
+setting.
 _Avoid_: Rule, threshold, trigger, policy, monitor, check, watch
 
 **Baseline**:
 What a project's own recent history says is normal for it, against which an
 **Alert Condition** measures the hour just closed — a median by hour of the day
-over a fortnight, and never an average over the whole of one. It is derived from
-the **Tally** and never entered by the operator, which is the whole reason the
-conditions can be closed.
+over a fortnight, and never an average over the whole of one. It is the same
+arithmetic over either of the **Tally**'s two numbers, and each hour being judged
+gets its own. It is derived from the **Tally** and never entered by the operator,
+which is the whole reason the conditions can be closed.
 _Avoid_: Threshold, limit, average, normal, budget, expectation
 
 **Alert**:

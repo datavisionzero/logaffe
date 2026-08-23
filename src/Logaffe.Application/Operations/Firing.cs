@@ -8,12 +8,12 @@ namespace Logaffe.Application.Operations;
 /// to say now.
 /// </summary>
 /// <remarks>
-/// The three conditions share this and only this. What each of them decides —
-/// how full is too full, how quiet is too quiet, how many is too many — is its
-/// own and is where the whole of the arithmetic lives; what none of them decides
-/// on its own is whether a thing that is true is also worth saying again, and
-/// that answer has to be the same for all three or the guarding is three
-/// guardings (ADR 0050).
+/// The four conditions share this and only this. What each of them decides —
+/// how full is too full, how quiet is too quiet, how many is too many, how long
+/// too many has to last — is its own and is where the whole of the arithmetic
+/// lives; what none of them decides on its own is whether a thing that is true
+/// is also worth saying again, and that answer has to be the same for all four
+/// or the guarding is four guardings (ADR 0050).
 /// </remarks>
 internal static class Firing
 {

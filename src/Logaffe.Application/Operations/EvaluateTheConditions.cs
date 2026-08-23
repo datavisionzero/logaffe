@@ -18,16 +18,26 @@ namespace Logaffe.Application.Operations;
 /// </para>
 /// <para>
 /// <b>The switches come first and the mute comes second.</b> An installation
-/// with all three off never walks the projects, and a muted project is not
+/// with every switch off never walks the projects, and a muted project is not
 /// evaluated at all — not evaluated and suppressed, but never asked, so a muted
 /// project's conditions have no state to arm or latch.
 /// </para>
 /// <para>
-/// <b>At most one alert per project.</b> The two project conditions are near
-/// enough opposites that both holding is hard to arrange — an hour with nothing
-/// in it is not an hour with too much in it — but the guard is worth having on
-/// its own account: two notifications about one project in one minute is the
-/// shape of a thing an operator learns to swipe away.
+/// <b>At most one alert per project, and the order here is what decides
+/// which.</b> Going quiet comes first because it is the only one of the three
+/// that is about nothing arriving at all. Failing comes before flooding because
+/// it names what is wrong rather than how much of it there is: an operator told
+/// both "twelve thousand entries" and "four thousand errors" about one hour
+/// wanted the second sentence.
+/// </para>
+/// <para>
+/// <b>What this does not collapse is one incident said twice across two
+/// hours.</b> A retry storm can flood on the hour it starts and fail on the hour
+/// after, because failing needs two consecutive hours and flooding needs one, so
+/// the two alerts fall in different passes and no per-pass guard can see both.
+/// That is accepted rather than worked around: they are different facts, the
+/// second is the more specific one, and an hour apart is not the burst this
+/// guard exists to stop (<c>docs/alerts.md</c>).
 /// </para>
 /// <para>
 /// It is a duty on the retention pass rather than a timer of its own, and it
@@ -40,6 +50,7 @@ public sealed class EvaluateTheConditions(
     CheckTheStoreIsFillingUp fillingUp,
     CheckAProjectHasGoneQuiet goneQuiet,
     CheckAProjectIsFlooding flooding,
+    CheckAProjectIsFailing failing,
     IAlertNotifier notifier,
     TimeProvider clock)
 {
@@ -56,7 +67,7 @@ public sealed class EvaluateTheConditions(
             await SendAsync(await fillingUp.ExecuteAsync(cancellationToken), cancellationToken);
         }
 
-        if (!switches.GoneQuiet && !switches.Flooding)
+        if (!switches.AnyProject)
         {
             return;
         }
@@ -72,6 +83,10 @@ public sealed class EvaluateTheConditions(
 
             var alert = switches.GoneQuiet
                 ? await goneQuiet.ExecuteAsync(project, closedHour, cancellationToken)
+                : null;
+
+            alert ??= switches.Failing
+                ? await failing.ExecuteAsync(project, closedHour, cancellationToken)
                 : null;
 
             alert ??= switches.Flooding

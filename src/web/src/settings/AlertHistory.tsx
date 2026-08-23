@@ -6,6 +6,7 @@ const named: Record<AlertCondition, string> = {
   fillingUp: "The store filling up",
   goneQuiet: "Gone quiet",
   flooding: "Delivering far more than it does",
+  failing: "Failing far more than it does",
 };
 
 /**

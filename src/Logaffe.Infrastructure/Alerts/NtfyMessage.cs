@@ -16,10 +16,13 @@ namespace Logaffe.Infrastructure.Alerts;
 /// setting here, no template, and no flag that turns content on.
 /// </para>
 /// <para>
-/// <b>The three read as three sentences and not as a format.</b> "Seven hours
+/// <b>The four read as four sentences and not as a format.</b> "Seven hours
 /// silent against five tolerated" and "twelve thousand entries against a usual
 /// three hundred" are different facts, and a shared template would have made
-/// them one shape with the numbers relabelled.
+/// them one shape with the numbers relabelled. The two rate conditions are the
+/// case that proves it: they run the same arithmetic and they do not say the
+/// same sentence, because one is about how much a project wrote and the other
+/// is about how much of it went wrong.
 /// </para>
 /// <para>
 /// No priority, no tags and no severity ride along: every alert is the same
@@ -49,6 +52,16 @@ public sealed record NtfyMessage(string Title, string Body, Uri? Link)
             $"{flood.Entries} entries in the hour from "
             + $"{flood.Hour.UtcDateTime:yyyy-MM-dd HH:mm} UTC, against a usual "
             + $"{flood.Baseline}.",
+            link),
+
+        // The second hour is the one it fired on, and the hour before it rides
+        // along because it is the answer to "why now, and not an hour ago".
+        Alert.ProjectFailing failing => new NtfyMessage(
+            $"logaffe: {failing.ProjectName} is failing",
+            $"{failing.Errors} entries at Error or above in the hour from "
+            + $"{failing.Hour.UtcDateTime:yyyy-MM-dd HH:mm} UTC, after "
+            + $"{failing.Previous} in the hour before it, against a usual "
+            + $"{failing.Baseline}.",
             link),
 
         _ => throw new ArgumentOutOfRangeException(

@@ -1,7 +1,7 @@
 # The Alert Conditions Are a Closed Set
 
-There are **three conditions**, named in the product, and there is no way for an
-operator to write a fourth. The obvious alternative is the one every logging
+There are **four conditions**, named in the product, and there is no way for an
+operator to write a fifth. The obvious alternative is the one every logging
 tool offers — an alert defined on the query surface, "notify me when this filter
 matches more than N in an hour" — and it is rejected for the reason
 [ADR 0044](./0044-a-sample-has-a-closed-schema.md) rejected the label: it moves the
@@ -16,7 +16,7 @@ thresholds from the project's own history**, using the tally of
 [ADR 0047](./0047-the-volume-history-is-tallied-as-it-arrives.md). Nothing is
 typed in, so nothing is typed in wrong.
 
-## The three
+## The four
 
 - **The store is filling up.** The filesystem the database sits on crosses 85
   per cent, and again at 95. Read from the samples of the host the installation
@@ -32,6 +32,11 @@ typed in, so nothing is typed in wrong.
 - **A project is delivering far more than it does.** A closed hour above ten
   times the median of that hour of the day across the last fourteen days, and
   above a floor of a thousand entries.
+- **A project is failing far more than it does.** The same ratio and the same
+  median, over entries at `Error` or above, above a floor of ten, and true of two
+  closed hours in a row. Each hour is judged against its own hour of the day.
+  [Alerts](../alerts.md#a-project-is-failing-far-more-than-it-does) has the
+  arithmetic and what the second hour costs in latency.
 
 Every one of them is off until the operator turns it on, one notifier serves the
 installation, and a project can be muted.
@@ -52,6 +57,9 @@ buy that trade:
   the day would make it fire every night and make the daytime baseline wrong too.
 - **One notification per project per condition, then six hours of silence**, and
   no second one while the condition still holds.
+- **At most one thing said about a project on a pass**, in a fixed order: gone
+  quiet, then failing, then flooding. The more specific sentence wins, and the
+  condition that loses is not evaluated rather than evaluated and dropped.
 - **Nothing is sent when a condition clears.** Silence is not information here,
   a "resolved" is a notification for something that no longer needs a person, and
   the operator looks at the screen either way.
@@ -62,14 +70,50 @@ buy that trade:
 
 ## Consequences
 
-**The error burst is deliberately absent, and it is the one everybody wants.**
-Entries at `Error` or above are in the tally, and the condition is a few lines
-away. It is left out because it is the least stable baseline in the set: a
-deploy produces errors, a retry storm produces thousands and resolves itself,
-and a project that logs a handled exception per request has a normal that is
-nothing like a project that does not. Adding it before the three above have been
-quiet in a real installation for a season would spend the credibility the whole
-feature runs on. It comes back by changing this document.
+**The fourth condition was deferred by this document, and it came back by
+changing it. What follows is why, stated straight.**
+
+The original deferral said the error burst would come back "once the three above
+have been quiet in a real installation for a season". **That did not happen, and
+this decision does not pretend it did.** The three conditions landed on
+2026-08-21 and v0.5.0 was tagged on 2026-08-23, at the commit that put their
+switches on a screen. They had not run anywhere for a day.
+
+What changed instead is that the gap acquired a price. A second consumer,
+`payaffe`, delivers its logs here — a non-custodial payment service for one shop
+— and keeps a separate error tracker running for exactly one capability this
+product did not offer: **being told that something started failing without going
+to look.** Everything else that tracker was carrying turned out to be either
+already available or already lost. The trail leading to an error is served
+better here than by breadcrumbs, because `TraceId` and `SpanId` are promoted to
+indexed fields and the real entries of the request are one filter away. Browser
+stack traces were never resolved, because that project uploads no source maps.
+What remained was grouping and an issue lifecycle — at fifteen payments a day, a
+luxury — and the notification, which is not. So the gap was costing a whole
+second service, a second secret to rotate, and a publicly-exposed DSN in a
+browser bundle, to deliver one message.
+
+**The three original objections were answered rather than argued past**, and two
+of them by the same clause. "A deploy produces errors" and "a retry storm
+produces thousands and resolves itself" are both answered by requiring two
+consecutive closed hours: both shapes are over inside one hour, so neither fires
+— not because the burst was filtered, but because it stopped. The third, that a
+project logging a handled exception per request has a normal nothing like one
+that does not, was already answered by the design the other rate condition uses:
+a median per project, per hour of the day, with an absolute floor underneath it.
+
+**What is not answered is the floor of ten**, and this decision would rather say
+so than dress it up. Nothing derives it. `Flood`'s thousand is equally a
+judgement, so it is not a new kind of number in this design, but it is the
+weakest part of the fourth condition and it is mitigated rather than solved: it
+only decides anything where the ratio has already passed, and only where the hour
+before it passed too.
+
+**The waiting would have been nearly free, and that is the honest counterweight.**
+The fourteen-day guard means no rate condition can fire in any installation until
+a fortnight of tally exists behind it, so the first two weeks of this cost
+nothing either way. What tipped it was that the second service would have been
+paid for over those two weeks too.
 
 **`docs/operations.md` said that deciding a quiet machine is a problem is
 alerting, and refused it.** That sentence now stands for hosts and no longer for
@@ -79,9 +123,23 @@ got the condition and the machine did not is that a silent project means an
 application stopped, which is the thing a self-hosting operator most wants to be
 told, while a silent collector usually means a collector.
 
-**Adding a condition is a change to this document, deliberately.** The friction
-is the same one ADR 0044 built for the sample schema, and it is what stands
-between three conditions and the first expression box.
+**Adding a condition is a change to this document, deliberately, and the fourth
+one paid the toll.** It cost this decision rewritten, `docs/alerts.md` rewritten,
+a column and a migration, a switch on a screen and a sentence saying what it will
+do. The friction is the same one ADR 0044 built for the sample schema, and it is
+what stands between a named set and the first expression box — the point of it is
+not that a condition can never be added but that adding one is visible, argued
+and paid for.
+
+**Every refusal this decision made survives the fourth condition**, and that is
+the test it had to pass. The set is still closed and still named in the product;
+there is still no threshold to type, no expression, and no alert attached to a
+filter or a saved search. No entry is read — the level is in the envelope at
+ingestion and the tally already holds it, so there is still no path from a
+condition to `log_entry`. The notification still carries numbers and names.
+Nothing is grouped, nothing is fingerprinted, and nothing has a lifecycle. There
+is still no severity and no second notifier: the fourth alert weighs exactly what
+the other three weigh on the way out.
 
 **Every condition runs on the tally and none of them reads an entry.** That
 keeps evaluation off the largest table in the database — one pass over a few

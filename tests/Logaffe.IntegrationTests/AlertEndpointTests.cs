@@ -87,7 +87,7 @@ public sealed class AlertEndpointTests(PostgresFixture postgres) : IAsyncLifetim
     }
 
     [Fact]
-    public async Task An_installation_nobody_has_asked_has_all_three_off_and_nowhere_to_send()
+    public async Task An_installation_nobody_has_asked_has_all_four_off_and_nowhere_to_send()
     {
         using var client = await SignedInAsync();
 
@@ -96,6 +96,7 @@ public sealed class AlertEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         Assert.False(alerts.Switches.FillingUp);
         Assert.False(alerts.Switches.GoneQuiet);
         Assert.False(alerts.Switches.Flooding);
+        Assert.False(alerts.Switches.Failing);
 
         Assert.Null(alerts.Notifier);
 
@@ -115,7 +116,7 @@ public sealed class AlertEndpointTests(PostgresFixture postgres) : IAsyncLifetim
 
         using (var put = await client.PutAsJsonAsync(
             "/alerts/switches",
-            new { fillingUp = false, goneQuiet = true, flooding = true },
+            new { fillingUp = false, goneQuiet = true, flooding = true, failing = true },
             TestContext.Current.CancellationToken))
         {
             Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
@@ -130,6 +131,7 @@ public sealed class AlertEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         Assert.False(alerts.Switches.FillingUp);
         Assert.True(alerts.Switches.GoneQuiet);
         Assert.True(alerts.Switches.Flooding);
+        Assert.True(alerts.Switches.Failing);
     }
 
     [Fact]
@@ -382,7 +384,8 @@ public sealed class AlertEndpointTests(PostgresFixture postgres) : IAsyncLifetim
 
     private sealed record TestNotificationBody(string Proof);
 
-    private sealed record SwitchesBody(bool FillingUp, bool GoneQuiet, bool Flooding);
+    private sealed record SwitchesBody(
+        bool FillingUp, bool GoneQuiet, bool Flooding, bool Failing);
 
     private sealed record StoreBody(
         string Blindness, Guid? HostId, string? HostName, string? Mount, int? Percent);

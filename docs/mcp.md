@@ -455,10 +455,10 @@ surface was absent before.
   installation remembers nothing about what an agent asked before.
 - **No agent-initiated anything.** Nothing is scheduled, watched, or delivered
   without a call, and nothing reaches an agent that an agent did not ask for. The
-  installation does now send something unasked — three conditions, to a push
+  installation does now send something unasked — four conditions, to a push
   notifier ([Alerts](./alerts.md)) — and none of it comes down this interface, is
   written by a model, or is a reason for an agent to be running.
-- **No alerting surface, on either kind of token.** The notifier, the three
+- **No alerting surface, on either kind of token.** The notifier, the four
   switches and a project's mute are absent from the tool list a reading token is
   handed and from the twenty-one an administering one earns. Adding one is a
   change to this document, and it would be a credential that could switch off the

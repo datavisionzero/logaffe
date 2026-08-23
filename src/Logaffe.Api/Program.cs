@@ -210,17 +210,19 @@ builder.Services.AddScoped<FlushTheTally>();
 // whole installation, and the samples a deleted host left behind.
 builder.Services.AddScoped<SweepExpiredSamples>();
 
-// The three conditions of ADR 0050 and the pass that runs them, on the same
+// The four conditions of ADR 0050 and the pass that runs them, on the same
 // hourly timer as the sweeps above and reading the tally those keep. They are
-// three acts rather than one because they are three decisions — what is too
-// full, what is too quiet, what is too much — and one pass because at most one
-// thing is said about a project in an hour.
+// four acts rather than one because they are four decisions — what is too
+// full, what is too quiet, what is too much, and what is too much of it failing
+// for too long — and one pass because at most one thing is said about a project
+// in an hour.
 builder.Services.AddScoped<CheckTheStoreIsFillingUp>();
 builder.Services.AddScoped<CheckAProjectHasGoneQuiet>();
 builder.Services.AddScoped<CheckAProjectIsFlooding>();
+builder.Services.AddScoped<CheckAProjectIsFailing>();
 builder.Services.AddScoped<EvaluateTheConditions>();
 
-// The operator's side of the same feature: the one notifier those three send
+// The operator's side of the same feature: the one notifier those four send
 // through, read back the way a token is (ADR 0022), and the test send that is
 // theirs rather than any condition's. Nothing here is reachable over MCP —
 // neither kind of agent token reaches the notifier (docs/mcp.md).

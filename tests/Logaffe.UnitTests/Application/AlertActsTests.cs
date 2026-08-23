@@ -20,7 +20,7 @@ public sealed class EvaluateTheConditionsTests
         await _scene.RunAsync();
 
         // A project silent for three days, and not a word: the switch is read
-        // before anything else happens, and all three are off until the operator
+        // before anything else happens, and all four are off until the operator
         // turns one on.
         Assert.Empty(_scene.Sent);
         Assert.Equal(0, _scene.States.Writes);
@@ -507,6 +507,252 @@ public sealed class CheckAProjectIsFloodingTests
     /// hour it means rather than one counted from whatever hour the scene starts
     /// at.
     /// </summary>
+    private static DateTimeOffset Midnight(DateTimeOffset moment) =>
+        new(moment.Year, moment.Month, moment.Day, 0, 0, 0, TimeSpan.Zero);
+}
+
+
+/// <summary>
+/// A project failing far more than it does: the ratio on the tally's second
+/// number, the floor of its own, and the second hour that is the whole of what
+/// separates this from a flood.
+/// </summary>
+public sealed class CheckAProjectIsFailingTests
+{
+    private readonly AlertScene _scene = new();
+
+    [Fact]
+    public async Task Two_hours_of_errors_far_above_that_hour_of_the_day_says_so()
+    {
+        var project = _scene.Holding();
+        _scene.SwitchOn(failing: true);
+
+        await Failing(project, closedHour: 500, previousHour: 300);
+
+        await _scene.RunAsync();
+
+        var alert = Assert.IsType<Alert.ProjectFailing>(Assert.Single(_scene.Sent));
+        Assert.Equal(_scene.ClosedHour, alert.Hour);
+        Assert.Equal(500, alert.Errors);
+
+        // The hour before rides along because it is the answer to "why now, and
+        // not an hour ago".
+        Assert.Equal(300, alert.Previous);
+        Assert.Equal(0, alert.Baseline);
+    }
+
+    [Fact]
+    public async Task A_deploys_spike_inside_one_hour_says_nothing()
+    {
+        var project = _scene.Holding();
+        _scene.SwitchOn(failing: true);
+
+        await Failing(project, closedHour: 5_000, previousHour: 0);
+
+        await _scene.RunAsync();
+
+        // Not because the burst was filtered, but because it stopped. This is
+        // the objection the condition was deferred on, answered by the second
+        // hour rather than argued past.
+        Assert.Empty(_scene.Sent);
+    }
+
+    [Fact]
+    public async Task A_storm_that_resolved_itself_says_nothing_either()
+    {
+        var project = _scene.Holding();
+        _scene.SwitchOn(failing: true);
+
+        await Failing(project, closedHour: 0, previousHour: 5_000);
+
+        await _scene.RunAsync();
+
+        Assert.Empty(_scene.Sent);
+    }
+
+    [Fact]
+    public async Task Nine_errors_against_none_stays_under_the_floor()
+    {
+        var project = _scene.Holding();
+        _scene.SwitchOn(failing: true);
+
+        await Failing(project, closedHour: 9, previousHour: 9);
+
+        await _scene.RunAsync();
+
+        // The ratio is infinite and the floor is absolute. A project that fails
+        // nine times in an hour twice over has not had an incident.
+        Assert.Empty(_scene.Sent);
+    }
+
+    [Fact]
+    public async Task A_project_that_logs_a_handled_exception_per_request_has_its_own_normal()
+    {
+        var project = _scene.Holding();
+        _scene.SwitchOn(failing: true);
+
+        // Two hundred errors an hour is what this project is: the median is high
+        // and ten times it is proportionally high.
+        await _scene.DeliveringAsync(
+            project,
+            _scene.ClosedHour - Tallying.Baseline - TimeSpan.FromHours(1),
+            _scene.ClosedHour,
+            _ => 10_000,
+            _ => 200);
+
+        await _scene.RunAsync();
+
+        Assert.Empty(_scene.Sent);
+    }
+
+    [Fact]
+    public async Task The_same_project_failing_ten_times_its_own_normal_says_so()
+    {
+        var project = _scene.Holding();
+        _scene.SwitchOn(failing: true);
+
+        await _scene.DeliveringAsync(
+            project,
+            _scene.ClosedHour - Tallying.Baseline - TimeSpan.FromHours(1),
+            _scene.ClosedHour,
+            _ => 10_000,
+            hour => hour >= _scene.ClosedHour.AddHours(-1) ? 5_000 : 200);
+
+        await _scene.RunAsync();
+
+        var alert = Assert.IsType<Alert.ProjectFailing>(Assert.Single(_scene.Sent));
+        Assert.Equal(200, alert.Baseline);
+    }
+
+    [Fact]
+    public async Task Each_of_the_two_hours_is_judged_against_its_own_hour_of_the_day()
+    {
+        var project = _scene.Holding();
+        _scene.SwitchOn(failing: true);
+
+        // A project that fails five hundred times at one in the afternoon every
+        // day and never at two: the ordinary one o'clock is normal for one
+        // o'clock and abnormal for two.
+        await _scene.DeliveringAsync(
+            project,
+            _scene.ClosedHour.AddDays(-16),
+            _scene.ClosedHour.AddDays(1),
+            _ => 10_000,
+            hour => hour.Hour == 13 ? 500 : 0);
+
+        // Three in the afternoon, so the two hours judged are two o'clock — with
+        // five thousand errors in it — and the ordinary one o'clock before it.
+        var afternoon = Midnight(_scene.ClosedHour.AddDays(1)).AddHours(14);
+        await _scene.DeliveringAsync(project, afternoon, afternoon, _ => 10_000, _ => 5_000);
+
+        _scene.Clock.Now = afternoon.AddHours(1).AddMinutes(5);
+        await _scene.RunAsync();
+
+        // One baseline for both hours would have judged one o'clock's five
+        // hundred against two o'clock's nought and fired on a project doing
+        // exactly what it does every day.
+        Assert.Empty(_scene.Sent);
+    }
+
+    [Fact]
+    public async Task A_project_without_a_fortnight_fires_nothing_however_it_fails()
+    {
+        var project = _scene.Holding();
+        _scene.SwitchOn(failing: true);
+
+        await _scene.DeliveringAsync(
+            project,
+            _scene.ClosedHour.AddDays(-1),
+            _scene.ClosedHour,
+            _ => 10_000,
+            hour => hour >= _scene.ClosedHour.AddHours(-1) ? 5_000 : 0);
+
+        await _scene.RunAsync();
+
+        Assert.Empty(_scene.Sent);
+    }
+
+    [Fact]
+    public async Task A_flood_of_entries_that_are_not_errors_says_nothing_here()
+    {
+        var project = _scene.Holding();
+        _scene.SwitchOn(failing: true);
+
+        // Fifty thousand entries in each of two hours and not one of them at
+        // Error: this condition counts the tally's second number and nothing
+        // else.
+        await _scene.DeliveringAsync(
+            project,
+            _scene.ClosedHour - Tallying.Baseline - TimeSpan.FromHours(1),
+            _scene.ClosedHour,
+            hour => hour >= _scene.ClosedHour.AddHours(-1) ? 50_000 : 10,
+            _ => 0);
+
+        await _scene.RunAsync();
+
+        Assert.Empty(_scene.Sent);
+    }
+
+    [Fact]
+    public async Task Failing_outranks_flooding_when_one_hour_is_both()
+    {
+        var project = _scene.Holding();
+        _scene.SwitchOn(flooding: true, failing: true);
+
+        await _scene.DeliveringAsync(
+            project,
+            _scene.ClosedHour - Tallying.Baseline - TimeSpan.FromHours(1),
+            _scene.ClosedHour,
+            hour => hour >= _scene.ClosedHour.AddHours(-1) ? 50_000 : 10,
+            hour => hour >= _scene.ClosedHour.AddHours(-1) ? 5_000 : 0);
+
+        await _scene.RunAsync();
+
+        // Both hold on this hour, and the operator gets the sentence that names
+        // what is wrong rather than the one that names how much of it there is.
+        Assert.IsType<Alert.ProjectFailing>(Assert.Single(_scene.Sent));
+
+        // The one that lost is not evaluated rather than evaluated and dropped.
+        Assert.Null(await _scene.States.FindAsync(
+            project.Id, AlertCondition.Flooding, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_failure_that_is_still_failing_says_nothing_more()
+    {
+        var project = _scene.Holding();
+        _scene.SwitchOn(failing: true);
+
+        await _scene.DeliveringAsync(
+            project,
+            _scene.ClosedHour - Tallying.Baseline - TimeSpan.FromHours(1),
+            _scene.ClosedHour.AddHours(5),
+            _ => 10_000,
+            hour => hour >= _scene.ClosedHour.AddHours(-1) ? 5_000 : 0);
+
+        await _scene.RunForHoursAsync(5);
+
+        // One event, still happening. The shared guard covers this condition
+        // exactly as it covers the other three.
+        Assert.Single(_scene.Sent);
+    }
+
+    /// <summary>
+    /// A fortnight of a project that never fails, and then the two hours being
+    /// judged, each with the errors it is given.
+    /// </summary>
+    private Task Failing(Project project, long closedHour, long previousHour) =>
+        _scene.DeliveringAsync(
+            project,
+            _scene.ClosedHour - Tallying.Baseline - TimeSpan.FromHours(1),
+            _scene.ClosedHour,
+            _ => 10_000,
+            hour =>
+                hour == _scene.ClosedHour ? closedHour
+                : hour == _scene.ClosedHour.AddHours(-1) ? previousHour
+                : 0);
+
+    /// <inheritdoc cref="CheckAProjectIsFloodingTests"/>
     private static DateTimeOffset Midnight(DateTimeOffset moment) =>
         new(moment.Year, moment.Month, moment.Day, 0, 0, 0, TimeSpan.Zero);
 }

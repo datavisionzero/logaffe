@@ -28,9 +28,12 @@ public sealed class InstallationSettingsConfiguration
             .HasColumnName("sample_retention_days")
             .IsRequired();
 
-        // The three switches, off on every installation that has never been
+        // The four switches, off on every installation that has never been
         // asked — which is what the row not existing says, and what the default
-        // keeps saying once the row exists for another reason.
+        // keeps saying once the row exists for another reason. The fourth
+        // defaults off for a second reason too: an installation upgrading into
+        // it never asked for it, and a condition that switched itself on during
+        // a deploy is the notification nobody consented to.
         builder.Property(s => s.AlertOnFillingUp)
             .HasColumnName("alert_on_filling_up")
             .HasDefaultValue(false)
@@ -43,6 +46,11 @@ public sealed class InstallationSettingsConfiguration
 
         builder.Property(s => s.AlertOnFlooding)
             .HasColumnName("alert_on_flooding")
+            .HasDefaultValue(false)
+            .IsRequired();
+
+        builder.Property(s => s.AlertOnFailing)
+            .HasColumnName("alert_on_failing")
             .HasDefaultValue(false)
             .IsRequired();
 

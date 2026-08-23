@@ -33,7 +33,7 @@ public static class Alerting
     /// The level a condition that either holds or does not fires at.
     /// </summary>
     /// <remarks>
-    /// Two of the three conditions are of that shape, and the store filling up
+    /// Three of the four conditions are of that shape, and the store filling up
     /// is not: it holds at 85 per cent and again, worse, at 95, and the second
     /// is a thing worth saying while the first is still latched
     /// (<see cref="StoreFullness"/>). A level rather than a flag is what lets

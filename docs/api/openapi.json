@@ -2368,7 +2368,7 @@
         "tags": [
           "logaffe"
         ],
-        "summary": "Switches the three conditions on, or off.",
+        "summary": "Switches the four conditions on, or off.",
         "operationId": "ChangeAlertSwitches",
         "requestBody": {
           "content": {
@@ -2528,7 +2528,8 @@
         "enum": [
           "fillingUp",
           "goneQuiet",
-          "flooding"
+          "flooding",
+          "failing"
         ]
       },
       "AlertSettingsResponse": {
@@ -2538,6 +2539,7 @@
           "store",
           "quiet",
           "flood",
+          "failure",
           "fired"
         ],
         "type": "object",
@@ -2564,6 +2566,9 @@
           "flood": {
             "$ref": "#/components/schemas/FloodConditionResponse"
           },
+          "failure": {
+            "$ref": "#/components/schemas/FailureConditionResponse"
+          },
           "fired": {
             "type": "array",
             "items": {
@@ -2576,7 +2581,8 @@
         "required": [
           "fillingUp",
           "goneQuiet",
-          "flooding"
+          "flooding",
+          "failing"
         ],
         "type": "object",
         "properties": {
@@ -2587,6 +2593,9 @@
             "type": "boolean"
           },
           "flooding": {
+            "type": "boolean"
+          },
+          "failing": {
             "type": "boolean"
           }
         }
@@ -2985,6 +2994,49 @@
           },
           "exceptionTruncated": {
             "type": "boolean"
+          }
+        }
+      },
+      "FailureConditionResponse": {
+        "required": [
+          "multiple",
+          "floor",
+          "baselineDays",
+          "consecutiveHours"
+        ],
+        "type": "object",
+        "properties": {
+          "multiple": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "floor": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "baselineDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "consecutiveHours": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },

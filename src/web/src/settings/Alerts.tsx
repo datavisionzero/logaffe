@@ -12,7 +12,7 @@ import { useAlerts } from "./alerting";
  * has stopped delivering, or a project is suddenly writing far more than it does
  * (`docs/alerts.md`).
  *
- * The area is deliberately small furniture: a notifier, three switches, and one
+ * The area is deliberately small furniture: a notifier, four switches, and one
  * checkbox per project that lives on that project's own screen. **There is no
  * notification bell and no alert list**, here or anywhere else in this
  * interface: an alert leaves the installation and reaches a phone, and a copy

@@ -117,16 +117,21 @@ internal sealed class AlertScene
 
     public CheckAProjectIsFlooding Flooding => new(Tallies, States, Clock);
 
+    public CheckAProjectIsFailing Failing => new(Tallies, States, Clock);
+
     public EvaluateTheConditions Pass =>
-        new(Installation, Projects, FillingUp, GoneQuiet, Flooding, Notifier, Clock);
+        new(Installation, Projects, FillingUp, GoneQuiet, Flooding, Failing, Notifier, Clock);
 
     /// <summary>The read the alerts area takes, over the same scene the pass runs on.</summary>
     public ReadTheAlertSettings Settings =>
         new(Installation, Projects, Hosts, Tallies, States, FillingUp, Clock);
 
     public void SwitchOn(
-        bool fillingUp = false, bool goneQuiet = false, bool flooding = false) =>
-        Installation.Switches = new AlertSwitches(fillingUp, goneQuiet, flooding);
+        bool fillingUp = false,
+        bool goneQuiet = false,
+        bool flooding = false,
+        bool failing = false) =>
+        Installation.Switches = new AlertSwitches(fillingUp, goneQuiet, flooding, failing);
 
     /// <summary>A project that has been there a good while.</summary>
     public Project Holding(string name = "api") =>
@@ -156,11 +161,16 @@ internal sealed class AlertScene
     /// nought leaving no row at all — which is how the tally says nothing
     /// arrived.
     /// </summary>
+    /// <param name="errors">
+    /// How many of that hour's entries were at <c>Error</c> or above, which is
+    /// nought unless a test about the fourth condition says otherwise.
+    /// </param>
     public async Task DeliveringAsync(
         Project project,
         DateTimeOffset from,
         DateTimeOffset until,
-        Func<DateTimeOffset, long> entries)
+        Func<DateTimeOffset, long> entries,
+        Func<DateTimeOffset, long>? errors = null)
     {
         var increments = new List<TallyIncrement>();
 
@@ -174,7 +184,7 @@ internal sealed class AlertScene
                     ProjectId = project.Id,
                     Hour = hour,
                     Entries = count,
-                    AtErrorOrAbove = 0,
+                    AtErrorOrAbove = errors?.Invoke(hour) ?? 0,
                 });
             }
         }
@@ -183,9 +193,19 @@ internal sealed class AlertScene
     }
 
     /// <summary>A fortnight of history behind the hour being evaluated.</summary>
+    /// <remarks>
+    /// It reaches an hour further back than the baseline, because the condition
+    /// that judges two consecutive hours asks for a fortnight behind the earlier
+    /// of them.
+    /// </remarks>
     public Task DeliveringEveryHourAsync(
-        Project project, DateTimeOffset until, long entries = 10) =>
-        DeliveringAsync(project, ClosedHour - Tallying.Baseline, until, _ => entries);
+        Project project, DateTimeOffset until, long entries = 10, long errors = 0) =>
+        DeliveringAsync(
+            project,
+            ClosedHour - Tallying.Baseline - TimeSpan.FromHours(1),
+            until,
+            _ => entries,
+            _ => errors);
 
     /// <summary>One hourly pass.</summary>
     public Task RunAsync() => Pass.ExecuteAsync(TestContext.Current.CancellationToken);

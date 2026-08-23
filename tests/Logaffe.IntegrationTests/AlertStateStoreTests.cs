@@ -114,7 +114,8 @@ public sealed class AlertStateStoreTests(PostgresFixture postgres)
         var installation = new Installation(context);
 
         await installation.RecordAlertSwitchesAsync(
-            new AlertSwitches(FillingUp: true, GoneQuiet: false, Flooding: true),
+            new AlertSwitches(
+                FillingUp: true, GoneQuiet: false, Flooding: true, Failing: true),
             TestContext.Current.CancellationToken);
 
         await using var restarted = await ContextAsync(context);
@@ -125,6 +126,7 @@ public sealed class AlertStateStoreTests(PostgresFixture postgres)
         Assert.True(switches.FillingUp);
         Assert.False(switches.GoneQuiet);
         Assert.True(switches.Flooding);
+        Assert.True(switches.Failing);
 
         // The one row, still: switching a condition on does not write a second
         // settings row and does not disturb the window beside it.

@@ -33,10 +33,10 @@ public sealed class InstallationSettings
     /// operator switches it on (<c>docs/alerts.md</c>).
     /// </summary>
     /// <remarks>
-    /// Three columns rather than one set of flags, because they are three
-    /// switches on a screen and the set is closed: a fourth is a change to
-    /// ADR 0050 and a migration, which is the friction that decision was built
-    /// with.
+    /// One column each rather than one set of flags, because they are switches
+    /// on a screen and the set is closed: another is a change to ADR 0050 and a
+    /// migration, which is the friction that decision was built with and which
+    /// the fourth one duly paid.
     /// </remarks>
     public bool AlertOnFillingUp { get; set; }
 
@@ -45,6 +45,13 @@ public sealed class InstallationSettings
 
     /// <summary>Whether a project flooding is watched for.</summary>
     public bool AlertOnFlooding { get; set; }
+
+    /// <summary>
+    /// Whether a project failing far more than it does is watched for, which is
+    /// the fourth condition and off on every installation that had the first
+    /// three.
+    /// </summary>
+    public bool AlertOnFailing { get; set; }
 
     /// <summary>
     /// The machine logaffe is itself on, or <c>null</c> for an installation that

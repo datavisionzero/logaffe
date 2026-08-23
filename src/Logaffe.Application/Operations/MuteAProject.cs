@@ -23,7 +23,7 @@ public enum MuteAProjectOutcome
 /// It is the project's own setting rather than the installation's, beside the
 /// group and the host, because it is a fact about that project and about nothing
 /// else (<c>docs/alerts.md</c>). The switches stay where they are: what is
-/// adjustable about alerting is three switches and this one checkbox, and there
+/// adjustable about alerting is four switches and this one checkbox, and there
 /// is nothing here that takes a threshold or a condition.
 /// </para>
 /// <para>

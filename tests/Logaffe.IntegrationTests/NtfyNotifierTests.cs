@@ -70,6 +70,39 @@ public sealed class NtfyNotifierTests
     }
 
     [Fact]
+    public async Task A_failure_says_both_hours_and_what_is_usual()
+    {
+        await Notifier().SendAsync(
+            new Alert.ProjectFailing(
+                Project,
+                "shop / api",
+                new DateTimeOffset(2026, 8, 22, 3, 0, 0, TimeSpan.Zero),
+                4_000,
+                2_500,
+                2),
+            TestContext.Current.CancellationToken);
+
+        var published = Assert.Single(_ntfy.Taken).Published;
+
+        Assert.Equal("logaffe: shop / api is failing", published.GetProperty("title").GetString());
+
+        // The hour before rides along because it is the answer to the question
+        // the alert provokes — why now, and not an hour ago.
+        Assert.Equal(
+            "4000 entries at Error or above in the hour from 2026-08-22 03:00 UTC, "
+            + "after 2500 in the hour before it, against a usual 2.",
+            published.GetProperty("message").GetString());
+
+        // Nothing an entry said, on any of the four: what a notification carries
+        // is names and numbers (ADR 0049).
+        Assert.Equal(
+            $"https://logs.example.com/project/{Project}"
+            + "?from=2026-08-22T03%3A00%3A00Z&until=2026-08-22T04%3A00%3A00Z"
+            + "&minimumLevel=Error",
+            published.GetProperty("click").GetString());
+    }
+
+    [Fact]
     public async Task A_filling_store_says_the_figure_and_the_threshold()
     {
         await Notifier().SendAsync(

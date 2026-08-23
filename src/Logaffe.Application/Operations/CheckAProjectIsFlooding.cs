@@ -35,7 +35,7 @@ public sealed class CheckAProjectIsFlooding(
     public async Task<Alert?> ExecuteAsync(
         Project project, DateTimeOffset closedHour, CancellationToken cancellationToken)
     {
-        var from = closedHour.AddDays(-Flood.Days);
+        var from = closedHour.AddDays(-Baseline.Days);
 
         var oldest = await tallies.OldestHourAsync(project.Id, cancellationToken);
         if (oldest is null || oldest.Value > from)
@@ -52,10 +52,10 @@ public sealed class CheckAProjectIsFlooding(
         var byHour = counted.ToDictionary(row => row.Hour, row => row.Entries);
 
         var entries = byHour.GetValueOrDefault(closedHour);
-        var baseline = Flood.Baseline(
+        var baseline = Baseline.Of(
         [
             .. Enumerable
-                .Range(1, Flood.Days)
+                .Range(1, Baseline.Days)
                 .Select(day => byHour.GetValueOrDefault(closedHour.AddDays(-day))),
         ]);
 

@@ -41,10 +41,12 @@ above, per project, per hour. Not per logger name, not per instance, not per
 level, not per host — each of those is the labelled series
 [ADR 0044](./0044-a-sample-has-a-closed-schema.md) rejected for samples, arriving by
 the back door on the one table whose cardinality is highest. The second number
-is in because it is the one the deferred fourth alert condition of
-[ADR 0050](./0050-the-alert-conditions-are-a-closed-set.md) will need and because it
-costs a single comparison at flush time; adding a third is a change to this
-document and a migration, deliberately.
+was put in for the fourth alert condition of
+[ADR 0050](./0050-the-alert-conditions-are-a-closed-set.md), which that decision was
+deferring at the time and has since taken, and because it costs a single
+comparison at flush time; adding a third is a change to this document and a
+migration, deliberately. **That the condition arrived needing nothing new here is
+what this decision was for.**
 
 **It outlives the entries it counts.** Tally rows are kept for **400 days**
 regardless of any project's retention window, so a project keeping entries for a

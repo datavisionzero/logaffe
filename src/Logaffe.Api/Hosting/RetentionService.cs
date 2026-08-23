@@ -3,7 +3,7 @@ using Logaffe.Application.Operations;
 namespace Logaffe.Api.Hosting;
 
 /// <summary>
-/// The hourly pass: what the three conditions of ADR 0050 make of the hour that
+/// The hourly pass: what the four conditions of ADR 0050 make of the hour that
 /// has just closed, then the entries that have outlived their project's window
 /// and the samples and tally hours that have outlived the installation's.
 /// </summary>

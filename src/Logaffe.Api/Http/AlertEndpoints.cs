@@ -8,15 +8,16 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace Logaffe.Api.Http;
 
 /// <summary>
-/// Which of the three conditions this installation is switched on for.
+/// Which of the four conditions this installation is switched on for.
 /// </summary>
 /// <remarks>
-/// All three every time, because they are one setting with three parts. There is
+/// All four every time, because they are one setting with four parts. There is
 /// no threshold beside any of them and no per-project variation of one: what the
-/// operator adjusts is these three switches and the mute on a project
+/// operator adjusts is these four switches and the mute on a project
 /// (<c>docs/alerts.md</c>).
 /// </remarks>
-public sealed record AlertSwitchesRequest(bool FillingUp, bool GoneQuiet, bool Flooding);
+public sealed record AlertSwitchesRequest(
+    bool FillingUp, bool GoneQuiet, bool Flooding, bool Failing);
 
 /// <summary>
 /// The machine logaffe itself runs on, and the mount holding its database.
@@ -106,7 +107,7 @@ public sealed record ToleratedSilenceResponse(Guid ProjectId, string Name, int T
 /// </param>
 /// <param name="Quietest">The project noticed latest.</param>
 /// <param name="WithoutAFortnight">
-/// How many projects have too little history to fire either rate condition,
+/// How many projects have too little history to fire any rate condition,
 /// however they behave.
 /// </param>
 public sealed record QuietConditionResponse(
@@ -124,6 +125,19 @@ public sealed record QuietConditionResponse(
 /// </summary>
 public sealed record FloodConditionResponse(int Multiple, long Floor, int BaselineDays);
 
+/// <summary>
+/// The condition about a project failing, which has no installation-specific
+/// number either: what it compares against is the project's own median of
+/// entries at <c>Error</c> or above for that hour of the day.
+/// </summary>
+/// <param name="ConsecutiveHours">
+/// How many closed hours in a row have to hold before anything is said, which is
+/// the whole of what separates this from the flood condition and is what buys
+/// the latency the screen states.
+/// </param>
+public sealed record FailureConditionResponse(
+    int Multiple, long Floor, int BaselineDays, int ConsecutiveHours);
+
 /// <summary>When one condition last fired about one subject.</summary>
 /// <remarks>
 /// It is the only history there is. There is no alert list, nothing to
@@ -140,6 +154,7 @@ public sealed record AlertSettingsResponse(
     StoreConditionResponse Store,
     QuietConditionResponse Quiet,
     FloodConditionResponse Flood,
+    FailureConditionResponse Failure,
     IEnumerable<LastFiredResponse> Fired);
 
 /// <summary>
@@ -201,13 +216,17 @@ public static class AlertEndpoints
                 // operator could not decide what to watch before deciding where
                 // to be told about it.
                 await switches.ExecuteAsync(
-                    new AlertSwitches(request.FillingUp, request.GoneQuiet, request.Flooding),
+                    new AlertSwitches(
+                        request.FillingUp,
+                        request.GoneQuiet,
+                        request.Flooding,
+                        request.Failing),
                     cancellationToken);
 
                 return Results.NoContent();
             })
             .WithName("ChangeAlertSwitches")
-            .WithSummary("Switches the three conditions on, or off.")
+            .WithSummary("Switches the four conditions on, or off.")
             .Produces(StatusCodes.Status204NoContent);
 
         operatorSurface.MapPut("/host", async (
@@ -324,7 +343,8 @@ public static class AlertEndpoints
             new AlertSwitchesRequest(
                 settings.Switches.FillingUp,
                 settings.Switches.GoneQuiet,
-                settings.Switches.Flooding),
+                settings.Switches.Flooding,
+                settings.Switches.Failing),
             Shown(settings.Host, settings.Store),
             new QuietConditionResponse(
                 Shown(settings.Quiet.Busiest),
@@ -332,8 +352,10 @@ public static class AlertEndpoints
                 settings.Quiet.WithoutAFortnight,
                 Quiet.Multiple,
                 Quiet.LeastTolerated,
-                Tallying.Baseline.Days),
-            new FloodConditionResponse(Flood.Multiple, Flood.Floor, Tallying.Baseline.Days),
+                Baseline.Days),
+            new FloodConditionResponse(Flood.Multiple, Flood.Floor, Baseline.Days),
+            new FailureConditionResponse(
+                Failure.Multiple, Failure.Floor, Baseline.Days, Failure.ConsecutiveHours),
             settings.Fired.Select(fired => new LastFiredResponse(
                 fired.SubjectId, fired.Subject, fired.Condition, fired.At)));
 

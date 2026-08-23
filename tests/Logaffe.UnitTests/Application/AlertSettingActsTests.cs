@@ -28,17 +28,19 @@ public sealed class AlertSettingActsTests
         var switches = new ChangeTheAlertSwitches(_scene.Installation);
 
         await switches.ExecuteAsync(
-            new AlertSwitches(FillingUp: true, GoneQuiet: false, Flooding: true),
+            new AlertSwitches(
+                FillingUp: true, GoneQuiet: false, Flooding: true, Failing: true),
             TestContext.Current.CancellationToken);
 
         var read = await switches.ReadAsync(TestContext.Current.CancellationToken);
 
-        // All three every time: the one left off is written as off rather than
+        // All four every time: the one left off is written as off rather than
         // left as whatever it was, because a screen that saved them separately
-        // would have three ways to be half-applied.
+        // would have four ways to be half-applied.
         Assert.True(read.FillingUp);
         Assert.False(read.GoneQuiet);
         Assert.True(read.Flooding);
+        Assert.True(read.Failing);
     }
 
     [Fact]
