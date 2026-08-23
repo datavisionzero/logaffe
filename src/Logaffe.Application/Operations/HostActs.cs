@@ -154,3 +154,36 @@ public sealed class DeleteHost(IHosts hosts)
         return true;
     }
 }
+
+/// <summary>
+/// The filesystems one machine last reported on, which is what the operator
+/// picks the installation's own mount out of.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The mounts a host reports are named in its collector's configuration
+/// (<c>docs/deployment.md</c>), so the newest sample already knows which strings
+/// are real ones and there is nothing here for the operator to type. It is the
+/// shape a filter's values have and it is the same argument (ADR 0029): a list
+/// the operator maintains alongside the thing it describes is a list that goes
+/// wrong.
+/// </para>
+/// <para>
+/// <b>An empty answer is an ordinary one.</b> A machine that has never reported,
+/// one whose collector was told to watch nothing, and a host deleted from
+/// another browser all come back the same way, because the choice in front of
+/// the operator is the same in each case: there is nothing to pick.
+/// </para>
+/// </remarks>
+public sealed class ListTheMountsAHostReports(ISampleReader samples)
+{
+    public async Task<IReadOnlyList<MountPath>> ExecuteAsync(
+        Guid hostId, CancellationToken cancellationToken)
+    {
+        var reports = await samples.NewestReportsAsync([hostId], cancellationToken);
+
+        return reports.FirstOrDefault(report => report.HostId == hostId) is { } newest
+            ? [.. newest.Filesystems.Select(filesystem => filesystem.MountPath)]
+            : [];
+    }
+}

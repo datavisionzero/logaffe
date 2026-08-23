@@ -52,11 +52,28 @@ public sealed record ProjectGroupRequest(Guid? GroupId);
 /// </summary>
 public sealed record ProjectHostRequest(Guid? HostId);
 
+/// <summary>
+/// Whether this project's alert conditions are evaluated.
+/// </summary>
+/// <remarks>
+/// One flag rather than a mute per condition. The project a batch job writes
+/// into at three in the morning is the project whose silence at four is not an
+/// incident either, so the two conditions are muted by the same fact — and a
+/// mute per condition is the beginning of the per-project configuration ADR 0050
+/// exists to refuse.
+/// </remarks>
+public sealed record ProjectMuteRequest(bool Muted);
+
 /// <summary>One project, by itself.</summary>
 /// <param name="HostId">
 /// The machine it runs on, or <c>null</c> for none — which is every project
 /// until the operator says otherwise, and which costs nothing except that there
 /// is no band to draw over its entries.
+/// </param>
+/// <param name="Muted">
+/// Whether the alert conditions are evaluated for this project at all. It is
+/// beside the group and the host because it is a fact about this project and
+/// about nothing else (<c>docs/alerts.md</c>).
 /// </param>
 public sealed record ProjectResponse(
     Guid Id,
@@ -64,7 +81,8 @@ public sealed record ProjectResponse(
     Guid? GroupId,
     Guid? HostId,
     int RetentionDays,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    bool Muted);
 
 /// <summary>
 /// One project on the list a session starts at.
@@ -89,6 +107,7 @@ public sealed record ProjectResponse(
 /// host's name is on the host list for the group's reason, and this is what says
 /// whether there is a band to draw above this project's entries.
 /// </param>
+/// <inheritdoc cref="ProjectResponse" path="/param[@name='Muted']"/>
 public sealed record ListedProjectResponse(
     Guid Id,
     string Name,
@@ -97,7 +116,8 @@ public sealed record ListedProjectResponse(
     int RetentionDays,
     DateTimeOffset CreatedAt,
     int IngestTokens,
-    DateTimeOffset? LastReceivedAt);
+    DateTimeOffset? LastReceivedAt,
+    bool Muted);
 
 /// <summary>
 /// The operator's project acts, reached over HTTP.
@@ -195,7 +215,8 @@ public static class ProjectEndpoints
                     project.Retention.Days,
                     project.CreatedAt,
                     project.IngestTokens,
-                    project.LastReceivedAt)));
+                    project.LastReceivedAt,
+                    project.Muted)));
             })
             .WithName("ListProjects")
             .WithSummary("Every project the installation holds.")
@@ -287,6 +308,30 @@ public static class ProjectEndpoints
                 })
             .WithName("PutProjectOnHost")
             .WithSummary("Says which machine a project runs on, or that none is tracked.")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+
+        operatorSurface.MapPut("/{id:guid}/muted", async (
+                Guid id,
+                ProjectMuteRequest request,
+                MuteAProject mute,
+                CancellationToken cancellationToken) =>
+                // It changes what is evaluated and nothing else. What a muted
+                // project receives, keeps and answers is exactly what it was:
+                // the tally is still written and the sweep still runs, and the
+                // hourly pass simply does not ask about it.
+                //
+                // There is no route beside this one for a single condition. The
+                // switch and the mute are the whole of what is adjustable about
+                // alerting (ADR 0050), and a mute per condition would be the
+                // beginning of what that decision refuses.
+                await mute.ExecuteAsync(id, request.Muted, cancellationToken) switch
+                {
+                    MuteAProjectOutcome.Muted => Results.NoContent(),
+                    _ => Results.NotFound(),
+                })
+            .WithName("MuteAProject")
+            .WithSummary("Takes a project out of the alert conditions, or puts it back in.")
             .Produces(StatusCodes.Status204NoContent)
             .Produces(StatusCodes.Status404NotFound);
 
@@ -397,7 +442,8 @@ public static class ProjectEndpoints
         project.GroupId,
         project.HostId,
         project.Retention.Days,
-        project.CreatedAt);
+        project.CreatedAt,
+        project.Muted);
 
     /// <summary>
     /// The domain refuses a name that is not one as a backstop; a caller taking

@@ -34,6 +34,23 @@ public sealed class NotifierTests
     public void What_is_not_a_topic_is_refused(string? topic) =>
         Assert.False(Notifier.TryCreate("https://ntfy.sh", topic, null, out _));
 
+    /// <summary>
+    /// The two halves are asked separately as well as together, because a screen
+    /// taking them from a person names the box that is wrong and "one of these
+    /// two is not right" is not that.
+    /// </summary>
+    [Fact]
+    public void The_two_halves_are_asked_one_at_a_time()
+    {
+        Assert.True(Notifier.IsServer("https://ntfy.sh"));
+        Assert.False(Notifier.IsServer("ntfy.sh"));
+
+        Assert.True(Notifier.IsTopic("logaffe-alerts_1"));
+        Assert.False(Notifier.IsTopic("logaffe/alerts"));
+        Assert.False(Notifier.IsTopic(null));
+        Assert.False(Notifier.IsTopic(new string('t', Notifier.TopicMaxLength + 1)));
+    }
+
     [Fact]
     public void A_topic_longer_than_ntfy_takes_is_refused() =>
         Assert.False(Notifier.TryCreate(

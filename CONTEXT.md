@@ -374,3 +374,11 @@ Where an **Alert** is delivered: one ntfy target, set once for the installation.
 There is one, it is the operator's own or a public server they chose, and a
 second kind of destination is not a setting the product has.
 _Avoid_: Channel, integration, webhook, destination, sink, provider, route
+
+**Mute**:
+A **Project** taken out of the **Alert Conditions**: while it is muted its
+conditions are not evaluated at all, rather than evaluated and kept quiet. It is
+one flag on the project and not one per condition, it is set beside the project's
+group and host, and it changes nothing about what the project receives, keeps or
+answers.
+_Avoid_: Snooze, silence, disable, pause, ignore, exclude, suppress

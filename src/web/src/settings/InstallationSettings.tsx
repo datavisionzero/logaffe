@@ -1,5 +1,6 @@
 import { useParams } from "react-router";
 import { AgentTokens } from "./AgentTokens";
+import { Alerts } from "./Alerts";
 import { BackupCodes } from "./BackupCodes";
 import { ChangePassword } from "./ChangePassword";
 import { Groups } from "./Groups";
@@ -18,13 +19,19 @@ import { SettingsScreen } from "./SettingsScreen";
  * recovery, no export and no backup button, because those are verbs on the
  * binary and are never reachable over the network (ADR 0013).
  *
- * What is left is the five things that are the installation's rather than a
- * project's, and they are five areas because that is what they are: the browsers
+ * What is left is the six things that are the installation's rather than a
+ * project's, and they are six areas because that is what they are: the browsers
  * signed in, the tokens agents connect with, the operator's own credentials, the
- * groups the projects are listed under, and the machines they run on. Four of
- * them are lists of what exists and the credentials are three acts on one
- * account, which is why those stay together on one area rather than becoming
- * three.
+ * groups the projects are listed under, the machines they run on, and what this
+ * installation says unasked. Four of them are lists of what exists and the
+ * credentials are three acts on one account, which is why those stay together on
+ * one area rather than becoming three.
+ *
+ * **The alerts area is the last of them and the smallest**: a notifier, three
+ * switches and what each of them currently works out to. It is not a
+ * notification bell and it is not an alert list — an alert leaves the
+ * installation and reaches a phone, so there is nothing here to mark as read
+ * (`docs/ui.md`).
  *
  * The groups and the hosts are here for the same reason the agent tokens are: a
  * group is a fact about the projects taken together and so is a host, and no
@@ -73,6 +80,7 @@ export function InstallationSettings() {
         },
         { at: "groups", name: "Groups", panel: <Groups /> },
         { at: "hosts", name: "Hosts", panel: <Hosts hostId={hostId} /> },
+        { at: "alerts", name: "Alerts", panel: <Alerts /> },
       ]}
     />
   );

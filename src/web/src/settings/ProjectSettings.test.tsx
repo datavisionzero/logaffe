@@ -473,3 +473,39 @@ describe("the machine a project runs on", () => {
     expect(screen.queryByLabelText("Host")).toBeNull();
   });
 });
+
+describe("the mute", () => {
+  it("takes this project out of the conditions, and puts it back in", async () => {
+    const installation = open({
+      "PUT /projects/p1/muted": { status: 204 },
+      "GET /projects": [
+        { body: [aProject({ id: "p1", name: "checkout" })] },
+        { body: [aProject({ id: "p1", name: "checkout", muted: true })] },
+      ],
+    });
+
+    const box = await screen.findByLabelText("Do not evaluate this project's conditions");
+
+    // Every project is evaluated until the operator says otherwise.
+    expect(box).not.toBeChecked();
+
+    await userEvent.click(box);
+
+    await waitFor(() =>
+      expect(installation.sentTo("PUT /projects/p1/muted")).toEqual([{ muted: true }]),
+    );
+
+    await waitFor(() => expect(box).toBeChecked());
+  });
+
+  // One flag rather than a mute per condition: the switch and this checkbox are
+  // the whole of what is adjustable about alerting (ADR 0050).
+  it("offers one checkbox and no per-condition anything", async () => {
+    open({});
+
+    await screen.findByLabelText("Do not evaluate this project's conditions");
+
+    expect(screen.queryByLabelText(/gone quiet/i)).toBeNull();
+    expect(screen.queryByLabelText(/flooding/i)).toBeNull();
+  });
+});

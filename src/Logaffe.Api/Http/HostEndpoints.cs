@@ -308,6 +308,28 @@ public static class HostEndpoints
             .Produces<SampleWindowResponse>()
             .Produces<ReadExpiredResponse>(StatusCodes.Status408RequestTimeout)
             .Produces(StatusCodes.Status404NotFound);
+
+        hosts.MapGet("/{id:guid}/mounts", async (
+                Guid id,
+                ListTheMountsAHostReports mounts,
+                CancellationToken cancellationToken) =>
+            {
+                // What the operator picks the installation's own mount out of
+                // (`docs/alerts.md`). It is the newest sample's filesystems
+                // rather than a list anybody maintains, which is the shape a
+                // filter's values have and is the same argument (ADR 0029).
+                //
+                // An empty answer is an ordinary one and not a 404: a machine
+                // that has never reported and one whose collector was told to
+                // watch nothing put the same choice in front of the operator,
+                // which is none.
+                var reported = await mounts.ExecuteAsync(id, cancellationToken);
+
+                return Results.Ok(reported.Select(mount => mount.Value));
+            })
+            .WithName("ListHostMounts")
+            .WithSummary("The filesystems one machine last reported on.")
+            .Produces<IEnumerable<string>>();
     }
 
     private static void MapSampleRetention(this IEndpointRouteBuilder endpoints)

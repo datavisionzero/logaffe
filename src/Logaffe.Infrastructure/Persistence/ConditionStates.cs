@@ -24,6 +24,20 @@ public sealed class ConditionStates(LogaffeDbContext context) : IConditionStates
             state => state.SubjectId == subjectId && state.Condition == condition,
             cancellationToken);
 
+    /// <remarks>
+    /// The one read here that is not tracked, and the one that is not the pass:
+    /// the alerts screen is showing what it holds rather than about to write it
+    /// back, and a change tracker full of rows nothing will alter is a cost with
+    /// nothing on the other side of it.
+    /// </remarks>
+    public async Task<IReadOnlyList<ConditionState>> ListFiredAsync(
+        CancellationToken cancellationToken) =>
+        await context.ConditionStates
+            .AsNoTracking()
+            .Where(state => state.NotifiedAt != null)
+            .OrderByDescending(state => state.NotifiedAt)
+            .ToListAsync(cancellationToken);
+
     public Task RecordAsync(ConditionState state, CancellationToken cancellationToken)
     {
         if (context.Entry(state).State is EntityState.Detached)

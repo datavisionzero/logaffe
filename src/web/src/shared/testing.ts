@@ -108,6 +108,7 @@ export function aProject(project: {
   createdAt?: string;
   ingestTokens?: number;
   lastReceivedAt?: string | null;
+  muted?: boolean;
 }) {
   return {
     id: project.id,
@@ -118,6 +119,7 @@ export function aProject(project: {
     createdAt: project.createdAt ?? "2026-08-01T09:00:00.000Z",
     ingestTokens: project.ingestTokens ?? 1,
     lastReceivedAt: project.lastReceivedAt ?? null,
+    muted: project.muted ?? false,
   };
 }
 

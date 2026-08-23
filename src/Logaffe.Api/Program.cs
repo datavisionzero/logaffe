@@ -169,6 +169,7 @@ builder.Services.AddScoped<RenameHost>();
 builder.Services.AddScoped<DeleteHost>();
 builder.Services.AddScoped<PutProjectOnHost>();
 builder.Services.AddScoped<ChangeSampleRetention>();
+builder.Services.AddScoped<ListTheMountsAHostReports>();
 
 // The read the ingestion path exists for, and the one surface both consumers
 // meet: the MCP tools call exactly these and add no query behaviour of
@@ -226,6 +227,10 @@ builder.Services.AddScoped<EvaluateTheConditions>();
 builder.Services.AddScoped<ChangeTheNotifier>();
 builder.Services.AddScoped<ReadTheNotifier>();
 builder.Services.AddScoped<SendATestNotification>();
+builder.Services.AddScoped<ChangeTheAlertSwitches>();
+builder.Services.AddScoped<NameTheInstallationHost>();
+builder.Services.AddScoped<ReadTheAlertSettings>();
+builder.Services.AddScoped<MuteAProject>();
 
 // The token acts. The ingest and host ones are reachable from HTTP, from the
 // command line and from an administering agent's tools; the agent token's are
@@ -325,6 +330,7 @@ app.MapGroups();
 app.MapEntries();
 app.MapHosts();
 app.MapTokens();
+app.MapAlerts();
 app.MapIngest();
 app.MapSamples();
 app.MapAgentTools();

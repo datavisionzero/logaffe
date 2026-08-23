@@ -26,6 +26,15 @@ internal sealed class InMemoryConditionStates : IConditionStates
         Guid subjectId, AlertCondition condition, CancellationToken cancellationToken) =>
         Task.FromResult(_rows.GetValueOrDefault((subjectId, condition)));
 
+    public Task<IReadOnlyList<ConditionState>> ListFiredAsync(
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ConditionState>>(
+        [
+            .. _rows.Values
+                .Where(state => state.NotifiedAt is not null)
+                .OrderByDescending(state => state.NotifiedAt),
+        ]);
+
     public Task RecordAsync(ConditionState state, CancellationToken cancellationToken)
     {
         _rows[(state.SubjectId, state.Condition)] = state;
@@ -110,6 +119,10 @@ internal sealed class AlertScene
 
     public EvaluateTheConditions Pass =>
         new(Installation, Projects, FillingUp, GoneQuiet, Flooding, Notifier, Clock);
+
+    /// <summary>The read the alerts area takes, over the same scene the pass runs on.</summary>
+    public ReadTheAlertSettings Settings =>
+        new(Installation, Projects, Hosts, Tallies, States, FillingUp, Clock);
 
     public void SwitchOn(
         bool fillingUp = false, bool goneQuiet = false, bool flooding = false) =>

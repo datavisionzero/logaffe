@@ -41,6 +41,12 @@ export interface HeldProject {
   ingestTokens: number;
   /** When it last received an entry, and `null` when it never has. */
   lastReceivedAt: Date | null;
+  /**
+   * Whether this project's alert conditions are evaluated at all
+   * (`docs/alerts.md`). It rides on the list because the checkbox that sets it
+   * reads the project off it, exactly as the group and the host do.
+   */
+  muted: boolean;
 }
 
 export type ProjectsState =
@@ -184,6 +190,7 @@ function held(project: {
   createdAt: string;
   ingestTokens: number | string;
   lastReceivedAt: null | string;
+  muted: boolean;
 }): HeldProject {
   return {
     id: project.id,
@@ -194,5 +201,6 @@ function held(project: {
     createdAt: asInstant(project.createdAt),
     ingestTokens: asNumber(project.ingestTokens),
     lastReceivedAt: project.lastReceivedAt === null ? null : asInstant(project.lastReceivedAt),
+    muted: project.muted,
   };
 }

@@ -84,15 +84,31 @@ public sealed record Notifier
         notifier = null!;
 
         var trimmed = topic?.Trim();
-        if (trimmed is not { Length: > 0 and <= TopicMaxLength }
-            || !IsTopic(trimmed)
-            || !TryServer(server, out var address))
+        if (!IsTopic(trimmed) || !TryServer(server, out var address))
         {
             return false;
         }
 
-        notifier = new Notifier(address, trimmed, encryptedAccessToken);
+        notifier = new Notifier(address, trimmed!, encryptedAccessToken);
         return true;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="value"/> is an address a notifier can sit at.
+    /// </summary>
+    /// <remarks>
+    /// The two halves are asked separately as well as together, because a screen
+    /// taking them from a person names the box that is wrong
+    /// (<c>docs/setup.md</c>) and "one of these two is not right" is not that.
+    /// </remarks>
+    public static bool IsServer(string? value) => TryServer(value, out _);
+
+    /// <inheritdoc cref="IsServer"/>
+    public static bool IsTopic(string? value)
+    {
+        var trimmed = value?.Trim();
+
+        return trimmed is { Length: > 0 and <= TopicMaxLength } && IsWrittenAsATopic(trimmed);
     }
 
     /// <summary>
@@ -130,7 +146,7 @@ public sealed record Notifier
         return true;
     }
 
-    private static bool IsTopic(string value)
+    private static bool IsWrittenAsATopic(string value)
     {
         foreach (var character in value)
         {

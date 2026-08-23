@@ -39,6 +39,26 @@ public interface IConditionStates
         Guid subjectId, AlertCondition condition, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Every subject and condition that has ever fired, newest first, and
+    /// nothing about the ones that have not.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>It is the only history alerting has</b>, and it is one row per subject
+    /// per condition rather than a list of what was sent: what it answers is
+    /// "when did this last fire", which is what makes "is this thing working?"
+    /// answerable without waiting for an incident (<c>docs/alerts.md</c>).
+    /// </para>
+    /// <para>
+    /// Rows that have never fired are left out here rather than handed over with
+    /// nothing in them. They exist because a condition cleared before it ever
+    /// fired, which is the ordinary shape of an installation nothing has gone
+    /// wrong on, and a screen has nothing to say about one.
+    /// </para>
+    /// </remarks>
+    Task<IReadOnlyList<ConditionState>> ListFiredAsync(CancellationToken cancellationToken);
+
+    /// <summary>
     /// Writes the state back, whether it is a row already there or the first
     /// thing this subject has ever had said about it.
     /// </summary>

@@ -9,7 +9,9 @@ rather than retrofitting it, and this is what a project actually is.
 
 A **name**, a **retention window**, and its **ingest token**. Nothing else — the
 group it may sit in belongs to the group rather than to it, and so does the host
-it may sit on.
+it may sit on. The one flag it carries is its **mute**, which says that its alert
+conditions are not evaluated and changes nothing about what the project receives,
+keeps or answers ([Alerts](./alerts.md)).
 
 The name is unique **within its group** and can be changed at any time. Two
 projects called `api` is a trap for the operator who reaches for one of them at

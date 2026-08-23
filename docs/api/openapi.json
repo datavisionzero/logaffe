@@ -753,6 +753,44 @@
         }
       }
     },
+    "/projects/{id}/muted": {
+      "put": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Takes a project out of the alert conditions, or puts it back in.",
+        "operationId": "MuteAProject",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectMuteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/projects/{id}/retention/outside": {
       "get": {
         "tags": [
@@ -1678,6 +1716,41 @@
         }
       }
     },
+    "/hosts/{id}/mounts": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "The filesystems one machine last reported on.",
+        "operationId": "ListHostMounts",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/samples/retention": {
       "get": {
         "tags": [
@@ -2268,6 +2341,179 @@
           }
         }
       }
+    },
+    "/alerts": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "The switches, what each of them currently does, and what last fired.",
+        "operationId": "ReadAlertSettings",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlertSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/alerts/switches": {
+      "put": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Switches the three conditions on, or off.",
+        "operationId": "ChangeAlertSwitches",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertSwitchesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/alerts/host": {
+      "put": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Says which machine this installation sits on, and on which mount.",
+        "operationId": "NameTheInstallationHost",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InstallationHostRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/alerts/notifier": {
+      "put": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Names the one place this installation's notifications go.",
+        "operationId": "ChangeTheNotifier",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NotifierRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Takes the notifier away, and the sealed token with it.",
+        "operationId": "ClearTheNotifier",
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/alerts/notifier/token": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "The access token this installation publishes with, in the clear.",
+        "operationId": "ReadTheNotifierToken",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotifierTokenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/alerts/notifier/test": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Sends the shape a real alert has, and says how it went.",
+        "operationId": "SendATestNotification",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestNotificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2277,6 +2523,73 @@
           "reading",
           "administering"
         ]
+      },
+      "AlertCondition": {
+        "enum": [
+          "fillingUp",
+          "goneQuiet",
+          "flooding"
+        ]
+      },
+      "AlertSettingsResponse": {
+        "required": [
+          "notifier",
+          "switches",
+          "store",
+          "quiet",
+          "flood",
+          "fired"
+        ],
+        "type": "object",
+        "properties": {
+          "notifier": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/NotifierResponse"
+              }
+            ]
+          },
+          "switches": {
+            "$ref": "#/components/schemas/AlertSwitchesRequest"
+          },
+          "store": {
+            "$ref": "#/components/schemas/StoreConditionResponse"
+          },
+          "quiet": {
+            "$ref": "#/components/schemas/QuietConditionResponse"
+          },
+          "flood": {
+            "$ref": "#/components/schemas/FloodConditionResponse"
+          },
+          "fired": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LastFiredResponse"
+            }
+          }
+        }
+      },
+      "AlertSwitchesRequest": {
+        "required": [
+          "fillingUp",
+          "goneQuiet",
+          "flooding"
+        ],
+        "type": "object",
+        "properties": {
+          "fillingUp": {
+            "type": "boolean"
+          },
+          "goneQuiet": {
+            "type": "boolean"
+          },
+          "flooding": {
+            "type": "boolean"
+          }
+        }
       },
       "BackupCodesResponse": {
         "required": [
@@ -2291,6 +2604,14 @@
             }
           }
         }
+      },
+      "Blindness": {
+        "enum": [
+          "none",
+          "noHostNamed",
+          "notReporting",
+          "mountAbsent"
+        ]
       },
       "ChangePasswordRequest": {
         "required": [
@@ -2710,6 +3031,40 @@
           }
         }
       },
+      "FloodConditionResponse": {
+        "required": [
+          "multiple",
+          "floor",
+          "baselineDays"
+        ],
+        "type": "object",
+        "properties": {
+          "multiple": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "floor": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "baselineDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "FootprintResponse": {
         "required": [
           "retentionDays",
@@ -2882,6 +3237,28 @@
           }
         }
       },
+      "InstallationHostRequest": {
+        "required": [
+          "hostId",
+          "mount"
+        ],
+        "type": "object",
+        "properties": {
+          "hostId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "mount": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "IssueAgentTokenRequest": {
         "required": [
           "name",
@@ -3016,6 +3393,31 @@
         }
       },
       "JsonNode": {},
+      "LastFiredResponse": {
+        "required": [
+          "subjectId",
+          "subject",
+          "condition",
+          "at"
+        ],
+        "type": "object",
+        "properties": {
+          "subjectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "subject": {
+            "type": "string"
+          },
+          "condition": {
+            "$ref": "#/components/schemas/AlertCondition"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
       "ListedAgentTokenResponse": {
         "required": [
           "id",
@@ -3246,7 +3648,8 @@
           "retentionDays",
           "createdAt",
           "ingestTokens",
-          "lastReceivedAt"
+          "lastReceivedAt",
+          "muted"
         ],
         "type": "object",
         "properties": {
@@ -3297,6 +3700,9 @@
               "string"
             ],
             "format": "date-time"
+          },
+          "muted": {
+            "type": "boolean"
           }
         }
       },
@@ -3335,6 +3741,72 @@
           }
         }
       },
+      "NotifierProof": {
+        "enum": [
+          "sent",
+          "noNotifier",
+          "refused",
+          "unreachable"
+        ]
+      },
+      "NotifierRequest": {
+        "required": [
+          "server",
+          "topic",
+          "accessToken"
+        ],
+        "type": "object",
+        "properties": {
+          "server": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "topic": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "accessToken": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "NotifierResponse": {
+        "required": [
+          "server",
+          "topic",
+          "hasAccessToken"
+        ],
+        "type": "object",
+        "properties": {
+          "server": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "hasAccessToken": {
+            "type": "boolean"
+          }
+        }
+      },
+      "NotifierTokenResponse": {
+        "required": [
+          "token"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        }
+      },
       "ProjectGroupRequest": {
         "required": [
           "groupId"
@@ -3365,6 +3837,17 @@
           }
         }
       },
+      "ProjectMuteRequest": {
+        "required": [
+          "muted"
+        ],
+        "type": "object",
+        "properties": {
+          "muted": {
+            "type": "boolean"
+          }
+        }
+      },
       "ProjectResponse": {
         "required": [
           "id",
@@ -3372,7 +3855,8 @@
           "groupId",
           "hostId",
           "retentionDays",
-          "createdAt"
+          "createdAt",
+          "muted"
         ],
         "type": "object",
         "properties": {
@@ -3408,6 +3892,74 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "muted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "QuietConditionResponse": {
+        "required": [
+          "busiest",
+          "quietest",
+          "withoutAFortnight",
+          "multiple",
+          "leastToleratedHours",
+          "baselineDays"
+        ],
+        "type": "object",
+        "properties": {
+          "busiest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ToleratedSilenceResponse"
+              }
+            ]
+          },
+          "quietest": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ToleratedSilenceResponse"
+              }
+            ]
+          },
+          "withoutAFortnight": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "multiple": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "leastToleratedHours": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "baselineDays": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -3775,6 +4327,67 @@
           }
         }
       },
+      "StoreConditionResponse": {
+        "required": [
+          "blindness",
+          "hostId",
+          "hostName",
+          "mount",
+          "percent",
+          "firstThreshold",
+          "secondThreshold"
+        ],
+        "type": "object",
+        "properties": {
+          "blindness": {
+            "$ref": "#/components/schemas/Blindness"
+          },
+          "hostId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "hostName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "mount": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "percent": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "firstThreshold": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "secondThreshold": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
       "TailResponse": {
         "required": [
           "entries",
@@ -3794,6 +4407,42 @@
           },
           "more": {
             "type": "boolean"
+          }
+        }
+      },
+      "TestNotificationResponse": {
+        "required": [
+          "proof"
+        ],
+        "type": "object",
+        "properties": {
+          "proof": {
+            "$ref": "#/components/schemas/NotifierProof"
+          }
+        }
+      },
+      "ToleratedSilenceResponse": {
+        "required": [
+          "projectId",
+          "name",
+          "toleratedHours"
+        ],
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "toleratedHours": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },

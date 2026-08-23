@@ -4,6 +4,7 @@ import { DeleteProject } from "./DeleteProject";
 import { IngestTokens } from "./IngestTokens";
 import { ProjectGroup } from "./ProjectGroup";
 import { ProjectHost } from "./ProjectHost";
+import { ProjectMute } from "./ProjectMute";
 import { ProjectName } from "./ProjectName";
 import { RetentionWindow } from "./RetentionWindow";
 import { SettingsScreen } from "./SettingsScreen";
@@ -55,6 +56,7 @@ export function ProjectSettings() {
               <ProjectGroup project={project} onMoved={reload} />
               <ProjectHost project={project} onMoved={reload} />
               <RetentionWindow project={project} onChanged={reload} />
+              <ProjectMute project={project} onMuted={reload} />
             </>
           ),
         },

@@ -29,6 +29,12 @@ namespace Logaffe.Application.Operations;
 /// (<c>docs/mcp.md</c>), and it is what lets an agent go from the errors in a
 /// project to the machine behind them.
 /// </param>
+/// <param name="Muted">
+/// Whether this project's alert conditions are evaluated at all
+/// (<c>docs/alerts.md</c>). It rides here because the screen that sets it reads
+/// the project off this list, and it goes no further than the operator's own
+/// surfaces: neither kind of agent token reaches the mute.
+/// </param>
 public sealed record ListedProject(
     Guid Id,
     string Name,
@@ -37,7 +43,8 @@ public sealed record ListedProject(
     RetentionWindow Retention,
     DateTimeOffset CreatedAt,
     int IngestTokens,
-    DateTimeOffset? LastReceivedAt);
+    DateTimeOffset? LastReceivedAt,
+    bool Muted);
 
 /// <summary>
 /// Every project the installation holds.
@@ -82,7 +89,8 @@ public sealed class ListProjects(IProjects projects, ITokens tokens, IEntryReade
                 project.Retention,
                 project.CreatedAt,
                 heldTokens.TryGetValue(project.Id, out var holding) ? holding.Count : 0,
-                await entries.LastReceivedAsync(project.Id, cancellationToken)));
+                await entries.LastReceivedAsync(project.Id, cancellationToken),
+                project.Muted));
         }
 
         return listed;

@@ -20,6 +20,7 @@ const PROJECT: HeldProject = {
   createdAt: new Date("2026-08-01T09:00:00.000Z"),
   ingestTokens: 1,
   lastReceivedAt: new Date("2026-08-08T11:59:00.000Z"),
+  muted: false,
 };
 
 /** A project nothing has ever delivered to, which is a different screen. */
