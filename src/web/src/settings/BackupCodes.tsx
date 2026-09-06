@@ -1,6 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { api, problemWith } from "../api/client";
 import { BackupCodeSheet } from "../session/Enrolment";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
+import { About, Area } from "./Area";
 
 /**
  * A fresh sheet, asked for on its own.
@@ -51,45 +55,43 @@ export function BackupCodes() {
   }
 
   return (
-    <section>
-      <h2>Backup codes</h2>
-      <p>
+    <Area title="Backup codes">
+      <About>
         Ten codes that stand in for the second factor, each used once. A fresh set
         replaces the previous one entirely — spent codes and unspent alike — and no
         session ends: replacing the way back in says nothing about the browsers already
         signed in.
-      </p>
+      </About>
       <p className="quiet">
         How many are left is said whenever one is spent signing in, because a set that
         quietly runs out ends at Host Recovery.
       </p>
 
       {codes === undefined ? (
-        <form onSubmit={issue}>
-          <label>
-            Password
-            <input
+        <form onSubmit={issue} className="grid max-w-md gap-3">
+          <Field label="Password">
+            <Input
               type="password"
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               aria-invalid={problem !== undefined || undefined}
             />
-          </label>
-          {problem !== undefined && <p className="refusal">{problem}</p>}
+          </Field>
+          {problem !== undefined && <p className="refusal text-sm">{problem}</p>}
 
-          <button type="submit" disabled={issuing}>
+          <Button type="submit" disabled={issuing} className="w-fit">
             Issue a fresh sheet
-          </button>
+          </Button>
         </form>
       ) : (
         <>
           <BackupCodeSheet codes={codes} replacing />
-          <button type="button" className="plain" onClick={() => setCodes(undefined)}>
+          <Button type="button" variant="link" size="sm" onClick={() => setCodes(undefined)}>
             Done — hide them
-          </button>
+          </Button>
         </>
       )}
-    </section>
+    </Area>
   );
 }

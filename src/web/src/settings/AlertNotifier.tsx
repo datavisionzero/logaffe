@@ -1,6 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { api, problemWith } from "../api/client";
 import type { HeldAlerts, NotifierProof } from "./alerting";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
+import { About, Area } from "./Area";
+import { Callout } from "../components/Page";
 
 /** What each way a test send can end says to the person who pressed it. */
 const proofs: Record<NotifierProof, string> = {
@@ -160,14 +165,13 @@ export function AlertNotifier({
   }
 
   return (
-    <section>
-      <h2>The notifier</h2>
-      <p>
+    <Area title="The notifier">
+      <About>
         Where an alert goes. There is one, and it is ntfy: a server, a topic and — if the
         topic is not a public one — an access token. Nothing else about a notification is
         configurable, because a notification here is a name, three numbers and a link, and
         that formats the same everywhere.
-      </p>
+      </About>
       <p className="quiet">
         A public topic is readable by anyone who guesses the word. That is the plainest
         reason an alert carries no log content: what an outsider on your topic learns is
@@ -187,30 +191,27 @@ export function AlertNotifier({
           void save(token === "" ? null : token);
         }}
       >
-        <label>
-          Server
-          <input
+        <Field label="Server">
+          <Input
             value={server}
             placeholder="https://ntfy.sh"
             onChange={(e) => setServer(e.target.value)}
             aria-invalid={serverProblem !== undefined || undefined}
           />
-        </label>
-        {serverProblem !== undefined && <p className="refusal">{serverProblem}</p>}
+        </Field>
+        {serverProblem !== undefined && <p className="refusal text-sm">{serverProblem}</p>}
 
-        <label>
-          Topic
-          <input
+        <Field label="Topic">
+          <Input
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
             aria-invalid={topicProblem !== undefined || undefined}
           />
-        </label>
-        {topicProblem !== undefined && <p className="refusal">{topicProblem}</p>}
+        </Field>
+        {topicProblem !== undefined && <p className="refusal text-sm">{topicProblem}</p>}
 
-        <label>
-          Access token
-          <input
+        <Field label="Access token">
+          <Input
             type={shown ? "text" : "password"}
             value={token}
             placeholder={
@@ -220,27 +221,27 @@ export function AlertNotifier({
             }
             onChange={(e) => setToken(e.target.value)}
           />
-        </label>
+        </Field>
 
         {held?.hasAccessToken === true && !shown && (
-          <button type="button" className="plain" disabled={busy} onClick={() => void reveal()}>
+          <Button type="button" variant="link" size="sm" disabled={busy} onClick={() => void reveal()}>
             Show the token
-          </button>
+          </Button>
         )}
 
-        <button type="submit" disabled={busy || server.trim() === "" || topic.trim() === ""}>
+        <Button type="submit" disabled={busy || server.trim() === "" || topic.trim() === ""} className="w-fit">
           {held === null ? "Set the notifier" : "Save the notifier"}
-        </button>
+        </Button>
       </form>
 
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
-      {said !== undefined && <p className="notice">{said}</p>}
+      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
+      {said !== undefined && <Callout>{said}</Callout>}
 
       {held !== null && (
         <p>
-          <button type="button" disabled={busy} onClick={() => void test()}>
+          <Button type="button" disabled={busy} onClick={() => void test()} className="w-fit">
             Send a test notification
-          </button>
+          </Button>
         </p>
       )}
 
@@ -254,22 +255,23 @@ export function AlertNotifier({
 
       {held?.hasAccessToken === true && (
         <p>
-          <button
+          <Button
             type="button"
-            className="plain"
+            variant="link"
+            size="sm"
             disabled={busy}
             onClick={() => void save("")}
           >
             Publish without a token
-          </button>
+          </Button>
         </p>
       )}
 
       {held !== null && (
         <p>
-          <button type="button" className="plain" disabled={busy} onClick={() => void clear()}>
+          <Button type="button" variant="link" size="sm" disabled={busy} onClick={() => void clear()}>
             Remove the notifier
-          </button>
+          </Button>
         </p>
       )}
 
@@ -278,6 +280,6 @@ export function AlertNotifier({
           Removing it takes the token with it and leaves the switches where they are.
         </p>
       )}
-    </section>
+    </Area>
   );
 }

@@ -2,6 +2,10 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { api } from "../api/client";
 import type { HeldProject } from "../projects/projects";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
+import { About, Area } from "./Area";
 
 /**
  * Ending a project, which is immediate and irreversible.
@@ -55,34 +59,41 @@ export function DeleteProject({
   }
 
   return (
-    <section className="grave">
-      <h2>Delete this project</h2>
-      <p>
+    <Area title="Delete this project" grave>
+      <About>
         Immediate and irreversible. The project, its tokens and everything that reads it
         go at once, and its entries are removed afterwards in the background. There is no
         undelete and no archive.
-      </p>
-      <p>
-        Anything still holding an ingest token gets <code>401</code> from its next
+      </About>
+      <About>
+        Anything still holding an ingest token gets{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">401</code> from its next
         delivery and carries on writing its own local file, exactly as it would through a
         botched rotation.
-      </p>
+      </About>
 
-      <label>
-        Type <b>{project.name}</b> to confirm
-        <input value={typed} onChange={(e) => setTyped(e.target.value)} />
-      </label>
+      <div className="max-w-md">
+        <Field
+          label={
+            <>
+              Type <b className="font-semibold">{project.name}</b> to confirm
+            </>
+          }
+          said={refusal}
+        >
+          <Input value={typed} onChange={(e) => setTyped(e.target.value)} />
+        </Field>
+      </div>
 
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
-
-      <button
+      <Button
         type="button"
-        className="grave"
+        variant="destructive"
+        className="w-fit"
         disabled={deleting || typed.trim() !== project.name}
         onClick={() => void remove()}
       >
         Delete {project.name}
-      </button>
-    </section>
+      </Button>
+    </Area>
   );
 }

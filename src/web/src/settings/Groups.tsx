@@ -2,6 +2,10 @@ import { useState, type FormEvent } from "react";
 import { api, problemWith } from "../api/client";
 import { projectsIn, useGroups, type HeldGroup } from "../projects/groups";
 import { useProjects } from "../projects/projects";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
+import { About, Area, Cell, Head, Listing, RowName } from "./Area";
 
 /**
  * The headings the projects are listed under.
@@ -116,19 +120,18 @@ export function Groups() {
     });
 
   return (
-    <section>
-      <h2>Groups</h2>
-      <p>
+    <Area title="Groups">
+      <About>
         A group is a heading the projects are listed under — one product's environments,
         one customer's applications. It is for finding a project and nothing else: it holds
         no retention window, no token, and nothing can be asked of it, because a search
         always names one project.
-      </p>
+      </About>
 
       {state.status === "asking" && <p className="quiet">Reading the groups…</p>}
 
       {state.status === "unreachable" && (
-        <p className="refusal">This installation did not answer.</p>
+        <p className="refusal text-sm">This installation did not answer.</p>
       )}
 
       {state.status === "held" && state.groups.length === 0 && (
@@ -139,14 +142,14 @@ export function Groups() {
       )}
 
       {state.status === "held" && state.groups.length > 0 && (
-        <table className="listing">
+        <Listing>
           <thead>
             <tr>
-              <th scope="col">Name</th>
-              <th scope="col">Projects</th>
-              <th scope="col">
+              <Head>Name</Head>
+              <Head>Projects</Head>
+              <Head>
                 <span className="sr-only">Acts</span>
-              </th>
+              </Head>
             </tr>
           </thead>
           <tbody>
@@ -157,7 +160,7 @@ export function Groups() {
 
               return (
                 <tr key={group.id}>
-                  <th scope="row">
+                  <RowName>
                     {renaming === group.id ? (
                       <Rename
                         group={group}
@@ -168,25 +171,27 @@ export function Groups() {
                     ) : (
                       group.name
                     )}
-                  </th>
-                  <td>{projects.status === "held" ? held : ""}</td>
-                  <td>
-                    <button
+                  </RowName>
+                  <Cell>{projects.status === "held" ? held : ""}</Cell>
+                  <Cell>
+                    <Button
                       type="button"
-                      className="plain"
+                      variant="link"
+                      size="sm"
                       onClick={() => setRenaming(group.id)}
                     >
                       Rename
-                    </button>{" "}
+                    </Button>{" "}
                     {removing === group.id ? (
                       <>
                         {/* Nothing is destroyed, so this states what happens
                             rather than asking for the name to be typed — that
                             guard belongs to deleting a project, where entries do
                             not come back (ADR 0039). */}
-                        <button
+                        <Button
                           type="button"
-                          className="plain"
+                          variant="link"
+                          size="sm"
                           disabled={busy}
                           onClick={() => void remove(group.id)}
                         >
@@ -195,30 +200,32 @@ export function Groups() {
                             : `Remove it — ${held} ${
                                 held === 1 ? "project is" : "projects are"
                               } left in no group`}
-                        </button>{" "}
-                        <button
+                        </Button>{" "}
+                        <Button
                           type="button"
-                          className="plain"
+                          variant="link"
+                          size="sm"
                           onClick={() => setRemoving(undefined)}
                         >
                           Keep it
-                        </button>
+                        </Button>
                       </>
                     ) : (
-                      <button
+                      <Button
                         type="button"
-                        className="plain"
+                        variant="link"
+                        size="sm"
                         onClick={() => setRemoving(group.id)}
                       >
                         Remove
-                      </button>
+                      </Button>
                     )}
-                  </td>
+                  </Cell>
                 </tr>
               );
             })}
           </tbody>
-        </table>
+        </Listing>
       )}
 
       <p className="quiet">
@@ -227,24 +234,23 @@ export function Groups() {
         settings.
       </p>
 
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
+      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
 
-      <form onSubmit={create}>
-        <label>
-          Name for a new group
-          <input
+      <form onSubmit={create} className="grid max-w-md gap-3">
+        <Field label="Name for a new group">
+          <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             aria-invalid={problem !== undefined || undefined}
           />
-        </label>
-        {problem !== undefined && <p className="refusal">{problem}</p>}
+        </Field>
+        {problem !== undefined && <p className="refusal text-sm">{problem}</p>}
 
-        <button type="submit" disabled={busy || name.trim() === ""}>
+        <Button type="submit" disabled={busy || name.trim() === ""} className="w-fit">
           Make a group
-        </button>
+        </Button>
       </form>
-    </section>
+    </Area>
   );
 }
 
@@ -272,17 +278,18 @@ function Rename({
         onChange={(e) => setRenamed(e.target.value)}
         aria-label={`Name of ${group.name}`}
       />
-      <button
+      <Button
         type="button"
-        className="plain"
+        variant="link"
+        size="sm"
         disabled={busy || renamed.trim() === ""}
         onClick={() => onRename(renamed)}
       >
         Save
-      </button>{" "}
-      <button type="button" className="plain" onClick={onLeave}>
+      </Button>{" "}
+      <Button type="button" variant="link" size="sm" onClick={onLeave}>
         Cancel
-      </button>
+      </Button>
     </>
   );
 }

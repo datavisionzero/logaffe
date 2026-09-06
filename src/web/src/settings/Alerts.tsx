@@ -26,7 +26,7 @@ export function Alerts() {
   }
 
   if (state.status === "unreachable") {
-    return <p className="refusal">This installation did not answer.</p>;
+    return <p className="refusal text-sm">This installation did not answer.</p>;
   }
 
   return (

@@ -3,6 +3,11 @@ import { api, asInstant, problemWith } from "../api/client";
 import { copyToClipboard, whyNotCopied, type Copying } from "../shared/clipboard";
 import { formatTimestamp } from "../shared/time";
 import { LastUse } from "./LastUse";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Check, Field } from "../components/Field";
+import { Snippet } from "../components/Page";
+import { About, Area, Cell, Head, Listing, RowName } from "./Area";
 
 /** Reading or administering, and never both (ADR 0046). */
 type Kind = "reading" | "administering";
@@ -216,9 +221,8 @@ export function AgentTokens() {
   }
 
   return (
-    <section>
-      <h2>Agent tokens</h2>
-      <p>
+    <Area title="Agent tokens">
+      <About>
         An agent authenticates with one of these. Each is issued to read or to administer
         and is never both: a reading token reads entries and counts them across every
         project and reaches no setting, and an administering token works the settings —
@@ -226,12 +230,12 @@ export function AgentTokens() {
         never reads an entry. They are here rather than in one project's settings because
         neither is about one project. Several can exist at once, so a terminal agent and a
         desktop agent can be retired one at a time.
-      </p>
+      </About>
 
       {listing.status === "asking" && <p className="quiet">Reading the agent tokens…</p>}
 
       {listing.status === "unreachable" && (
-        <p className="refusal">This installation did not answer.</p>
+        <p className="refusal text-sm">This installation did not answer.</p>
       )}
 
       {listing.status === "held" && listing.tokens.length === 0 && (
@@ -239,22 +243,22 @@ export function AgentTokens() {
       )}
 
       {listing.status === "held" && listing.tokens.length > 0 && (
-        <table className="listing">
+        <Listing>
           <thead>
             <tr>
-              <th scope="col">Name</th>
-              <th scope="col">What it may do</th>
-              <th scope="col">Issued</th>
-              <th scope="col">Last used</th>
-              <th scope="col">
+              <Head>Name</Head>
+              <Head>What it may do</Head>
+              <Head>Issued</Head>
+              <Head>Last used</Head>
+              <Head>
                 <span className="sr-only">Acts</span>
-              </th>
+              </Head>
             </tr>
           </thead>
           <tbody>
             {listing.tokens.map((token) => (
               <tr key={token.id}>
-                <th scope="row">
+                <RowName>
                   {renaming === token.id ? (
                     <Rename
                       token={token}
@@ -265,69 +269,73 @@ export function AgentTokens() {
                   ) : (
                     token.name
                   )}
-                </th>
-                <td>
+                </RowName>
+                <Cell>
                   {token.kind === "administering" ? "Administers" : "Reads"}
                   {token.mayDestroy && (
                     <>
                       {" "}
-                      <span className="refusal">and may destroy data</span>
+                      <span className="refusal text-sm">and may destroy data</span>
                     </>
                   )}
-                </td>
-                <td>
+                </Cell>
+                <Cell>
                   <time dateTime={token.issuedAt.toISOString()}>
                     {formatTimestamp(token.issuedAt)}
                   </time>
-                </td>
-                <td>
+                </Cell>
+                <Cell>
                   <LastUse at={token.lastUsedAt} />
-                </td>
-                <td>
-                  <button type="button" className="plain" onClick={() => void show(token.id)}>
+                </Cell>
+                <Cell>
+                  <Button type="button" variant="link" size="sm" onClick={() => void show(token.id)}>
                     Show the configuration
-                  </button>{" "}
-                  <button
+                  </Button>{" "}
+                  <Button
                     type="button"
-                    className="plain"
+                    variant="link"
+                    size="sm"
                     onClick={() => setRenaming(token.id)}
                   >
                     Rename
-                  </button>{" "}
+                  </Button>{" "}
                   {revoking === token.id ? (
                     <>
-                      <button
+                      <Button
                         type="button"
-                        className="plain refusal"
+                        variant="link"
+                        size="sm" className="text-destructive"
                         disabled={busy}
                         onClick={() => void revoke(token.id)}
                       >
                         {token.kind === "administering"
                           ? "Revoke it — the agent using it stops administering"
                           : "Revoke it — the agent using it stops reading"}
-                      </button>{" "}
-                      <button
+                      </Button>{" "}
+                      <Button
                         type="button"
-                        className="plain"
+                        variant="link"
+                        size="sm"
                         onClick={() => setRevoking(undefined)}
                       >
                         Keep it
-                      </button>
+                      </Button>
                     </>
                   ) : (
-                    <button
+                    <Button
                       type="button"
-                      className="plain"
+                      variant="link"
+                      size="sm"
                       onClick={() => setRevoking(token.id)}
                     >
                       Revoke
-                    </button>
+                    </Button>
                   )}
-                </td>
+                </Cell>
               </tr>
             ))}
           </tbody>
-        </table>
+        </Listing>
       )}
 
       <p className="quiet">
@@ -336,58 +344,60 @@ export function AgentTokens() {
         the read that earned it and is shown no finer than that (ADR 0033).
       </p>
 
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
+      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
 
-      <form onSubmit={issue}>
-        <label>
-          Name for a new token
-          <input
+      <form onSubmit={issue} className="grid max-w-md gap-3">
+        <Field label="Name for a new token">
+          <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
             aria-invalid={problem !== undefined || undefined}
           />
-        </label>
-        {problem !== undefined && <p className="refusal">{problem}</p>}
+        </Field>
+        {problem !== undefined && <p className="refusal text-sm">{problem}</p>}
 
-        <fieldset>
-          <legend>What the new token may do</legend>
+        <fieldset className="grid gap-2">
+          <legend className="pb-1 text-sm font-semibold">What the new token may do</legend>
 
-          <label className="confirm">
+          <Check>
             <input
               type="radio"
               name="kind"
               value="reading"
               checked={kind === "reading"}
               onChange={() => chooseKind("reading")}
+              className="mt-0.5 size-4 shrink-0 accent-brand"
             />
             Read entries, counts and samples across every project, and no setting
-          </label>
+          </Check>
 
-          <label className="confirm">
+          <Check>
             <input
               type="radio"
               name="kind"
               value="administering"
               checked={kind === "administering"}
               onChange={() => chooseKind("administering")}
+              className="mt-0.5 size-4 shrink-0 accent-brand"
             />
             Work the settings — projects, groups, hosts, retention windows, ingest and
             host tokens — and no entry, ever
-          </label>
+          </Check>
 
           {/* Off, offered only here, and said where it is turned on rather than
               in a sentence about permissions: these four acts and no others
               remove data that does not come back (ADR 0046). */}
           {kind === "administering" && (
             <>
-              <label className="confirm">
+              <Check>
                 <input
                   type="checkbox"
                   checked={mayDestroy}
                   onChange={(e) => setMayDestroy(e.target.checked)}
+                  className="mt-0.5 size-4 shrink-0 accent-brand"
                 />
                 And may destroy data
-              </label>
+              </Check>
               <p className="quiet">
                 Four acts: deleting a project, deleting a host, shortening a project's
                 retention window, and shortening the retention window for samples. The
@@ -397,9 +407,9 @@ export function AgentTokens() {
           )}
         </fieldset>
 
-        <button type="submit" disabled={busy || name.trim() === ""}>
+        <Button type="submit" disabled={busy || name.trim() === ""} className="w-fit">
           Issue an agent token
-        </button>
+        </Button>
       </form>
 
       <p className="quiet">
@@ -412,33 +422,35 @@ export function AgentTokens() {
       </p>
 
       {shown !== undefined && (
-        <section>
-          <h3>The client configuration</h3>
+        <div className="grid gap-3 rounded-lg border bg-card p-4">
+          <h3 className="text-sm font-semibold">The client configuration</h3>
           <p>
             Paste this into the agent. This installation's address and this token are
             already in it, and the same block comes back whenever the token is read back.
             It names the server after the kind of token it carries, so both can sit in one
             client without one overwriting the other.
           </p>
-          <pre>{shown.configuration}</pre>
+          <Snippet>{shown.configuration}</Snippet>
           <p className="quiet">
-            The token by itself: <code>{shown.token}</code>
+            The token by itself:{" "}
+            <code className="font-mono break-all">{shown.token}</code>
           </p>
-          <button
+          <Button
             type="button"
             onClick={() => void copyToClipboard(shown.configuration).then(setCopying)}
+            className="w-fit"
           >
             {copying === "copied" ? "Copied" : "Copy the configuration"}
-          </button>
+          </Button>
           {whyNotCopied(copying) !== undefined && (
-            <p className="refusal">{whyNotCopied(copying)}</p>
+            <p className="refusal text-sm">{whyNotCopied(copying)}</p>
           )}
-          <button type="button" className="plain" onClick={() => setShown(undefined)}>
+          <Button type="button" variant="link" size="sm" onClick={() => setShown(undefined)}>
             Hide it
-          </button>
-        </section>
+          </Button>
+        </div>
       )}
-    </section>
+    </Area>
   );
 }
 
@@ -468,17 +480,18 @@ function Rename({
         onChange={(e) => setRenamed(e.target.value)}
         aria-label={`Name of ${token.name}`}
       />
-      <button
+      <Button
         type="button"
-        className="plain"
+        variant="link"
+        size="sm"
         disabled={busy || renamed.trim() === ""}
         onClick={() => onRename(renamed)}
       >
         Save
-      </button>{" "}
-      <button type="button" className="plain" onClick={onLeave}>
+      </Button>{" "}
+      <Button type="button" variant="link" size="sm" onClick={onLeave}>
         Cancel
-      </button>
+      </Button>
     </>
   );
 }

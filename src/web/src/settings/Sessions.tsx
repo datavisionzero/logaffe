@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { api, asInstant } from "../api/client";
 import { formatTimestamp } from "../shared/time";
 import { LastUse } from "./LastUse";
+import { Button } from "../components/ui/button";
+import { About, Area, Cell, Head, Listing, RowName } from "./Area";
 
 interface HeldSession {
   id: string;
@@ -98,101 +100,101 @@ export function Sessions() {
 
   if (listing.status === "asking") {
     return (
-      <section>
-        <h2>Signed-in browsers</h2>
+      <Area title="Signed-in browsers">
         <p className="quiet">Reading the sessions…</p>
-      </section>
+      </Area>
     );
   }
 
   if (listing.status === "unreachable") {
     return (
-      <section>
-        <h2>Signed-in browsers</h2>
-        <p className="refusal">This installation did not answer.</p>
-      </section>
+      <Area title="Signed-in browsers">
+        <p className="refusal text-sm">This installation did not answer.</p>
+      </Area>
     );
   }
 
   const others = listing.sessions.filter((session) => !session.isCurrent).length;
 
   return (
-    <section>
-      <h2>Signed-in browsers</h2>
-      <p>
+    <Area title="Signed-in browsers">
+      <About>
         Several can exist at once, because one person with a desktop and a laptop is the
         normal case. There is no notification anywhere in this product, so this list is
         the only place a session that is not yours can be noticed — and ending one takes
         effect on that browser's next request.
-      </p>
+      </About>
 
-      <table className="listing">
+      <Listing>
         <thead>
           <tr>
-            <th scope="col">Last seen from</th>
-            <th scope="col">Started</th>
-            <th scope="col">Last used</th>
-            <th scope="col">Expires</th>
-            <th scope="col">
+            <Head>Last seen from</Head>
+            <Head>Started</Head>
+            <Head>Last used</Head>
+            <Head>Expires</Head>
+            <Head>
               <span className="sr-only">Acts</span>
-            </th>
+            </Head>
           </tr>
         </thead>
         <tbody>
           {listing.sessions.map((session) => (
             <tr key={session.id}>
-              <th scope="row">
+              <RowName>
                 {session.lastSeenFrom}
                 {session.isCurrent && <span className="here"> This browser</span>}
-              </th>
-              <td>
+              </RowName>
+              <Cell>
                 <time dateTime={session.startedAt.toISOString()}>
                   {formatTimestamp(session.startedAt)}
                 </time>
-              </td>
-              <td>
+              </Cell>
+              <Cell>
                 <LastUse at={session.lastUsedAt} />
-              </td>
-              <td>
+              </Cell>
+              <Cell>
                 <time dateTime={session.expiresAt.toISOString()}>
                   {formatTimestamp(session.expiresAt)}
                 </time>
-              </td>
-              <td>
+              </Cell>
+              <Cell>
                 {ending === session.id ? (
                   <>
-                    <button
+                    <Button
                       type="button"
-                      className="plain refusal"
+                      variant="link"
+                      size="sm" className="text-destructive"
                       disabled={busy}
                       onClick={() => void end(session.id)}
                     >
                       {session.isCurrent
                         ? "End it — this browser signs out"
                         : "End it now"}
-                    </button>{" "}
-                    <button
+                    </Button>{" "}
+                    <Button
                       type="button"
-                      className="plain"
+                      variant="link"
+                      size="sm"
                       onClick={() => setEnding(undefined)}
                     >
                       Leave it
-                    </button>
+                    </Button>
                   </>
                 ) : (
-                  <button
+                  <Button
                     type="button"
-                    className="plain"
+                    variant="link"
+                    size="sm"
                     onClick={() => setEnding(session.id)}
                   >
                     End
-                  </button>
+                  </Button>
                 )}
-              </td>
+              </Cell>
             </tr>
           ))}
         </tbody>
-      </table>
+      </Listing>
 
       <p className="quiet">
         A session lasts on the order of thirty days and every use pushes the deadline
@@ -200,14 +202,14 @@ export function Sessions() {
         there would be nothing to recognize it by.
       </p>
 
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
+      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
 
       {others > 0 && (
-        <button type="button" disabled={busy} onClick={() => void endEveryOther()}>
+        <Button type="button" disabled={busy} onClick={() => void endEveryOther()} className="w-fit">
           End every other session
-        </button>
+        </Button>
       )}
-    </section>
+    </Area>
   );
 }
 

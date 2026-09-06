@@ -1,5 +1,6 @@
 import { formatTimestamp } from "../shared/time";
 import type { AlertCondition, HeldAlerts } from "./alerting";
+import { Area, Cell, Head, Listing, RowName } from "./Area";
 
 /** What each condition is called where it is being looked back at. */
 const named: Record<AlertCondition, string> = {
@@ -24,8 +25,7 @@ const named: Record<AlertCondition, string> = {
  */
 export function AlertHistory({ alerts }: { alerts: HeldAlerts }) {
   return (
-    <section>
-      <h2>When each condition last fired</h2>
+    <Area title="When each condition last fired">
 
       {alerts.fired.length === 0 ? (
         <p className="quiet">
@@ -34,26 +34,26 @@ export function AlertHistory({ alerts }: { alerts: HeldAlerts }) {
           test notification is worth pressing.
         </p>
       ) : (
-        <table className="listing">
+        <Listing>
           <thead>
             <tr>
-              <th scope="col">Project or machine</th>
-              <th scope="col">Condition</th>
-              <th scope="col">Last fired</th>
+              <Head>Project or machine</Head>
+              <Head>Condition</Head>
+              <Head>Last fired</Head>
             </tr>
           </thead>
           <tbody>
             {alerts.fired.map((fired) => (
               <tr key={`${fired.subjectId}-${fired.condition}`}>
-                <th scope="row">{fired.subject}</th>
-                <td>{named[fired.condition]}</td>
-                <td>
+                <RowName>{fired.subject}</RowName>
+                <Cell>{named[fired.condition]}</Cell>
+                <Cell>
                   <time dateTime={fired.at.toISOString()}>{formatTimestamp(fired.at)}</time>
-                </td>
+                </Cell>
               </tr>
             ))}
           </tbody>
-        </table>
+        </Listing>
       )}
 
       <p className="quiet">
@@ -61,6 +61,6 @@ export function AlertHistory({ alerts }: { alerts: HeldAlerts }) {
         nothing at all is sent when one clears. So this is when an event started rather
         than when it ended, and there is no second message saying it did.
       </p>
-    </section>
+    </Area>
   );
 }

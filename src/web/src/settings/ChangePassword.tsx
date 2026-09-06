@@ -1,6 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { api, problemWith } from "../api/client";
 import { PASSWORD_MINIMUM } from "../session/password";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
+import { About, Area } from "./Area";
 
 /**
  * Changing the password, which requires the current one and ends every other
@@ -67,63 +71,59 @@ export function ChangePassword() {
   }
 
   return (
-    <section>
-      <h2>Password</h2>
-      <p>
+    <Area title="Password">
+      <About>
         At least {PASSWORD_MINIMUM} characters, and nothing else is asked of it: length is
         the property that matters and the second factor carries the rest. Changing it
         <b> ends every other session</b>, which is what makes it the thing to reach for
         after a cookie has gone somewhere it should not have.
-      </p>
+      </About>
 
-      <form onSubmit={change}>
-        <label>
-          Current password
-          <input
+      <form onSubmit={change} className="grid max-w-md gap-3">
+        <Field label="Current password">
+          <Input
             type="password"
             autoComplete="current-password"
             value={current}
             onChange={(e) => setCurrent(e.target.value)}
             aria-invalid={problems.current !== undefined || undefined}
           />
-        </label>
-        {problems.current !== undefined && <p className="refusal">{problems.current}</p>}
+        </Field>
+        {problems.current !== undefined && <p className="refusal text-sm">{problems.current}</p>}
 
-        <label>
-          New password
-          <input
+        <Field label="New password">
+          <Input
             type="password"
             autoComplete="new-password"
             value={chosen}
             onChange={(e) => setChosen(e.target.value)}
             aria-invalid={problems.chosen !== undefined || undefined}
           />
-        </label>
-        {problems.chosen !== undefined && <p className="refusal">{problems.chosen}</p>}
+        </Field>
+        {problems.chosen !== undefined && <p className="refusal text-sm">{problems.chosen}</p>}
 
-        <label>
-          New password again
-          <input
+        <Field label="New password again">
+          <Input
             type="password"
             autoComplete="new-password"
             value={again}
             onChange={(e) => setAgain(e.target.value)}
             aria-invalid={mismatched || undefined}
           />
-        </label>
-        {mismatched && <p className="refusal">These two are not the same.</p>}
+        </Field>
+        {mismatched && <p className="refusal text-sm">These two are not the same.</p>}
 
-        {refusal !== undefined && <p className="refusal">{refusal}</p>}
+        {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
         {changed && (
           <p className="quiet">
             Changed. Every other session has ended; this browser stays signed in.
           </p>
         )}
 
-        <button type="submit" disabled={changing}>
+        <Button type="submit" disabled={changing} className="w-fit">
           Change the password
-        </button>
+        </Button>
       </form>
-    </section>
+    </Area>
   );
 }
