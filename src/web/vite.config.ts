@@ -26,7 +26,9 @@ export default defineConfig({
   // Vite serves the SPA and forwards what belongs to the backend. Every route
   // of the contract is listed, because the session cookie is `SameSite=Strict`
   // and only reaches the installation when the browser thinks it is talking to
-  // one origin — which is what this forwarding is for.
+  // one origin — which is what this forwarding is for. A route left out of this
+  // list is a screen that works in the image and not on this machine, and
+  // nothing says so: the request is answered by the SPA's own `index.html`.
   server: {
     port: 5173,
     proxy: Object.fromEntries(
@@ -36,6 +38,8 @@ export default defineConfig({
         "/ingest",
         "/ingest-tokens",
         "/claim",
+        "/groups",
+        "/alerts",
         "/sign-in",
         "/sign-out",
         "/sessions",
