@@ -3,6 +3,10 @@ import { api, asNumber, problemWith } from "../api/client";
 import type { HeldProject } from "../projects/projects";
 import { RETENTION_MAXIMUM, RETENTION_MINIMUM } from "../projects/retention";
 import { Footprint, type ReadFootprint } from "./Footprint";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
+import { About, Area, Confirming } from "./Area";
 
 /**
  * What the field is waiting on. Only one of these is a screen the operator has
@@ -147,23 +151,22 @@ export function RetentionWindow({
   }
 
   return (
-    <section>
-      <h2>Kept for</h2>
-      <p>
+    <Area title="Kept for">
+      <About>
         Counted from receipt time, and time is the only limit there is — no size cap, no
         row quota. The number is yours up to {RETENTION_MAXIMUM} days, which is a ceiling
         no installation can raise. What a window will cost is below, and it is there to
         be read rather than to refuse anything.
-      </p>
-      <p>
-        <b>Lowering it removes entries</b>, and you are told how many before it takes
-        effect. Raising it again brings nothing back: what the sweep has taken is gone.
-      </p>
+      </About>
+      <About>
+        <b className="font-medium text-foreground">Lowering it removes entries</b>, and
+        you are told how many before it takes effect. Raising it again brings nothing
+        back: what the sweep has taken is gone.
+      </About>
 
-      <form onSubmit={ask}>
-        <label>
-          Kept for
-          <input
+      <form onSubmit={ask} className="grid max-w-md gap-3">
+        <Field label="Kept for" after="days" said={problem}>
+          <Input
             type="number"
             min={RETENTION_MINIMUM}
             max={RETENTION_MAXIMUM}
@@ -175,49 +178,51 @@ export function RetentionWindow({
             }}
             aria-invalid={problem !== undefined || undefined}
           />
-          days
-        </label>
-        {problem !== undefined && <p className="refusal">{problem}</p>}
+        </Field>
 
         <Footprint read={readFootprint} days={wanted} counting="entries" />
 
         {changed !== undefined && (
-          <p className="quiet">
+          <p className="quiet text-sm">
             Kept for {changed} {changed === 1 ? "day" : "days"} now.
           </p>
         )}
 
         {asked.at === "confirming" ? (
-          <div className="notice">
+          <Confirming>
             <p>
               Lowering this to {asked.days} {asked.days === 1 ? "day" : "days"} puts{" "}
-              <b>
+              <b className="font-medium">
                 {asked.entries} {asked.entries === 1 ? "entry" : "entries"}
               </b>{" "}
               outside the window. The sweep removes them, and raising the window again
               does not bring them back.
             </p>
-            <button type="button" onClick={() => void apply(asked.days)}>
-              Lower it and remove them
-            </button>
-            <button
-              type="button"
-              className="plain"
-              onClick={() => setAsked({ at: "settled" })}
-            >
-              Leave it at {project.retentionDays}
-            </button>
-          </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" size="sm" onClick={() => void apply(asked.days)}>
+                Lower it and remove them
+              </Button>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                onClick={() => setAsked({ at: "settled" })}
+              >
+                Leave it at {project.retentionDays}
+              </Button>
+            </div>
+          </Confirming>
         ) : (
-          <button
+          <Button
             type="submit"
+            className="w-fit"
             disabled={asked.at !== "settled" || wanted === project.retentionDays}
           >
             {asked.at === "counting" ? "Counting what this removes…" : "Change the window"}
-          </button>
+          </Button>
         )}
       </form>
-    </section>
+    </Area>
   );
 }
 

@@ -125,7 +125,7 @@ export function CountPanel({
     <section className="count" aria-label="Count">
       <div className="count-head">
         <label>
-          <span className="visually-hidden">Grouping</span>
+          <span className="sr-only">Grouping</span>
           <select value={grouping} onChange={(e) => setGrouping(e.target.value as Grouping)}>
             {GROUPINGS.map((one) => (
               <option key={one} value={one}>
@@ -137,7 +137,7 @@ export function CountPanel({
 
         {grouping === "Time" && (
           <label>
-            <span className="visually-hidden">Bucket</span>
+            <span className="sr-only">Bucket</span>
             <select value={bucket} onChange={(e) => setBucket(e.target.value as Bucket)}>
               {BUCKETS.map((one) => (
                 <option key={one} value={one}>

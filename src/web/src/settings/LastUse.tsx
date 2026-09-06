@@ -19,6 +19,8 @@ export function LastUse({ at }: { at: Date | null }) {
   return at === null ? (
     <span className="quiet">Never used</span>
   ) : (
-    <time dateTime={at.toISOString()}>{formatToTheMinute(at)}</time>
+    <time dateTime={at.toISOString()} className="font-mono text-xs">
+      {formatToTheMinute(at)}
+    </time>
   );
 }

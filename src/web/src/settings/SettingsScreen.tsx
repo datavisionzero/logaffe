@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Navigate, NavLink } from "react-router";
+import { Page, PageTitle } from "../components/Page";
 
 /**
  * One area of a settings screen: what it is called, where it is, and what is on
@@ -58,24 +59,25 @@ export function SettingsScreen({
   }
 
   return (
-    <section className="narrow settings">
-      <h1>{heading}</h1>
+    <Page wide className="grid gap-6">
+      <PageTitle>{heading}</PageTitle>
 
-      <div className="settings-body">
-        <nav className="settings-rail" aria-label="Settings">
+      <div className="flex flex-wrap gap-x-10 gap-y-4">
+        <nav className="flex flex-[0_0_12rem] flex-col" aria-label="Settings">
           {groups.map((group) => (
             <NavLink
               key={group.name}
               end={group.at === null}
               to={group.at === null ? at : `${at}/${group.at}`}
+              className="border-l-2 px-3 py-1.5 text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50 aria-[current=page]:border-l-foreground aria-[current=page]:bg-muted aria-[current=page]:font-medium aria-[current=page]:text-foreground"
             >
               {group.name}
             </NavLink>
           ))}
         </nav>
 
-        <div className="settings-panel">{open.panel}</div>
+        <div className="grid min-w-0 flex-[1_1_24rem] gap-6 overflow-x-auto">{open.panel}</div>
       </div>
-    </section>
+    </Page>
   );
 }

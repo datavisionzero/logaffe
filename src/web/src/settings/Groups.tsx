@@ -145,7 +145,7 @@ export function Groups() {
               <th scope="col">Name</th>
               <th scope="col">Projects</th>
               <th scope="col">
-                <span className="visually-hidden">Acts</span>
+                <span className="sr-only">Acts</span>
               </th>
             </tr>
           </thead>

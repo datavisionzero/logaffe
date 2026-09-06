@@ -195,7 +195,7 @@ export function HostTokens({
               <th scope="col">Issued</th>
               <th scope="col">Last used</th>
               <th scope="col">
-                <span className="visually-hidden">Acts</span>
+                <span className="sr-only">Acts</span>
               </th>
             </tr>
           </thead>

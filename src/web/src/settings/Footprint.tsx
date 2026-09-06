@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { formatBytes } from "../hosts/readings";
 import { RETENTION_MAXIMUM, RETENTION_MINIMUM } from "../projects/retention";
 
@@ -120,15 +120,15 @@ export function Footprint({
   const { heldBytes, impliedBytes, diskFreeBytes, diskTotalBytes } = footprint;
 
   return (
-    <dl className="footprint">
+    <dl className="flex flex-wrap gap-x-8 gap-y-3 rounded-lg border bg-muted px-4 py-3">
       <div>
-        <dt>Held now</dt>
-        <dd>{formatBytes(heldBytes)}</dd>
+        <Term>Held now</Term>
+        <Amount>{formatBytes(heldBytes)}</Amount>
       </div>
 
       <div>
-        <dt>{footprint.retentionDays} days would hold</dt>
-        <dd>
+        <Term>{footprint.retentionDays} days would hold</Term>
+        <Amount>
           {impliedBytes === null ? (
             <span className="quiet">
               {counting === "entries"
@@ -138,17 +138,27 @@ export function Footprint({
           ) : (
             formatBytes(impliedBytes)
           )}
-        </dd>
+        </Amount>
       </div>
 
       {diskFreeBytes !== null && diskTotalBytes !== null && (
         <div>
-          <dt>Free on the disk</dt>
-          <dd>
+          <Term>Free on the disk</Term>
+          <Amount>
             {formatBytes(diskFreeBytes)} of {formatBytes(diskTotalBytes)}
-          </dd>
+          </Amount>
         </div>
       )}
     </dl>
   );
+}
+
+/** What one of the three numbers is called. */
+function Term({ children }: { children: ReactNode }) {
+  return <dt className="text-xs text-muted-foreground">{children}</dt>;
+}
+
+/** The number itself, in figures that line up under each other. */
+function Amount({ children }: { children: ReactNode }) {
+  return <dd className="mt-0.5 tabular-nums">{children}</dd>;
 }

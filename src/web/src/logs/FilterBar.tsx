@@ -71,7 +71,7 @@ function TimeRange({
   return (
     <span className="filter">
       <label>
-        <span className="visually-hidden">Time range</span>
+        <span className="sr-only">Time range</span>
         <select
           value={filters.span ?? "absolute"}
           onChange={(event) =>
@@ -94,7 +94,7 @@ function TimeRange({
       {absolute && (
         <>
           <label>
-            <span className="visually-hidden">From</span>
+            <span className="sr-only">From</span>
             <input
               type="datetime-local"
               step="1"
@@ -105,7 +105,7 @@ function TimeRange({
             />
           </label>
           <label>
-            <span className="visually-hidden">To</span>
+            <span className="sr-only">To</span>
             <input
               type="datetime-local"
               step="1"
@@ -138,7 +138,7 @@ function LevelThreshold({
 }) {
   return (
     <label className="filter">
-      <span className="visually-hidden">Level</span>
+      <span className="sr-only">Level</span>
       <select
         value={filters.minimumLevel ?? ""}
         onChange={(event) =>
@@ -192,7 +192,7 @@ function SearchText({
   return (
     <form className="filter" onSubmit={apply}>
       <label>
-        <span className="visually-hidden">Search the message</span>
+        <span className="sr-only">Search the message</span>
         <input
           ref={boxRef}
           type="search"
