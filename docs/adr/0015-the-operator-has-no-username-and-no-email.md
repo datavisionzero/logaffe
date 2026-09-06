@@ -1,5 +1,13 @@
 # The Operator Has No Username and No Email
 
+**Superseded by
+[ADR 0052](./0052-a-user-and-an-agent-are-one-identity.md).** A user has a name
+and an email address, and signing in selects an account. The last paragraph below
+asked for the mail question to be reopened as a question about mail rather than
+answered quietly, and
+[ADR 0053](./0053-transactional-email-is-an-optional-capability-of-the-installation.md)
+is that reopening.
+
 Signing in is a password and the second factor, with nothing identifying *which*
 account is meant. An installation has exactly one, so a username selects from a
 set of one and is a field kept out of habit. An email address is the more

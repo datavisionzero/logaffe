@@ -1,5 +1,12 @@
 # The Claim Is Atomic and Holds Nothing
 
+**Superseded by
+[ADR 0054](./0054-the-first-administrator-comes-from-the-environment.md).** There
+is no claim to be atomic about: the first administrator comes out of the
+configuration on the one start where the installation holds no identity. What
+this document refused — a half-claimed state that a stranger can leave behind —
+is refused more completely by there being no reachable act at all.
+
 An installation is unclaimed until the last step of the claim completes, and a
 claim that is started and abandoned leaves nothing behind. The obvious
 alternative is to treat starting the claim as taking it — a reservation, a lock,

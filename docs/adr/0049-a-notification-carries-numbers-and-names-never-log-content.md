@@ -1,5 +1,13 @@
 # A Notification Carries Numbers and Names, Never Log Content
 
+**Corrected by
+[ADR 0053](./0053-transactional-email-is-an-optional-capability-of-the-installation.md).**
+One of the reasons given below for ntfy being the only notifier was that the
+product has no address to send anything to. It has one now, and the decision is
+unchanged: the reason that carries it is push to a phone, and mail is for
+identity transactions only. Nothing about what a notification may contain
+changes.
+
 An alert leaves the installation carrying a project's name, the condition that
 fired, the numbers behind it, and a link into the log view with the filters
 already set. It carries **no text that came out of an entry** — no rendered

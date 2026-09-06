@@ -1,5 +1,11 @@
 # The Claim Is Guarded by a Secret or by a Window, and Whoever Installs Chooses
 
+**Superseded by
+[ADR 0054](./0054-the-first-administrator-comes-from-the-environment.md).** The
+choice between a secret and a window is gone with the act it guarded. The
+argument below — that a door which is locked does not need a clock — is what 0054
+takes to its conclusion: a door that is never opened needs neither.
+
 An unclaimed installation is guarded either by a **claim secret**, which is
 presented to claim and has no deadline, or by the **open window** of
 [ADR 0034](./0034-the-claim-window-is-a-row-in-the-database.md), which has no

@@ -1,5 +1,13 @@
 # A Wrong Password Never Locks the Account
 
+**Superseded by
+[ADR 0056](./0056-sign-in-is-throttled-per-account-and-per-source.md).** A failed
+sign-in now counts per account as well as per source. The argument below is not
+overruled, its premise is: with exactly one account a per-account limit is a
+weapon pointed at its owner, and with several it is a throttle that drains on its
+own in minutes. What survives is the shape — a limit that expires rather than a
+lockout that has to be lifted.
+
 Failed sign-ins are throttled by their source with a delay that grows as they
 accumulate, and the account is never locked. Lockout after some number of wrong
 attempts is the conventional answer and it is the wrong one here: with exactly

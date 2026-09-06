@@ -1,5 +1,15 @@
 # Administration Is Reachable Over MCP, on a Token That Reads No Entries
 
+**Amended by
+[ADR 0052](./0052-a-user-and-an-agent-are-one-identity.md) and
+[ADR 0055](./0055-project-access-is-one-filter.md).** The two kinds of agent
+token and everything said below about what they may reach is unchanged. What is
+added is an owner: a token belongs to the user who issued it, sees exactly the
+projects that user sees, and reaches the installation-wide administrative acts
+only while that user is an administrator. The exclusion of agent tokens from the
+surface below now carries a second reason — an agent issuing a token is an
+identity escaping the one it was given.
+
 An agent can create, rename and delete projects, groups and hosts, set retention
 windows, and issue and revoke ingest and host tokens. This supersedes
 [ADR 0018](./0018-projects-and-tokens-are-never-reachable-over-mcp.md), which

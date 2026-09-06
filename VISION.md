@@ -2,8 +2,8 @@
 
 ## In one sentence
 
-logaffe is a self-hostable, central logging tool for a single operator and their
-AI agent: it collects logs from many applications, keeps them separated by
+logaffe is a self-hostable, central logging tool for a small team and their AI
+agents: it collects logs from many applications, keeps them separated by
 project, and makes them accessible through a web UI and through MCP — safe
 enough to expose directly to the public internet.
 
@@ -21,8 +21,9 @@ first rebuilding how their applications log.
 
 ## Target users and scenario
 
-- One operator running a handful of self-hosted backend services — plus their
-  AI agent.
+- A handful of people running self-hosted backend services between them — plus
+  the AI agents working on their behalf. One person on their own is the ordinary
+  case and stays a first-class one.
 - Primarily .NET backend applications that today log to local files.
 - A single deployment hosting on the order of 10–30 projects, each with a
   deliberately limited retention window.
@@ -31,17 +32,34 @@ logaffe is not designed for multi-year log archives or billions of rows. Log
 volume per project is intentionally capped, and short retention is the expected
 mode of operation.
 
-## The operator model
+## The user model
 
-logaffe is a **single-operator, god-mode** system. There is exactly one human
-account, and it can see and do everything. There are no additional users, no
-roles, no permissions, no teams, no sharing, no invitations. The audience is one
-person and the AI agent working on their behalf.
+logaffe has **users**, and a user sees the projects they were given and no
+others. There is one role, **administrator**, and it is about running the
+installation — inviting people, deactivating them, handing out project access —
+rather than about seeing what is in it. An administrator who wants to read a
+project assigns it to themselves, and that assignment is a recorded act. Nothing
+in the product is visible by virtue of a role
+([ADR 0055](./docs/adr/0055-project-access-is-one-filter.md)).
 
-This is a deliberate simplification, not a stage on the way to multi-tenancy. It
-removes an entire dimension of complexity from the data model, the UI, and the
-agent interface, and it is what makes the rest of the product small enough to
-stay simple.
+**A user and an agent are the same kind of thing**, and the product calls both an
+identity ([ADR 0052](./docs/adr/0052-a-user-and-an-agent-are-one-identity.md)). An
+agent belongs to the person who issued its token, sees exactly the projects that
+person sees, is never an administrator, and goes quiet when its owner is
+deactivated. An agent is a way for somebody to act, not a second somebody.
+
+This replaces the single god-mode operator the product started with. That was a
+deliberate simplification and it was worth having for as long as the answer to
+*who else uses this* was *nobody*; project-scoped access is the likeliest second
+wish of anyone running a log store, and retrofitting it would mean opening every
+read path a second time. What the model still refuses is everything above it:
+there are no teams, no per-entry permissions, no roles an operator defines, no
+sharing links, and no directory to federate with.
+
+**Nobody is deleted.** An account that should not be used is deactivated, so that
+every project assignment and every record of who changed something keeps pointing
+at somebody. There is always at least one active administrator, and the last one
+can be neither deactivated nor stripped of the role.
 
 ## Publicly reachable by design
 
@@ -82,7 +100,7 @@ An outsider needs no access to the operator's systems for their text to end up
 verbatim in the log store — an HTTP request to any exposed application is
 enough.
 
-Because that stored text is later read by an AI agent operating with god-mode
+Because that stored text is later read by an AI agent operating with its owner's
 access, log content is a prompt-injection surface, and for this product it is
 the normal case rather than an edge case. Two consequences follow:
 
@@ -91,60 +109,61 @@ the normal case rather than an edge case. Two consequences follow:
   and the agent interface is designed so that content cannot be mistaken for
   direction from the operator.
 
-## Setup and the installation claim
+## Setup and the first administrator
 
-A fresh installation is **unclaimed**. The claim is a flow in the web UI through
-which the operator takes the installation and establishes their account, and what
-it establishes is a **password**. It is one act: until it completes the
-installation belongs to nobody, and nothing about it is half-done.
+**The first administrator comes out of the configuration.** Whoever installs
+names them — a name, an email address and a bootstrap token — before the first
+start, and the installation creates them on the one start where it holds no
+identity. There is no claim, no first-run screen, and no publicly reachable act
+that establishes an account
+([ADR 0054](./docs/adr/0054-the-first-administrator-comes-from-the-environment.md)).
 
-**How the claim is guarded is decided by whoever installs**, before the first
-start, because they are the one who knows which of the two they can actually
-perform.
+The token rather than a password, because a password in a compose file is a
+password in a shell history and in `docker inspect`, and because it is the
+credential a human reuses. It is exchanged once in the browser for a password and
+a session, and it stays valid afterwards as that administrator's own user token.
+**From the second start the variables are ignored**, whatever they say, so an
+installation that already has an administrator cannot be bootstrapped again by
+editing a file.
 
-- **A claim secret.** The installation is not claimable by anyone who cannot
-  present it. Whoever installs either sets it beforehand or leaves it to the
-  installation, which draws one on its first start and writes it where the host
-  can read it. There is no deadline, because a door that is locked does not need
-  a clock: an installation that is spun up and then forgotten is not an open
-  door, and the operator can claim it a week later.
-- **An open window.** No secret, and anyone who can reach the installation may
-  claim it — for a short, time-limited window after it first runs. There is no
-  data to take yet, but the installation itself can be taken, so the exposure is
-  real rather than nil; it is accepted because it is narrow and because it is
-  recoverable. The time limit is the whole of what keeps it narrow, and when it
-  lapses, claiming over the network is over until the operator intervenes on the
-  host.
+An installation that starts with nothing and was told nothing starts anyway and
+says in its log that nothing can authenticate. An installation given a bootstrap
+secret it will not accept — too short, or an address that is not one — does not
+start, the way a failed migration does not.
 
-The claim secret is the default. The window is for the installation where reading
-a file or a container log is not on offer — a one-click host, a panel — and it is
-the older of the two rather than the better one. The secret is also what makes an
-**unattended installation** work: whoever or whatever performs it writes the
-configuration before the first start and hands the secret over, and the operator
-claims when they get to it rather than within minutes of the container coming up.
+**Everybody after the first arrives by invitation.** An administrator invites an
+address, the person sets their own password from a one-time link, and they begin
+with an account and no project access until somebody gives them some. Recovering
+a forgotten password and changing an address work the same way, and all three
+need mail — which is the one external dependency this product takes
+([ADR 0053](./docs/adr/0053-transactional-email-is-an-optional-capability-of-the-installation.md)).
+An installation with no SMTP configured is healthy and complete in every other
+respect; only those three acts refuse, and they say why.
 
-**The second factor is offered, not required.** An operator enrols a TOTP
+**The second factor is offered, not required.** A user enrols a TOTP
 authenticator, and takes the sheet of backup codes that comes with it, whenever
-they decide to — from the settings, behind their own password — and can turn it
-off again. It is deliberately not part of the claim. Requiring it there buys
-account strength at the price of a claim that cannot be finished by someone
-without an authenticator to hand, and a forced enrolment is the one most likely
-to be done badly. This is a real concession: one god-mode account on the public
-internet behind a password alone is weaker than the same account behind two
-factors, and nothing else in the product compensates for it. What the product
-owes in return is that the choice is never made by accident — an installation
-whose second factor is off says so in the UI for as long as it is off — and that
-the sign-in rate limits stand either way.
+they decide to — from their own settings, behind their own password — and can
+turn it off again. It is deliberately not forced. Requiring it buys account
+strength at the price of an enrolment that cannot be completed by somebody
+without an authenticator to hand, and a forced enrolment is the one most likely to
+be done badly. This is a real concession: an account on the public internet behind
+a password alone is weaker than the same account behind two factors. What the
+product owes in return is that the choice is never made by accident — a user with
+no second factor is told so for as long as that is true — and that the sign-in
+throttle stands either way, per account and per source
+([ADR 0056](./docs/adr/0056-sign-in-is-throttled-per-account-and-per-source.md)).
 
-**There is always a way back in from the host.** With a single account, no email
-and no reset channel, a forgotten password — or a lost second factor with the
-backup codes gone too — would otherwise mean losing the installation. Whoever has
-access to the machine logaffe runs on can therefore run **Host Recovery**, which
-returns the installation to unclaimed and opens the way back in the form that
-installation is configured for, a fresh claim secret or a fresh window, while
-keeping its projects, tokens and entries. It is one operation for every case, and
-it is deliberately host-local: it is reachable from the Docker host, never over
-the network. See [`docs/setup.md`](./docs/setup.md).
+**There is always a way back in from the host.** An installation whose
+administrators are all locked out — forgotten passwords, a lost authenticator
+with the backup codes gone too — would otherwise be lost. Whoever has access to
+the machine logaffe runs on can therefore run **Host Recovery**, which removes
+every identity on the installation and leaves everything else — projects, groups,
+ingest tokens, settings, entries — untouched; the way back in afterwards is the
+bootstrap from configuration. It is one operation for every case, it now costs
+every account rather than one, and it is deliberately host-local: reachable from
+the Docker host, never over the network
+([ADR 0058](./docs/adr/0058-host-recovery-removes-every-identity.md)). See
+[`docs/setup.md`](./docs/setup.md).
 
 ## Core capabilities
 
@@ -210,11 +229,11 @@ surface as the web UI — see [`docs/querying.md`](./docs/querying.md) for what 
 can ask and [`docs/mcp.md`](./docs/mcp.md) for how it connects and what it
 cannot.
 
-The agent acts on the operator's behalf and is, alongside the operator, the
-second first-class consumer of the system.
+An agent acts on the behalf of the person who owns it, sees exactly the projects
+that person sees, and is, alongside them, a first-class consumer of the system.
 
-**Agent access is operator-initiated.** The agent looks into the logs because
-the operator asks it to — while fixing a bug, or on a request such as "check
+**Agent access is initiated by its owner.** The agent looks into the logs because
+they ask it to — while fixing a bug, or on a request such as "check
 project *mysupertestapp* and tell me whether there were critical errors in the
 last three days". The agent does not watch the log stream on its own and does
 not act unprompted. Passive, continuously running agent monitoring is not part
@@ -262,8 +281,8 @@ actually sees, and how it behaves, is [`docs/ui.md`](./docs/ui.md).
 
 **Following logs live** is done by polling — refreshing the current view every
 few seconds, on the order of five. Push-based streaming (SSE, WebSockets) is
-deliberately not used: with a single operator there is at most one open view at
-a time, so polling is cheap and avoids a whole class of connection-lifecycle,
+deliberately not used: an installation of this size has a handful of open views
+at a time, so polling is cheap and avoids a whole class of connection-lifecycle,
 proxy, and reconnect problems on a publicly exposed deployment.
 
 ### 5. What the machine was doing
@@ -334,8 +353,11 @@ operator wanted to be anyway.
 **One notifier is supported, and it is ntfy** — it pushes, it needs no inbound
 port, it is self-hostable, and it reaches a phone. A notification that is a name,
 three numbers and a URL formats identically everywhere, so there is nothing a
-second integration would render better. Email in particular stays absent for the
-reason it was always absent: this product has no address to send anything to.
+second integration would render better. Email stays absent, and the reason has
+been corrected: the product does have addresses now and can send mail
+([ADR 0053](./docs/adr/0053-transactional-email-is-an-optional-capability-of-the-installation.md)),
+but what this capability is for is a push to a phone, and mail is for identity
+transactions only.
 
 None of this reads an entry. The conditions run on a small tally the installation
 keeps as deliveries arrive — how many entries a project received in an hour —
@@ -359,8 +381,11 @@ which is also what tells the operator what a retention window will cost
   people's software.
 - **No requirement of full OpenTelemetry adoption** in the applications that
   send logs.
-- **No multi-user features.** No user management, roles, permissions, teams,
-  sharing, or invitations. One operator, full access.
+- **No user model beyond users, one role, and project access.** No teams, no
+  organizations, no permissions an operator defines, no roles beyond
+  administrator, no per-project role, no permission on an individual entry, no
+  sharing link, and no SSO, LDAP or OIDC to federate with. Access is a list of
+  projects against a person, and that is the whole of it.
 - **No reliance on network-level protection.** logaffe does not assume it sits
   behind a VPN, Tailscale, or an authenticating reverse proxy, and it will not
   treat "run it on a private network" as a security answer.
@@ -431,10 +456,14 @@ in [`docs/adr/`](./docs/adr/), and how the repository is laid out around them is
 - **Live updates:** polling on the order of five seconds, no push streaming
 - **Deployment:** containerized, runnable with Docker Compose as the standard
   way to operate it — including on a public cloud host
-- **Authentication:** a single operator account with a password, established
-  through the claim and guarded by a claim secret or a time-limited window, with
-  no username and no email address; an optional TOTP second factor and its backup
-  codes are enrolled afterwards. See [`docs/sign-in.md`](./docs/sign-in.md)
+- **Authentication:** users signing in with an email address and a password
+  hashed with Argon2id, on server-side browser sessions; an optional TOTP second
+  factor and its backup codes are each user's own. The first administrator comes
+  from the environment on the first start, everybody after them by invitation.
+  See [`docs/sign-in.md`](./docs/sign-in.md)
+- **Transactional email:** SMTP the operator configures, used for invitations,
+  password recovery and address changes and for nothing else — optional, with no
+  queue and no second container. See [`docs/setup.md`](./docs/setup.md)
 - **Distribution:** the project is intended to be released as open source
 
 ## Operating an installation: upgrades and backup
@@ -461,8 +490,8 @@ that backing up is *simple to do and clearly documented*:
 
 **Not everything is equally worth saving.** Logs are expendable: they are
 short-lived by design, they are additive to the applications' own local logs,
-and losing them costs little. The operator account and the configuration are
-not — losing those means losing access to the installation. A backup strategy
+and losing them costs little. The accounts and the configuration are not —
+losing those means losing access to the installation. A backup strategy
 that covers only the small, slow-changing part is a legitimate choice, and the
 documentation should say so.
 
@@ -479,9 +508,11 @@ documentation should say so.
    are designed for machine consumption, not only for a human-facing UI.
 4. **Bounded by design.** Limited retention and moderate volume are deliberate
    constraints that keep the system simple to run.
-5. **One operator, no user model.** Every feature is designed for a single
-   god-mode account; anything that would only make sense with multiple users is
-   out of scope by definition.
+5. **Access is a list of projects, and there is one filter.** Every read narrows
+   to the projects the identity behind the request can reach, through one
+   component rather than at each call site, because a call site that forgets is a
+   leak. Anything that would need a richer permission model than *this person may
+   see that project* is out of scope by definition.
 6. **Safe on the open internet.** Every publicly exposed surface — UI, MCP,
    ingestion, samples — is designed to withstand being reachable by anyone,
    without a network-level safety net in front of it.
