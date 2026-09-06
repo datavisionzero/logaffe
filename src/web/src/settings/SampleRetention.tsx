@@ -3,7 +3,9 @@ import { api, asNumber, problemWith } from "../api/client";
 import { RETENTION_MAXIMUM, RETENTION_MINIMUM } from "../projects/retention";
 import { Footprint, type ReadFootprint } from "./Footprint";
 import { Button } from "../components/ui/button";
-import { About, Area, Confirming, Said } from "./Area";
+import { About, Area, Confirming } from "./Area";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
 
 /**
  * What the field is waiting on. Only one of these is a screen the operator has
@@ -189,9 +191,8 @@ export function SampleRetention() {
 
       {held !== undefined && (
         <form onSubmit={ask} className="grid max-w-md gap-3">
-          <label>
-            Kept for
-            <input
+          <Field label="Kept for" after="days" said={problem}>
+            <Input
               type="number"
               min={RETENTION_MINIMUM}
               max={RETENTION_MAXIMUM}
@@ -203,9 +204,7 @@ export function SampleRetention() {
               }}
               aria-invalid={problem !== undefined || undefined}
             />
-            days
-          </label>
-          <Said problem={problem} />
+          </Field>
 
           <Footprint read={readFootprint} days={wanted} counting="samples" />
 

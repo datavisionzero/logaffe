@@ -512,9 +512,13 @@ nobody asked.
   product `VISION.md` says logaffe is not.
 - **No column configuration, no layout settings, no theme setting.** The row is
   what it is, and the interface follows the colour scheme the operating system
-  asks for. Putting the navigation column away is not one of these: it is not
-  stored anywhere and every load starts with the column open, so no screenshot
-  carries a question about the state it was taken in.
+  asks for. There is a `dark` class on `<html>` and it is set from
+  `prefers-color-scheme` and from nothing else
+  ([ADR 0051](./adr/0051-the-web-interface-is-tailwind-base-ui-and-planaffes-own-tokens.md)) —
+  the mechanism a token layer needs, with no control in front of it. Putting the
+  navigation column away is not one of these either: it is not stored anywhere
+  and every load starts with the column open, so no screenshot carries a
+  question about the state it was taken in.
 - **No export of a filtered result to a file.** A single entry copies as JSON,
   and an agent reads through [MCP](./mcp.md); a bulk export is a second read path
   with its own limits and its own answer to what happens at ten million rows.

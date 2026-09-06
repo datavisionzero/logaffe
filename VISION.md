@@ -404,8 +404,10 @@ in [`docs/adr/`](./docs/adr/), and how the repository is laid out around them is
 
 - **Backend:** .NET 10, in four layers. See
   [`docs/codebase.md`](./docs/codebase.md)
-- **Frontend:** React, as a single-page application. See
-  [`docs/ui.md`](./docs/ui.md)
+- **Frontend:** React, as a single-page application, drawn with Tailwind CSS v4
+  as the token layer, Base UI as the primitive layer and shadcn components this
+  repository owns — the same foundation and the same token values as planaffe,
+  so that the two read as one family. See [`docs/ui.md`](./docs/ui.md)
 - **Storage:** PostgreSQL, tuned for high log-row counts through appropriate
   indexing and schema design — sized for a moderate, bounded data set rather
   than unbounded growth. See [`docs/storage.md`](./docs/storage.md)

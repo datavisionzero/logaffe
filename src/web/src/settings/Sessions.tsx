@@ -4,6 +4,7 @@ import { formatTimestamp } from "../shared/time";
 import { LastUse } from "./LastUse";
 import { Button } from "../components/ui/button";
 import { About, Area, Cell, Head, Listing, RowName, Said } from "./Area";
+import { Badge } from "../components/ui/badge";
 
 interface HeldSession {
   id: string;
@@ -142,7 +143,11 @@ export function Sessions() {
             <tr key={session.id}>
               <RowName>
                 {session.lastSeenFrom}
-                {session.isCurrent && <span className="here"> This browser</span>}
+                {session.isCurrent && (
+                  <Badge variant="outline" className="ml-2">
+                    This browser
+                  </Badge>
+                )}
               </RowName>
               <Cell>
                 <time dateTime={session.startedAt.toISOString()}>

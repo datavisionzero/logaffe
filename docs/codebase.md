@@ -130,6 +130,13 @@ and owned here. The token values are planaffe's, deliberately, so that the two
 products read as one family. Tailwind's own palette is switched off in the token
 layer, so a screen speaks that vocabulary or does not build.
 
+`src/web/src/index.css` is that token layer and nothing else: the palette, the
+radii, the two fonts, the six log levels, and the handful of rules that are true
+of every screen. What a screen looks like is on the screen. Beside it sit the
+pieces every screen is made of — `components/ui/` as it came from planaffe,
+`components/Page.tsx` and `components/Field.tsx` for the shapes logaffe has and
+planaffe does not, and `settings/Area.tsx` for the shape a settings screen is.
+
 ## The HTTP contract is an artifact, not an intention
 
 ADR 0001 takes as its cost that the frontend cannot share types with the backend

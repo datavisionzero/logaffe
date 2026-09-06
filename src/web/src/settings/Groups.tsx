@@ -273,7 +273,8 @@ function Rename({
 
   return (
     <>
-      <input
+      <Input
+        className="inline-block w-auto"
         value={renamed}
         onChange={(e) => setRenamed(e.target.value)}
         aria-label={`Name of ${group.name}`}

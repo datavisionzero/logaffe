@@ -186,6 +186,7 @@ export function AlertNotifier({
       )}
 
       <form
+        className="grid max-w-md gap-3"
         onSubmit={(event: FormEvent) => {
           event.preventDefault();
           void save(token === "" ? null : token);

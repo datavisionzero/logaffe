@@ -117,7 +117,7 @@ export function LogView({ project }: { project: HeldProject }) {
   if (project.lastReceivedAt === null) {
     return (
       <section className="flex min-h-0 flex-1 flex-col gap-1.5 px-4 py-2.5">
-        <h1>{project.name}</h1>
+        <h1 className="px-1 text-xl font-semibold tracking-tight">{project.name}</h1>
         <EmptyProject projectId={project.id} />
       </section>
     );
