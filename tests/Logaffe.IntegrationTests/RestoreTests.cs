@@ -112,7 +112,7 @@ public sealed class RestoreTests(PostgresFixture postgres) : IDisposable
 
         // And the person: the password hash and the second factor's secret came
         // back together, which is the other thing losing a volume costs.
-        var hasher = new FrameworkPasswordHasher();
+        var hasher = new Argon2idPasswordHasher();
         var signedIn = await new SignIn(
                 new Identities(context),
                 new Sessions(context),
@@ -179,7 +179,7 @@ public sealed class RestoreTests(PostgresFixture postgres) : IDisposable
 
         var user = User.Bootstrap("The Administrator", TheirAddress, Claimed);
         user.ActivateWith(
-            new FrameworkPasswordHasher().Hash(Password.Create(TheirPassword)));
+            new Argon2idPasswordHasher().Hash(Password.Create(TheirPassword)));
         user.EnrolSecondFactor(cipher.Encrypt(SecondFactorSecret), Claimed);
 
         var identities = new Identities(context);

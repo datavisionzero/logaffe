@@ -100,28 +100,44 @@ of the machine in front of the operator.
 **At least sixteen characters**, and nothing else — no composition rules, no
 forced rotation, and no check against an outside service, which would put a
 network dependency and a disclosure into the sign-in path of a self-hosted
-product. Length is the property that matters, and on an installation with no
-second factor it is the only property there is
+product. Length is the property that matters, and on an account with no second
+factor it is the only property there is
 ([ADR 0042](./adr/0042-the-password-carries-more-so-it-gets-longer.md)). Sixteen
 is a passphrase — three words and a separator — rather than a rule about symbols.
 
 **It is a rule about choosing a password and not about giving one.** A sign-in
-takes what was typed and lets the hash answer, so an operator whose password was
+takes what was typed and lets the hash answer, so somebody whose password was
 long enough when they set it is never locked out by the minimum rising later —
 they are asked for their password, and it is right or it is wrong. What is
 refused before the hasher is only what would make it work for nothing: an empty
 box, and anything past a few hundred characters.
 
-It is stored as a **slow hash** — the framework's PBKDF2-HMAC-SHA512, at OWASP's
-current figure — whose cost parameters are versioned, and a successful sign-in
-rewrites the hash at the current cost, so raising that cost later is a thing the
-product does on its own
-([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)). What
-that buys and what it does not is stated rather than argued away: a stolen
+It is stored as **Argon2id** — 64 MiB, three passes, one lane, which is OWASP's
+second recommended option and the figures planaffe and vaultaffe hash at
+([ADR 0057](./adr/0057-a-users-secrets-are-stored-for-what-they-are-and-the-password-is-argon2id.md)).
+Argon2id is memory-hard, which is the property that takes the advantage away from
+the hardware an offline attacker would bring, and against a human-chosen password
+that advantage is the whole game.
+
+**The stored value carries its own parameters**, in the PHC form
+`$argon2id$v=19$m=…,t=…,p=…$salt$hash`, and a candidate is hashed with what the
+value says rather than with what the code says. Raising the figures later is one
+line and a rewrite per sign-in, with no schema change and nothing to migrate: a
+successful sign-in against older parameters rewrites the hash at the current
+ones.
+
+**An installation from before this crosses over on its own.** Passwords used to
+be hashed with the framework's PBKDF2-HMAC-SHA512, and that format is still read:
+a hash in it admits exactly as a current one does, and the next successful
+sign-in rewrites it as Argon2id. Nobody is locked out, nobody is asked to reset
+anything, and a password nobody signs in with keeps its old hash — which costs
+nothing, because it is also a password nobody is signing in with.
+
+What that buys and what it does not is stated rather than argued away: a stolen
 database dump is the one place this credential can be attacked without limit, and
-against an operator who enrolled no second factor it is the whole account. The
-length above is what stands there, and it is the product's largest single
-accepted risk.
+against somebody who enrolled no second factor it is the whole account. It is a
+much worse deal for the attacker than it used to be, and it is still the
+product's largest single accepted risk.
 
 Changing the password requires the current one, and it ends every other session.
 

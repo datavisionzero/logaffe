@@ -167,7 +167,7 @@ public sealed class SignInActsTests(PostgresFixture postgres) : IDisposable
 
         var user = User.Bootstrap("The Administrator", TheirAddress, Claimed);
         user.ActivateWith(
-            new FrameworkPasswordHasher().Hash(Password.Create(TheirPassword)));
+            new Argon2idPasswordHasher().Hash(Password.Create(TheirPassword)));
         user.EnrolSecondFactor(CipherOn(_volume).Encrypt(SecondFactorSecret), Claimed);
 
         var minted = BackupCode.MintSet(user.Id, Claimed);
@@ -184,7 +184,7 @@ public sealed class SignInActsTests(PostgresFixture postgres) : IDisposable
     {
         await using var context = ContextFor(installation);
 
-        var hasher = new FrameworkPasswordHasher();
+        var hasher = new Argon2idPasswordHasher();
 
         return await new SignIn(
                 new Identities(context),

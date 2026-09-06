@@ -5,11 +5,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- For PasswordHasher<T>, which is the whole of what this takes from it.
-         ADR 0032 chose it over Argon2id precisely because it arrives with the
-         shared framework at no dependency cost, and a FrameworkReference is what
-         that costs nothing means: the runtime is already there, and no package
-         is fetched. -->
+    <!-- For PasswordHasher<T>, which today verifies rather than writes: a hash
+         from before ADR 0057 is read by it and rewritten as Argon2id on the next
+         successful sign-in. A FrameworkReference costs nothing — the runtime is
+         already there and no package is fetched — so it stays for as long as a
+         PBKDF2 hash might. -->
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
@@ -19,6 +19,8 @@
          filtered page is the first work that has rows to turn back into
          entries, which is when ADR 0003 said this would arrive. -->
     <PackageReference Include="Dapper" />
+    <!-- Argon2id, which is what a password is hashed with (ADR 0057). -->
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <!-- Named as well as arriving under the provider above, because the log
          path writes with Npgsql's binary COPY directly (ADR 0003) rather than

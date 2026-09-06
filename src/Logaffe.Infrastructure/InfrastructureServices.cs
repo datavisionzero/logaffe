@@ -103,7 +103,7 @@ public static class InfrastructureServices
         // Neither of these holds anything: one writes its parameters into every
         // hash it produces, the other is arithmetic over a secret the caller
         // brings.
-        services.AddSingleton<IPasswordHasher, FrameworkPasswordHasher>();
+        services.AddSingleton<IPasswordHasher, Argon2idPasswordHasher>();
         services.AddSingleton<ISecondFactor, Rfc6238SecondFactor>();
 
         return services;
