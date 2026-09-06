@@ -46,12 +46,12 @@ public sealed class BackupTests(PostgresFixture postgres)
         var names = tables.Select(table => table.Name).ToArray();
 
         // Everything EF Core declares, with nothing left out: a table the model
-        // has and the artifact does not is a table an operator loses.
+        // has and the artifact does not is a table an installation loses.
         Assert.Equal(
             [
-                "agent_token", "alert_condition_state", "backup_code", "claim_guard",
-                "filesystem_reading", "host", "host_sample", "host_token",
-                "ingest_token", "installation_settings", "log_entry", "operator",
+                "agent_token", "alert_condition_state", "backup_code",
+                "filesystem_reading", "host", "host_sample", "host_token", "identity",
+                "ingest_token", "installation_settings", "log_entry",
                 "project", "project_group", "project_tally", "session",
             ],
             names.Order(StringComparer.Ordinal));
@@ -59,8 +59,8 @@ public sealed class BackupTests(PostgresFixture postgres)
         // Every foreign key in the schema, each read as "after".
         Assert.True(Array.IndexOf(names, "project") < Array.IndexOf(names, "ingest_token"));
         Assert.True(Array.IndexOf(names, "project_group") < Array.IndexOf(names, "project"));
-        Assert.True(Array.IndexOf(names, "operator") < Array.IndexOf(names, "session"));
-        Assert.True(Array.IndexOf(names, "operator") < Array.IndexOf(names, "backup_code"));
+        Assert.True(Array.IndexOf(names, "identity") < Array.IndexOf(names, "session"));
+        Assert.True(Array.IndexOf(names, "identity") < Array.IndexOf(names, "backup_code"));
 
         // The host is pointed at by four things, one of them the project — which
         // is why it has to be restored before a table that was already in this

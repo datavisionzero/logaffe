@@ -1,5 +1,5 @@
 using Logaffe.Api.Hosting;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 
@@ -49,66 +49,61 @@ public sealed class HostConfigurationTests
     }
 
     [Fact]
-    public void An_installation_told_nothing_draws_its_own_claim_secret()
+    public void An_installation_told_nothing_bootstraps_nobody()
     {
-        var claim = HostConfiguration.Claim(Configured([]));
+        var bootstrap = HostConfiguration.Bootstrap(Configured([]));
 
-        // The default, and the one an unattended installation runs with
-        // (ADR 0040).
-        Assert.Equal(ClaimMode.Secret, claim.Mode);
-        Assert.Null(claim.SuppliedSecret);
-        Assert.True(claim.DrawsItsOwnSecret);
-    }
-
-    [Theory]
-    [InlineData("window")]
-    [InlineData("Window")]
-    [InlineData("WINDOW")]
-    public void The_other_guard_is_named_however_it_is_written(string mode)
-    {
-        var claim = HostConfiguration.Claim(
-            Configured([new("Logaffe:Claim:Mode", mode)]));
-
-        Assert.Equal(ClaimMode.Window, claim.Mode);
-        Assert.False(claim.DrawsItsOwnSecret);
+        // Not a refusal: an installation that was told nothing starts anyway and
+        // says so, because ingestion needs no identity (ADR 0054).
+        Assert.Null(bootstrap.Administrator);
+        Assert.Null(bootstrap.Email);
+        Assert.Null(bootstrap.Token);
+        Assert.False(bootstrap.IsComplete);
     }
 
     [Fact]
-    public void A_supplied_secret_is_read_and_kept_out_of_the_database()
+    public void The_three_keys_are_read_together()
     {
-        var claim = HostConfiguration.Claim(Configured(
+        var bootstrap = HostConfiguration.Bootstrap(Configured(
         [
-            new("Logaffe:Claim:Mode", "secret"),
-            new("Logaffe:Claim:Secret", "the-one-the-compose-file-names"),
+            new("Logaffe:Bootstrap:Administrator", "The Administrator"),
+            new("Logaffe:Bootstrap:Email", "somebody@example.com"),
+            new("Logaffe:Bootstrap:Token", "a-bootstrap-token-long-enough-to-be-one"),
         ]));
 
-        Assert.NotNull(claim.SuppliedSecret);
-        Assert.False(claim.DrawsItsOwnSecret);
+        Assert.Equal("The Administrator", bootstrap.Administrator);
+        Assert.Equal("somebody@example.com", bootstrap.Email);
+        Assert.Equal("a-bootstrap-token-long-enough-to-be-one", bootstrap.Token);
+        Assert.True(bootstrap.IsComplete);
     }
 
-    /// <summary>
-    /// Both mistakes stop the start rather than being served on: a mode that is
-    /// not one is a typo, and a short secret is the one public door a guess
-    /// opens.
-    /// </summary>
     [Theory]
-    [InlineData("sceret", null)]
-    [InlineData("secret", "short")]
-    [InlineData("window", "a secret that is never presented to anything")]
-    public void A_claim_nobody_could_have_meant_stops_the_start(string mode, string? secret)
+    [InlineData(null, "somebody@example.com", "a-bootstrap-token-long-enough-to-be-one")]
+    [InlineData("The Administrator", null, "a-bootstrap-token-long-enough-to-be-one")]
+    [InlineData("The Administrator", "somebody@example.com", null)]
+    public void Two_of_the_three_bootstrap_nobody(
+        string? administrator, string? email, string? token)
     {
-        var settings = new List<KeyValuePair<string, string?>>
-        {
-            new("Logaffe:Claim:Mode", mode),
-        };
+        var settings = new List<KeyValuePair<string, string?>>();
 
-        if (secret is not null)
+        if (administrator is not null)
         {
-            settings.Add(new("Logaffe:Claim:Secret", secret));
+            settings.Add(new("Logaffe:Bootstrap:Administrator", administrator));
         }
 
-        Assert.Throws<InvalidOperationException>(
-            () => HostConfiguration.Claim(Configured(settings)));
+        if (email is not null)
+        {
+            settings.Add(new("Logaffe:Bootstrap:Email", email));
+        }
+
+        if (token is not null)
+        {
+            settings.Add(new("Logaffe:Bootstrap:Token", token));
+        }
+
+        // Reading them is not where a partial configuration is judged: the
+        // bootstrap decides what to do about it, and says so in the log.
+        Assert.False(HostConfiguration.Bootstrap(Configured(settings)).IsComplete);
     }
 
     private static IConfiguration Configured(

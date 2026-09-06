@@ -4,7 +4,7 @@ using System.Text.Json;
 using Logaffe.Application.Ports;
 using Logaffe.Domain.Alerts;
 using Logaffe.Domain.Hosts;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Projects;
 using Logaffe.Infrastructure.Alerts;
 using Microsoft.Extensions.Configuration;
@@ -360,20 +360,6 @@ public sealed class NtfyNotifierTests
             Task.FromResult(notifier);
 
         public Task RecordNotifierAsync(Notifier? notifier, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<ClaimGuard?> ReadClaimGuardAsync(CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<ClaimGuard> OpenClaimAsync(
-            DateTimeOffset firstRunAt, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<ClaimGuard> ArmClaimAsync(
-            DateTimeOffset at, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task RecordClaimAsync(ClaimGuard guard, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
         public Task<RetentionWindow> ReadSampleRetentionAsync(CancellationToken cancellationToken) =>

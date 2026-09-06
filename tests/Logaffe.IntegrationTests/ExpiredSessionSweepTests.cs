@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 using Logaffe.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -66,21 +66,21 @@ public sealed class ExpiredSessionSweepTests(PostgresFixture postgres) : IDispos
 
     /// <summary>
     /// The row the sweep is meant to find: a session whose last use is older
-    /// than the sliding lifetime, written straight into the table because no act
+    /// than the idle lifetime, written straight into the table because no act
     /// can produce one.
     /// </summary>
     private static async Task<Guid> SeedExpiredSessionAsync(string connectionString)
     {
         await using var context = ContextFor(connectionString);
 
-        var theOperator = await context.Operators.SingleAsync(
-            TestContext.Current.CancellationToken);
+        var user = await context.Identities.OfType<User>()
+            .SingleAsync(TestContext.Current.CancellationToken);
 
         var expired = Session.Start(
-            theOperator.Id,
+            user.Id,
             SessionSecret.Mint(),
             "203.0.113.7",
-            DateTimeOffset.UtcNow - Session.SlidingLifetime - TimeSpan.FromDays(1));
+            DateTimeOffset.UtcNow - Session.IdleLifetime - TimeSpan.FromDays(1));
 
         context.Sessions.Add(expired);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -119,7 +119,7 @@ public sealed class ExpiredSessionSweepTests(PostgresFixture postgres) : IDispos
             HttpStatusCode.OK,
             (await client.GetAsync("/health", TestContext.Current.CancellationToken)).StatusCode);
 
-        await AClaimedInstallation.ClaimAsync(installation, _volume);
+        await ABootstrappedInstallation.SignInAsync(installation);
 
         await using var context = ContextFor(connectionString);
 

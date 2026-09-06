@@ -2,7 +2,7 @@ using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.Application.Operations;
 
@@ -102,8 +102,8 @@ public sealed record EnrolmentTicket(
     }
 
     /// <summary>
-    /// Whether this is <paramref name="theOperator"/>'s and still current.
+    /// Whether this is <paramref name="user"/>'s and still current.
     /// </summary>
-    public bool BelongsTo(Operator theOperator, DateTimeOffset now) =>
-        OperatorId == theOperator.Id && now < DrawnAt + Lifetime;
+    public bool BelongsTo(User user, DateTimeOffset now) =>
+        OperatorId == user.Id && now < DrawnAt + Lifetime;
 }

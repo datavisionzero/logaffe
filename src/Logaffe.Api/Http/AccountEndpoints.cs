@@ -1,5 +1,5 @@
 using Logaffe.Application.Operations;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace Logaffe.Api.Http;
@@ -117,25 +117,26 @@ public sealed record TurnOffSecondFactorRequest(
 /// to say so.
 /// </para>
 /// </remarks>
-public static class OperatorEndpoints
+public static class AccountEndpoints
 {
-    public static IEndpointRouteBuilder MapOperator(this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapAccount(this IEndpointRouteBuilder endpoints)
     {
-        var operatorSurface = endpoints
+        var account = endpoints
             .MapGroup(string.Empty)
             .RequireAuthorization()
             .RequireRateLimiting(PublicRateLimits.Operator);
 
-        operatorSurface.MapPut("/password", async (
+        account.MapPut("/password", async (
                 ChangePasswordRequest request,
                 ChangePassword change,
                 HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 var outcome = await change.ExecuteAsync(
+                    context.CurrentUser(),
                     request.CurrentPassword,
                     request.NewPassword,
-                    context.OperatorSession(),
+                    context.CurrentSession(),
                     cancellationToken);
 
                 return outcome switch
@@ -152,12 +153,14 @@ public static class OperatorEndpoints
             .Produces(StatusCodes.Status204NoContent)
             .ProducesValidationProblem();
 
-        operatorSurface.MapPost("/backup-codes", async (
+        account.MapPost("/backup-codes", async (
                 IssueBackupCodesRequest request,
                 IssueBackupCodes issue,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                var sheet = await issue.ExecuteAsync(request.Password, cancellationToken);
+                var sheet = await issue.ExecuteAsync(
+                    context.CurrentUser(), request.Password, cancellationToken);
 
                 // The one response body in the product that carries ten
                 // credentials at once, which is why the request log records no
@@ -177,59 +180,53 @@ public static class OperatorEndpoints
             .Produces(StatusCodes.Status409Conflict)
             .ProducesValidationProblem();
 
-        operatorSurface.MapGet("/second-factor", async (
-                CheckTheSecondFactor check, CancellationToken cancellationToken) =>
+        account.MapGet("/second-factor", (CheckTheSecondFactor check, HttpContext context) =>
             {
-                var state = await check.ExecuteAsync(cancellationToken);
+                var state = check.Execute(context.CurrentUser());
 
-                return state is null
-                    ? Results.Unauthorized()
-                    : Results.Ok(new SecondFactorResponse(state.IsEnrolled, state.EnrolledAt));
+                return Results.Ok(new SecondFactorResponse(state.IsEnrolled, state.EnrolledAt));
             })
             .WithName("CheckSecondFactor")
-            .WithSummary("Whether the operator has a second factor, and since when.")
-            .Produces<SecondFactorResponse>()
-            .Produces(StatusCodes.Status401Unauthorized);
+            .WithSummary("Whether the signed-in user has a second factor, and since when.")
+            .Produces<SecondFactorResponse>();
 
-        operatorSurface.MapPost("/second-factor/enrolment", async (
+        account.MapPost("/second-factor/enrolment", async (
                 BeginEnrolment begin, HttpContext context, CancellationToken cancellationToken) =>
             {
                 // The name an authenticator app will show in its list is the
-                // address the operator reached this installation by, which only
-                // an adapter knows — and behind a reverse proxy it is the
-                // forwarded one.
+                // address this installation was reached by, which only an
+                // adapter knows — and behind a reverse proxy it is the forwarded
+                // one.
                 var enrolment = await begin.ExecuteAsync(
-                    context.Request.Host.Value ?? "logaffe", cancellationToken);
+                    context.CurrentUser(),
+                    context.Request.Host.Value ?? "logaffe",
+                    cancellationToken);
 
-                // No account behind a live session is Host Recovery a moment
-                // ago. The session it left behind admits nothing either, so the
-                // next request is a sign-in screen.
-                return enrolment is null
-                    ? Results.Unauthorized()
-                    : Results.Ok(new EnrolmentResponse(
-                        enrolment.SecondFactorSecret,
-                        enrolment.EnrolmentUri,
-                        [.. enrolment.BackupCodes.Select(code => code.Display)],
-                        enrolment.Ticket));
+                return Results.Ok(new EnrolmentResponse(
+                    enrolment.SecondFactorSecret,
+                    enrolment.EnrolmentUri,
+                    [.. enrolment.BackupCodes.Select(code => code.Display)],
+                    enrolment.Ticket));
             })
             .WithName("BeginEnrolment")
             .WithSummary("Draws a second factor and a sheet of backup codes, and stores neither.")
             .Produces<EnrolmentResponse>()
             .Produces(StatusCodes.Status401Unauthorized);
 
-        operatorSurface.MapPut("/second-factor", async (
+        account.MapPut("/second-factor", async (
                 EnrolSecondFactorRequest request,
                 EnrolTheSecondFactor enrol,
                 HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 var outcome = await enrol.ExecuteAsync(
+                    context.CurrentUser(),
                     request.Password,
                     request.SecondFactorCode,
                     request.BackupCode,
                     request.NewSecondFactorCode,
                     request.Ticket,
-                    context.OperatorSession(),
+                    context.CurrentSession(),
                     cancellationToken);
 
                 return RefusedBy(outcome);
@@ -244,17 +241,18 @@ public static class OperatorEndpoints
         // A removal rather than a `DELETE`, because this act carries credentials
         // and a body on a `DELETE` is the one thing on the way between a browser
         // and an installation that nothing guarantees survives.
-        operatorSurface.MapPost("/second-factor/removal", async (
+        account.MapPost("/second-factor/removal", async (
                 TurnOffSecondFactorRequest request,
                 TurnOffTheSecondFactor turnOff,
                 HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 var outcome = await turnOff.ExecuteAsync(
+                    context.CurrentUser(),
                     request.Password,
                     request.SecondFactorCode,
                     request.BackupCode,
-                    context.OperatorSession(),
+                    context.CurrentSession(),
                     cancellationToken);
 
                 return outcome switch
@@ -316,7 +314,12 @@ public static class OperatorEndpoints
     /// </summary>
     private static IResult NoSecondFactor() => Results.Conflict();
 
-    /// <inheritdoc cref="ClaimEndpoints"/>
+    /// <summary>
+    /// Which field the request was refused over, said by name. There is nobody
+    /// here but the signed-in user — they proved it with the session — and
+    /// somebody enrolling with a phone in one hand has to know which of the
+    /// credentials did not take.
+    /// </summary>
     private static IResult NotRight(string field, string message) =>
         Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
 }

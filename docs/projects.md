@@ -25,9 +25,10 @@ attached to — never the name.
 
 Projects are **created explicitly by the operator**. There is no implicit
 creation on first delivery, so a token that names nothing admits nothing, and an
-installation's project list is exactly what the operator put there. The first
-project usually comes from the first-run guide after the claim
-([Setup](./setup.md)).
+installation's project list is exactly what somebody put there. The first
+project usually comes from the first-run guide that follows the bootstrap
+exchange ([Setup](./setup.md)). Whoever creates one holds access to it from that
+moment ([ADR 0055](./adr/0055-project-access-is-one-filter.md)).
 
 There is no cap on how many an installation holds. `VISION.md` expects on the
 order of 10 to 30, and that is a statement about the shape of the product rather

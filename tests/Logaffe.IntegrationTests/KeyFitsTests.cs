@@ -1,5 +1,5 @@
 using Logaffe.Application.Operations;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
@@ -83,21 +83,21 @@ public sealed class KeyFitsTests(PostgresFixture postgres) : IDisposable
     }
 
     [Fact]
-    public async Task An_operator_with_no_tokens_at_all_is_enough_to_check_against()
+    public async Task A_user_with_no_tokens_at_all_is_enough_to_check_against()
     {
         var volume = NewVolume();
         var context = await MigratedAsync();
         var cipher = CipherOn(volume);
-        var theOperator = Operator.Claim("AQAAAAIAAYagAAAAE-not-a-real-hash", Now);
-        theOperator.EnrolSecondFactor(
-            cipher.Encrypt("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"), Now);
-        context.Operators.Add(theOperator);
+        var user = User.Bootstrap("The Administrator", "somebody@example.com", Now);
+        user.ActivateWith("$argon2id$v=19$m=19456,t=2,p=1$not-a-real-hash");
+        user.EnrolSecondFactor(cipher.Encrypt("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"), Now);
+        context.Identities.Add(user);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        // An installation claimed a minute ago holds no project, no token and
-        // one sealed secret — the operator's second factor. It is the case the
+        // An installation bootstrapped a minute ago holds no project, no token
+        // and one sealed secret — that user's second factor. It is the case the
         // token tables miss entirely, and the one where a wrong key costs the
-        // most: without it the operator cannot verify a code at all (ADR 0032).
+        // most: without it nobody can verify a code at all (ADR 0057).
         Assert.Equal(KeyFit.Fits, await CheckWith(context, volume));
         Assert.Equal(KeyFit.DoesNotFit, await CheckWith(context, NewVolume()));
     }

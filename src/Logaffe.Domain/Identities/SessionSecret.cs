@@ -1,7 +1,7 @@
 using System.Buffers.Text;
 using System.Security.Cryptography;
 
-namespace Logaffe.Domain.Operators;
+namespace Logaffe.Domain.Identities;
 
 /// <summary>
 /// The value a signed-in browser holds and presents, and the only thing that
@@ -13,8 +13,8 @@ namespace Logaffe.Domain.Operators;
 /// the same reasons (ADR 0032): it is drawn by the installation at full entropy,
 /// so there is no candidate list a slow hash would defend against, and it is not
 /// recoverable — a session that has to be shown again is a session, not a thing
-/// to read back. Unlike the operator's three secrets it is also not the
-/// operator's to keep: losing it costs a sign-in.
+/// to read back. Unlike a user's three secrets it is also not
+/// theirs to keep: losing it costs a sign-in.
 /// </para>
 /// <para>
 /// Because the hash is deterministic and the value carries all of its entropy,

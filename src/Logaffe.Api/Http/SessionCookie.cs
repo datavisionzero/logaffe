@@ -1,4 +1,4 @@
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.Api.Http;
 
@@ -49,7 +49,7 @@ public static class SessionCookie
     /// operator nothing, since the row is what admits anything.
     /// </remarks>
     public static void Issue(HttpResponse response, string secret) =>
-        response.Cookies.Append(Name, secret, Options(Session.SlidingLifetime));
+        response.Cookies.Append(Name, secret, Options(Session.IdleLifetime));
 
     /// <summary>
     /// Takes the cookie back — a sign-out, and a secret that named no live

@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 
-namespace Logaffe.Domain.Operators;
+namespace Logaffe.Domain.Identities;
 
 /// <summary>
 /// One of a set of single-use codes, standing in for the second factor when it
@@ -11,7 +11,7 @@ namespace Logaffe.Domain.Operators;
 /// A set is shown once when a second factor is enrolled, and a fresh set can be
 /// generated at any time — which replaces the previous one entirely
 /// (<c>docs/sign-in.md</c>). It belongs to the second factor rather than to the
-/// account: an operator who has enrolled none holds none and needs none
+/// account: a user who has enrolled none holds none and needs none
 /// (ADR 0041). What is held here is a hash and a pair of dates; the code itself
 /// exists for as long as it takes to show it.
 /// </para>
@@ -25,7 +25,7 @@ namespace Logaffe.Domain.Operators;
 public sealed class BackupCode
 {
     /// <summary>
-    /// How many are minted at once. Enough that an operator who spends one on a
+    /// How many are minted at once. Enough that somebody who spends one on a
     /// train does not immediately need a fresh sheet, few enough that the sheet
     /// is one to print.
     /// </summary>
@@ -39,17 +39,17 @@ public sealed class BackupCode
         // EF Core materializes through this; every other route goes through MintSet.
     }
 
-    private BackupCode(Guid id, Guid operatorId, byte[] hash, DateTimeOffset issuedAt)
+    private BackupCode(Guid id, Guid userId, byte[] hash, DateTimeOffset issuedAt)
     {
         Id = id;
-        OperatorId = operatorId;
+        UserId = userId;
         Hash = hash;
         IssuedAt = issuedAt;
     }
 
     public Guid Id { get; private init; }
 
-    public Guid OperatorId { get; private init; }
+    public Guid UserId { get; private init; }
 
     /// <inheritdoc cref="BackupCodeText.Hash"/>
     public byte[] Hash { get; private init; } = null!;
@@ -70,12 +70,12 @@ public sealed class BackupCode
     public bool IsSpent => UsedAt is not null;
 
     /// <summary>
-    /// Draws a whole set: what the operator is shown, and what the installation
+    /// Draws a whole set: what the user is shown, and what the installation
     /// keeps of it. They are returned together because they are one act — a set
     /// is minted, shown and stored, and there is no moment at which one of the
     /// two halves is meaningful on its own.
     /// </summary>
-    public static MintedBackupCodes MintSet(Guid operatorId, DateTimeOffset issuedAt)
+    public static MintedBackupCodes MintSet(Guid userId, DateTimeOffset issuedAt)
     {
         var shown = new List<BackupCodeText>(SetSize);
         for (var index = 0; index < SetSize; index++)
@@ -84,7 +84,7 @@ public sealed class BackupCode
         }
 
         return new MintedBackupCodes(
-            shown, SetOf(operatorId, [.. shown.Select(code => code.Hash)], issuedAt));
+            shown, SetOf(userId, [.. shown.Select(code => code.Hash)], issuedAt));
     }
 
     /// <summary>
@@ -97,11 +97,11 @@ public sealed class BackupCode
     /// Not a set this product draws — the wrong number of codes, something that
     /// is not one of these hashes, or one hash twice. It is refused here because
     /// the values have come back through a browser, and a set that is short by a
-    /// duplicate is one the operator would discover was short at the worst
+    /// duplicate is one its holder would discover was short at the worst
     /// possible moment.
     /// </exception>
     public static IReadOnlyList<BackupCode> SetOf(
-        Guid operatorId, IReadOnlyList<byte[]> hashes, DateTimeOffset issuedAt)
+        Guid userId, IReadOnlyList<byte[]> hashes, DateTimeOffset issuedAt)
     {
         if (hashes.Count != SetSize)
         {
@@ -121,7 +121,7 @@ public sealed class BackupCode
         }
 
         return [.. hashes.Select(hash =>
-            new BackupCode(Guid.CreateVersion7(), operatorId, hash, issuedAt))];
+            new BackupCode(Guid.CreateVersion7(), userId, hash, issuedAt))];
     }
 
     /// <summary>
@@ -150,7 +150,7 @@ public sealed class BackupCode
 
 /// <summary>
 /// A freshly drawn set, in its two forms: <paramref name="Shown"/> is what the
-/// operator sees once and <paramref name="Stored"/> is what replaces whatever
+/// user sees once and <paramref name="Stored"/> is what replaces whatever
 /// they had.
 /// </summary>
 public sealed record MintedBackupCodes(

@@ -1,5 +1,6 @@
+using Logaffe.Application.Operations;
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.Api.Hosting;
 
@@ -78,56 +79,18 @@ public static class HostConfiguration
         ?? throw new InvalidOperationException("Logaffe:VolumePath is not configured.");
 
     /// <summary>
-    /// How this installation guards its claim, as the compose file says it
-    /// (ADR 0040).
+    /// What the first start creates its first administrator from, as the compose
+    /// file says it (ADR 0054).
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// Read by the server and by <c>recover</c> alike, because the command opens
-    /// whichever door the installation is configured for and a verb reading this
-    /// differently would open the other one.
-    /// </para>
-    /// <para>
-    /// <b>Both mistakes stop the start.</b> A mode that is not one of the two is
-    /// a typo, and a secret below the minimum is the one public door a guess
-    /// opens — neither is a thing to accept quietly and serve on.
-    /// </para>
+    /// Any of the three may be missing, and what that means is the bootstrap's
+    /// to decide rather than this method's: an installation that was never told
+    /// anything starts and says so, while one that was told something it cannot
+    /// use does not start at all.
     /// </remarks>
-    /// <exception cref="InvalidOperationException">
-    /// The mode is not a mode, or the supplied secret is too short.
-    /// </exception>
-    public static ClaimSettings Claim(IConfiguration configuration)
-    {
-        var mode = configuration["Logaffe:Claim:Mode"];
-        var secret = configuration["Logaffe:Claim:Secret"];
-
-        var chosen = string.IsNullOrWhiteSpace(mode)
-            ? ClaimSettings.Default.Mode
-            : Enum.TryParse<ClaimMode>(mode, ignoreCase: true, out var parsed)
-                ? parsed
-                : throw new InvalidOperationException(
-                    $"Logaffe:Claim:Mode is '{mode}', which is neither `secret` nor "
-                    + "`window`. See docs/setup.md.");
-
-        if (string.IsNullOrEmpty(secret))
-        {
-            return new ClaimSettings(chosen, null);
-        }
-
-        if (chosen is ClaimMode.Window)
-        {
-            throw new InvalidOperationException(
-                "Logaffe:Claim:Secret is set and Logaffe:Claim:Mode is `window`, which "
-                + "would guard the claim with nothing while looking as though it guarded "
-                + "it with that. Pick one.");
-        }
-
-        return ClaimSecret.TryCreate(secret, out var supplied)
-            ? new ClaimSettings(chosen, supplied)
-            : throw new InvalidOperationException(
-                $"Logaffe:Claim:Secret is shorter than {ClaimSecret.MinimumLength} "
-                + "characters. It is the whole of what stands in front of the claim, so "
-                + "draw it rather than think of it — or leave it empty and let the "
-                + "installation draw one.");
-    }
+    public static BootstrapSettings Bootstrap(IConfiguration configuration) =>
+        new(
+            configuration[BootstrapSettings.AdministratorKey],
+            configuration[BootstrapSettings.EmailKey],
+            configuration[BootstrapSettings.TokenKey]);
 }

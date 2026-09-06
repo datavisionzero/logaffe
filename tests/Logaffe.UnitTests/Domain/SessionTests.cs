@@ -1,4 +1,4 @@
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.UnitTests.Domain;
 
@@ -9,13 +9,13 @@ public sealed class SessionTests
     [Fact]
     public void A_started_session_has_just_been_used()
     {
-        var operatorId = Guid.CreateVersion7();
+        var userId = Guid.CreateVersion7();
         var secret = SessionSecret.Mint();
 
-        var session = Session.Start(operatorId, secret, "203.0.113.7", Now);
+        var session = Session.Start(userId, secret, "203.0.113.7", Now);
 
         Assert.NotEqual(Guid.Empty, session.Id);
-        Assert.Equal(operatorId, session.OperatorId);
+        Assert.Equal(userId, session.UserId);
         Assert.Equal(secret.Hash, session.SecretHash);
         Assert.Equal("203.0.113.7", session.LastSeenFrom);
         Assert.Equal(Now, session.StartedAt);
@@ -23,26 +23,44 @@ public sealed class SessionTests
     }
 
     [Fact]
-    public void A_session_lasts_thirty_days_from_its_last_use()
+    public void A_session_lasts_seven_days_from_its_last_use()
     {
         var session = Session.Start(Guid.CreateVersion7(), SessionSecret.Mint(), "203.0.113.7", Now);
 
-        Assert.Equal(Now.AddDays(30), session.ExpiresAt);
-        Assert.False(session.HasExpiredAt(Now.AddDays(30).AddTicks(-1)));
-        Assert.True(session.HasExpiredAt(Now.AddDays(30)));
+        Assert.Equal(Now.AddDays(7), session.ExpiresAt);
+        Assert.False(session.HasExpiredAt(Now.AddDays(7).AddTicks(-1)));
+        Assert.True(session.HasExpiredAt(Now.AddDays(7)));
     }
 
     [Fact]
-    public void Every_use_pushes_the_deadline_forward()
+    public void Every_use_pushes_the_idle_deadline_forward()
     {
         var session = Session.Start(Guid.CreateVersion7(), SessionSecret.Mint(), "203.0.113.7", Now);
 
-        session.WasUsedAt(Now.AddDays(20), "198.51.100.4");
+        session.WasUsedAt(Now.AddDays(5), "198.51.100.4");
 
-        // An installation in regular use is not a place where the operator keeps
+        // An installation somebody works in daily is not a place where they keep
         // re-authenticating.
-        Assert.Equal(Now.AddDays(50), session.ExpiresAt);
+        Assert.Equal(Now.AddDays(12), session.ExpiresAt);
         Assert.Equal("198.51.100.4", session.LastSeenFrom);
+    }
+
+    [Fact]
+    public void Nothing_pushes_the_absolute_deadline()
+    {
+        var session = Session.Start(Guid.CreateVersion7(), SessionSecret.Mint(), "203.0.113.7", Now);
+
+        // Used every day for a month, which is what a browser somebody works in
+        // looks like.
+        for (var day = 1; day <= 29; day++)
+        {
+            session.WasUsedAt(Now.AddDays(day), "203.0.113.7");
+        }
+
+        // Thirty days from the sign-in, whatever happened in between: a cookie
+        // somebody took must not be permanent as long as it is used.
+        Assert.Equal(Now.AddDays(30), session.ExpiresAt);
+        Assert.True(session.HasExpiredAt(Now.AddDays(30)));
     }
 
     [Fact]

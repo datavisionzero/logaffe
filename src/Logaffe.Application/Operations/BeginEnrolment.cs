@@ -1,5 +1,5 @@
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.Application.Operations;
 
@@ -40,7 +40,6 @@ public sealed record Enrolment(
 /// </para>
 /// </remarks>
 public sealed class BeginEnrolment(
-    IOperators operators,
     ISecondFactor secondFactor,
     ISecretCipher cipher,
     TimeProvider clock)
@@ -50,26 +49,17 @@ public sealed class BeginEnrolment(
     /// There is no username to put there (ADR 0015), so it is the address the
     /// operator reached it by — which only an adapter knows.
     /// </param>
-    /// <returns>
-    /// The enrolment to show, or <c>null</c> when there is no account to enrol
-    /// for — which behind a session means Host Recovery ran a moment ago.
-    /// </returns>
-    public async Task<Enrolment?> ExecuteAsync(
-        string installationName, CancellationToken cancellationToken)
+    /// <returns>The enrolment to show, which is stored nowhere until it is confirmed.</returns>
+    public async Task<Enrolment> ExecuteAsync(
+        User user, string installationName, CancellationToken cancellationToken)
     {
-        var theOperator = await operators.FindAsync(cancellationToken);
-        if (theOperator is null)
-        {
-            return null;
-        }
-
         var secret = secondFactor.MintSecret();
         var codes = Enumerable.Range(0, BackupCode.SetSize)
             .Select(_ => BackupCodeText.Mint())
             .ToList();
 
         var ticket = new EnrolmentTicket(
-            theOperator.Id,
+            user.Id,
             clock.GetUtcNow(),
             secret,
             [.. codes.Select(code => code.Hash)]);

@@ -2,13 +2,14 @@ using System.Security.Cryptography;
 using System.Text;
 using Logaffe.Application.Operations;
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.UnitTests.Application;
 
 public sealed class SignInTests
 {
     private const string TheirPassword = "a passphrase they typed";
+    private const string TheirAddress = "somebody@example.com";
     private const string TheCode = "314159";
 
     private static readonly DateTimeOffset Claimed = new(2026, 8, 7, 9, 0, 0, TimeSpan.Zero);
@@ -16,9 +17,10 @@ public sealed class SignInTests
     [Fact]
     public async Task The_password_and_the_second_factor_start_a_session()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
 
         var signedIn = await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             TheirPassword, TheCode, null, "203.0.113.7", TestContext.Current.CancellationToken);
 
         Assert.NotNull(signedIn);
@@ -32,9 +34,10 @@ public sealed class SignInTests
     [Fact]
     public async Task The_session_holds_a_hash_and_the_secret_is_handed_over_once()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
 
         var signedIn = await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken);
 
         Assert.NotNull(signedIn);
@@ -50,12 +53,13 @@ public sealed class SignInTests
     [Fact]
     public async Task The_second_factor_is_checked_against_the_secret_the_key_opens()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
 
         await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken);
 
-        // The row holds it sealed (ADR 0032); what the arithmetic gets is what
+        // The row holds it sealed (ADR 0057); what the arithmetic gets is what
         // the key on the host volume made of it again.
         Assert.Equal(StubSecondFactor.Secret, installation.SecondFactor.CheckedAgainst);
     }
@@ -63,25 +67,27 @@ public sealed class SignInTests
     [Fact]
     public async Task A_wrong_password_admits_nothing_and_writes_nothing()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
 
         Assert.Null(await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             "some other passphrase", TheCode, null, null, TestContext.Current.CancellationToken));
 
         // ADR 0017: with exactly one account a lockout is a weapon pointed at
         // its owner, so there is no counter, no flag, and nothing at all for a
         // failed attempt to leave behind.
         Assert.Empty(installation.Sessions.Stored);
-        Assert.Equal(0, installation.Operators.Writes);
+        Assert.Equal(0, installation.Identities.Writes);
         Assert.Equal(0, installation.Sessions.Writes);
     }
 
     [Fact]
     public async Task The_right_password_with_the_wrong_code_admits_nothing()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
 
         Assert.Null(await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             TheirPassword, "000000", null, null, TestContext.Current.CancellationToken));
         Assert.Empty(installation.Sessions.Stored);
     }
@@ -89,9 +95,10 @@ public sealed class SignInTests
     [Fact]
     public async Task A_password_below_the_minimum_is_wrong_rather_than_malformed()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
 
         Assert.Null(await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             "short", TheCode, null, null, TestContext.Current.CancellationToken));
 
         // The minimum is a rule about choosing a password (ADR 0042). A short
@@ -105,9 +112,10 @@ public sealed class SignInTests
     [Fact]
     public async Task A_password_that_would_be_a_denial_of_service_never_reaches_the_hasher()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
 
         Assert.Null(await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             new string('x', Password.MaximumLength + 1),
             TheCode,
             null,
@@ -121,22 +129,74 @@ public sealed class SignInTests
     }
 
     [Fact]
-    public async Task An_unclaimed_installation_admits_nothing()
+    public async Task An_installation_with_no_identity_admits_nothing()
     {
-        var installation = Unclaimed_installation();
+        var installation = Installation_with_nobody_on_it();
 
         Assert.Null(await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken));
-        Assert.Equal(0, installation.Hasher.Verifications);
+
+        // And it still hashed. An address nobody holds has to cost what one
+        // somebody holds costs, or the clock says which is which (ADR 0056).
+        Assert.Equal(1, installation.Hasher.Verifications);
+    }
+
+    [Fact]
+    public async Task An_address_nobody_holds_costs_what_a_wrong_password_costs()
+    {
+        var installation = Signed_up_installation();
+
+        Assert.Null(await installation.SignIn.ExecuteAsync(
+            "somebody.else@example.com",
+            TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken));
+
+        Assert.Equal(1, installation.Hasher.Verifications);
+        Assert.Equal(0, installation.Identities.Writes);
+    }
+
+    [Fact]
+    public async Task A_user_who_was_invited_and_never_arrived_admits_nothing()
+    {
+        var installation = Installation_with_nobody_on_it();
+        installation.Identities.Seed(
+            User.Invite("Newcomer", TheirAddress, administrator: false, Claimed));
+
+        Assert.Null(await installation.SignIn.ExecuteAsync(
+            TheirAddress,
+            TheirPassword, null, null, null, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_deactivated_user_admits_nothing()
+    {
+        var installation = Signed_up_installation();
+        var user = installation.Identities.Stored.OfType<User>().Single();
+        user.Deactivate();
+
+        Assert.Null(await installation.SignIn.ExecuteAsync(
+            TheirAddress,
+            TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task The_address_is_read_however_it_was_typed()
+    {
+        var installation = Signed_up_installation();
+
+        Assert.NotNull(await installation.SignIn.ExecuteAsync(
+            "  SOMEBODY@Example.COM ",
+            TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task A_backup_code_stands_in_for_the_second_factor_and_is_spent()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
         var code = installation.BackupCodes[0];
 
         var signedIn = await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             TheirPassword, null, code.Display, null, TestContext.Current.CancellationToken);
 
         Assert.NotNull(signedIn);
@@ -144,18 +204,19 @@ public sealed class SignInTests
         // docs/sign-in.md: the product says how many remain whenever one is
         // spent, because a set that quietly runs out ends at Host Recovery.
         Assert.Equal(BackupCode.SetSize - 1, signedIn.BackupCodesRemaining);
-        Assert.Equal(1, installation.Operators.BackupCodes.Count(stored => stored.IsSpent));
+        Assert.Equal(1, installation.Identities.BackupCodes.Count(stored => stored.IsSpent));
     }
 
     [Fact]
     public async Task A_backup_code_is_read_however_it_was_typed()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
         var code = installation.BackupCodes[0];
 
         // Refusing a code over a dash or a capital is refusing the operator
         // their way back in.
         var signedIn = await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             TheirPassword,
             null,
             $"  {code.Symbols.ToUpperInvariant()}  ",
@@ -168,16 +229,18 @@ public sealed class SignInTests
     [Fact]
     public async Task A_backup_code_offered_twice_is_refused_the_second_time()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
         var code = installation.BackupCodes[0].Display;
 
         Assert.NotNull(await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             TheirPassword, null, code, null, TestContext.Current.CancellationToken));
 
         // A spent code matches exactly as a fresh one does; being single use is
         // what refuses it, and it is refused with the same answer as a code that
         // was never theirs.
         Assert.Null(await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             TheirPassword, null, code, null, TestContext.Current.CancellationToken));
         Assert.Single(installation.Sessions.Stored);
     }
@@ -185,9 +248,10 @@ public sealed class SignInTests
     [Fact]
     public async Task A_code_that_is_nobody_s_admits_nothing()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
 
         Assert.Null(await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             TheirPassword,
             null,
             BackupCodeText.Mint().Display,
@@ -199,48 +263,58 @@ public sealed class SignInTests
     [Fact]
     public async Task Getting_in_rewrites_a_hash_that_is_out_of_date()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
         installation.Hasher.Answer = PasswordCheck.RightAndOutOfDate;
 
         Assert.NotNull(await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken));
 
         // ADR 0032: raising the cost later is a path rather than an intention,
         // and this is the step that walks it.
         Assert.Equal(1, installation.Hasher.Hashes);
-        Assert.Equal(1, installation.Operators.Writes);
+        Assert.Equal(1, installation.Identities.Writes);
     }
 
     [Fact]
     public async Task An_attempt_that_fails_on_the_second_factor_rewrites_nothing()
     {
-        var installation = Claimed_installation();
+        var installation = Signed_up_installation();
         installation.Hasher.Answer = PasswordCheck.RightAndOutOfDate;
 
         Assert.Null(await installation.SignIn.ExecuteAsync(
+            TheirAddress,
             TheirPassword, "000000", null, null, TestContext.Current.CancellationToken));
 
         // The rewrite is maintenance a sign-in owes the row, not something a
         // correct password on its own gets to trigger.
         Assert.Equal(0, installation.Hasher.Hashes);
-        Assert.Equal(0, installation.Operators.Writes);
+        Assert.Equal(0, installation.Identities.Writes);
     }
 
-    private static Installation Claimed_installation()
+    private static Installation Signed_up_installation()
     {
-        var installation = Unclaimed_installation();
-        var theOperator = Operator.Claim(StubPasswordHasher.HashOf(TheirPassword), Claimed);
-        theOperator.EnrolSecondFactor(
-            installation.Cipher.Encrypt(StubSecondFactor.Secret), Claimed);
+        var installation = Installation_with_nobody_on_it();
+        var user = TheUser();
+        user.EnrolSecondFactor(installation.Cipher.Encrypt(StubSecondFactor.Secret), Claimed);
 
-        installation.BackupCodes = installation.Operators.Claim(theOperator, Claimed).Shown;
+        installation.BackupCodes =
+            installation.Identities.SeedWithBackupCodes(user, Claimed).Shown;
 
         return installation;
     }
 
-    private static Installation Unclaimed_installation()
+    private static User TheUser()
     {
-        var operators = new InMemoryOperators();
+        var user = User.Bootstrap("The Administrator", TheirAddress, Claimed);
+        user.ActivateWith(StubPasswordHasher.HashOf(TheirPassword));
+
+        return user;
+    }
+
+    private static Installation Installation_with_nobody_on_it()
+    {
+        var identities = new InMemoryIdentities();
         var sessions = new InMemorySessions();
         var hasher = new StubPasswordHasher();
         var secondFactor = new StubSecondFactor(TheCode);
@@ -248,15 +322,16 @@ public sealed class SignInTests
 
         return new Installation
         {
-            Operators = operators,
+            Identities = identities,
             Sessions = sessions,
             Hasher = hasher,
             SecondFactor = secondFactor,
             Cipher = cipher,
             SignIn = new SignIn(
-                operators,
+                identities,
                 sessions,
                 hasher,
+                new DummyPasswordHash(hasher),
                 secondFactor,
                 cipher,
                 new StoppedClock(Claimed.AddDays(1))),
@@ -265,7 +340,7 @@ public sealed class SignInTests
 
     private sealed class Installation
     {
-        public required InMemoryOperators Operators { get; init; }
+        public required InMemoryIdentities Identities { get; init; }
 
         public required InMemorySessions Sessions { get; init; }
 

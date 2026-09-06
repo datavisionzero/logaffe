@@ -369,6 +369,7 @@ public sealed class OperatorEndpointTests(PostgresFixture postgres) : IAsyncLife
             "/sign-in",
             new
             {
+                email = ABootstrappedInstallation.TheirAddress,
                 password,
                 secondFactorCode = backupCode is null
                     ? code ?? Authenticator.CodeFor(_secondFactorSecret)
@@ -383,7 +384,7 @@ public sealed class OperatorEndpointTests(PostgresFixture postgres) : IAsyncLife
     /// </summary>
     private async Task ClaimAsync()
     {
-        var enrolled = await AClaimedInstallation.ClaimAsync(_installation, _volume);
+        var enrolled = await ABootstrappedInstallation.SignInAsync(_installation);
 
         _secondFactorSecret = enrolled.SecondFactorSecret;
         _backupCodes = enrolled.BackupCodes;

@@ -1,46 +1,56 @@
 # Signing In and Sessions
 
-The claim establishes an operator; this is how they get back in afterwards, from
-whatever machine they happen to be at. [Setup and the claim](./setup.md) covers
-how the account comes to exist and how it is recovered when everything is lost.
+How somebody gets into an installation, from whatever machine they happen to be
+at. [Setup and the first administrator](./setup.md) covers how the first account
+comes to exist, how the ones after it are invited, and how an installation is
+recovered when every way in is lost.
 
-## What the operator carries
+## What a user carries
 
-A **password**, and — if they enrolled one — a **second factor** with the set of
-**backup codes** that stands in for it. There is no username and no email address
-([ADR 0015](./adr/0015-the-operator-has-no-username-and-no-email.md)), so that is
-the whole of it.
+An **email address**, a **password**, and — if they enrolled one — a **second
+factor** with the set of **backup codes** that stands in for it. The address is
+what selects the account and the only thing about it that is not a secret
+([ADR 0052](./adr/0052-a-user-and-an-agent-are-one-identity.md)).
 
-**The second factor is the operator's to enrol and to remove**
+**The address is stored twice**: as it was written, which is what a list shows,
+and folded — trimmed, Unicode-normalized and lowercased — which is what a sign-in
+looks up and what a unique index stands on. Two spellings of one address are one
+account, and the database is what says so rather than a check somewhere above it.
+
+**The second factor is each user's to enrol and to remove**
 ([ADR 0041](./adr/0041-the-second-factor-is-offered-not-required.md)). It is not
-part of the claim, it is offered by the guide that follows one, and an
-installation running without it says so in the interface for as long as that is
-true — so that having none is a decision somebody made rather than a thing that
+part of anything that creates an account, it is offered by the guide that follows
+the first sign-in, and somebody running without it is told so for as long as that
+is true — so that having none is a decision they made rather than a thing that
 happened.
 
 **Nothing is bound to a device or a browser.** That is a deliberate property
-rather than an omission: with one account, no email and no reset channel, every
-binding to a particular machine is a way for the operator to lock themselves out
-of their own installation by replacing a laptop. Signing in from a strange
-computer has to work with nothing but what the operator knows and what is in
-their pocket.
+rather than an omission: every binding to a particular machine is a way for
+somebody to lock themselves out by replacing a laptop. Signing in from a strange
+computer has to work with nothing but what they know and what is in their pocket.
 
 ## Signing in
 
-Open the installation's address, enter the password, and enter the six digits if
-there are six digits to enter. There is nothing to select, nothing to remember
-about which account is meant, and nothing to prepare on a machine being used for
-the first time. An account with no second factor signs in on the password alone
+Open the installation's address, enter the address and the password, and enter
+the six digits if there are six digits to enter. There is nothing to prepare on a
+machine being used for the first time. An account with no second factor signs in
+on the address and the password alone
 ([ADR 0041](./adr/0041-the-second-factor-is-offered-not-required.md)).
 
 **The code is the one field an account may leave empty**, and the screen says so
-beside it. Asking for the password first and the code on a second screen would
-read better and is refused for what it would give away: the installation would be
-answering *that password was right*, and every way of not getting in is one
-refusal here ([ADR 0017](./adr/0017-a-wrong-password-never-locks-the-account.md)).
-So the form asks for both at once, an operator with no second factor sends
-nothing in the second box, and the installation says the same thing to every
-attempt that fails.
+beside it. Asking for the address and password first and the code on a second
+screen would read better and is refused for what it would give away: the
+installation would be answering *that password was right*. So the form asks for
+all of it at once, somebody with no second factor sends nothing in the last box,
+and the installation says the same thing to every attempt that fails.
+
+**Every refusal is one refusal, and they cost the same.** An address nobody
+holds, a wrong password, a wrong code, a code already spent, an account that was
+invited and never arrived, and one that has been deactivated are one answer, in
+one wording. An address nobody holds is verified against a hash belonging to
+nobody, so the absence of an account cannot be read off how quickly the refusal
+came back — otherwise the wording would be careful and the clock would say it
+anyway, and the sign-in would become a way of asking who has an account here.
 
 A **backup code** may be given instead of the second factor. It is consumed when
 used, and the product says how many remain whenever one is spent, because a set
@@ -48,8 +58,8 @@ that quietly runs out ends at Host Recovery.
 
 A code is **stored as a plain fast hash and cannot be read back**, which is the
 deliberate opposite of a token
-([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)): a
-token is a copy of something the operator can already reach, and a backup code is
+([ADR 0057](./adr/0057-a-users-secrets-are-stored-for-what-they-are-and-the-password-is-argon2id.md)):
+a token is a copy of something its holder can already reach, and a backup code is
 what stands in when they can reach nothing. Being consumed is a timestamp rather
 than a deletion, so how many remain is a count and a spent code stays visibly
 spent.
@@ -117,9 +127,12 @@ Changing the password requires the current one, and it ends every other session.
 
 ## Sessions
 
-A session lasts generously — on the order of **30 days** — and every use pushes
-the deadline forward, so an installation in regular use is not a place where the
-operator keeps re-authenticating.
+A session has **two deadlines**. It ends after **seven days without a use**, and
+every use pushes that one forward, so an installation somebody works in daily is
+not a place where they keep re-authenticating. And it ends **thirty days after
+the sign-in** whatever happens in between: nothing pushes that one, which is what
+keeps a cookie somebody took from being permanent as long as it is used. The
+earlier of the two is the one that applies.
 
 What the browser holds is **a cookie and nothing else** — `HttpOnly`, so no
 script can read the value that is the whole of the operator's standing
@@ -133,10 +146,10 @@ immediately.
 
 The value the browser holds is one the installation draws, and it is stored as a
 **fast hash** — the same storage a backup code gets and for the same reasons
-([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)): it
-carries all of its own entropy, so there is nothing a slow hash would defend
-against, and it is not readable back. Unlike the operator's three credentials it
-is not theirs to keep, and losing it costs a sign-in and nothing else.
+([ADR 0057](./adr/0057-a-users-secrets-are-stored-for-what-they-are-and-the-password-is-argon2id.md)):
+it carries all of its own entropy, so there is nothing a slow hash would defend
+against, and it is not readable back. Unlike a user's three credentials it is not
+theirs to keep, and losing it costs a sign-in and nothing else.
 
 **There is no separate "trust this browser".** The session *is* the remembering.
 A second mechanism whose entire purpose is skipping the second factor would
@@ -146,23 +159,30 @@ convenience the sliding session already provides.
 **Several sessions can exist at once**, because one person with a desktop and a
 laptop is the normal case and forcing them to fight over one seat helps nobody.
 Each is listed with where it was last used and when, and each can be ended
-individually, along with an "end all others". With no email in the product, that
-list is the only way the operator can ever notice a session that is not theirs,
-which makes it a security surface rather than a convenience.
+individually, along with an "end all others". That list is how somebody notices a
+session that is not theirs, which makes it a security surface rather than a
+convenience.
+
+**Nobody sees anybody else's list**, not even an administrator: it is a record of
+where a person has been, and the role is about running the installation rather
+than about looking into it ([ADR 0055](./adr/0055-project-access-is-one-filter.md)).
+A session id that belongs to somebody else answers exactly as one that never
+existed does.
 
 A session ends when it is signed out, when it is revoked from that list, when the
-password changes, when the second factor changes at all, when it goes 30 days
-untouched, or when Host Recovery removes the account it belonged to.
+password changes, when the second factor changes at all, when either deadline
+passes, when the account is deactivated, or when Host Recovery removes every
+identity on the installation.
 
 **The list says which row is this browser**, because nothing else can: it carries
 no secret and the cookie carries nothing but one, so there is nothing the
 interface could compare. Without it "end all others" is a guess and ending a row
-signs the operator out of the screen they are on. Ending the current one from the
+signs somebody out of the screen they are on. Ending the current one from the
 list is allowed and is a sign-out by another name.
 
 **A session that has expired is not on the list** — it admits nothing, so putting
-it there would be asking the operator to recognize a browser they cannot be
-signed in from. The row itself is removed by a **daily sweep**
+it there would be asking somebody to recognize a browser they cannot be signed in
+from. The row itself is removed by a **daily sweep**
 ([Operations](./operations.md#housekeeping-that-runs-on-a-timer)), which is
 housekeeping rather than a security measure: expiry is what refuses the session,
 and the sweep is what keeps the list from filling with rows that cannot act.
@@ -222,18 +242,15 @@ guessing is slow rather than that guessing cannot succeed
 
 - **No "remember this browser"**, and no device trust or fingerprinting of any
   kind. Covered above.
-- **No password reset, and no account recovery over the network.** Settled in
-  [ADR 0015](./adr/0015-the-operator-has-no-username-and-no-email.md): the answer
-  is [Host Recovery](./setup.md#host-recovery).
+- **No external identity provider.** Recovering a password is a one-time link to
+  an address ([Setup](./setup.md)), and where no mail is configured the answer is
+  still [Host Recovery](./setup.md#host-recovery).
 - **No external identity.** No SSO, no OAuth, no "sign in with" anything —
   `VISION.md` makes enterprise identity a non-goal, and a single self-hosted
   account has nothing to federate with.
-- **No sign-in notification.** There is a channel now
-  ([Alerts](./alerts.md)) and this still does not go down it. The reason was
-  never only that there was nowhere to send it: an installation has one account,
-  so a sign-in the operator is told about is a sign-in the operator just made,
-  and a message that is right every time until the one time it is not is a
-  message nobody reads by then. The session list is what serves the purpose
-  instead, and it serves it by being looked at deliberately.
-- **No second account**, not even a read-only or break-glass one. Settled in
-  `VISION.md`.
+- **No sign-in notification**, by mail or by the notifier. A message that is
+  right every time until the one time it is not is a message nobody reads by
+  then. The session list is what serves the purpose instead, and it serves it by
+  being looked at deliberately.
+- **No self-registration.** Nobody creates their own account: an administrator
+  invites an address, and that is the only way a second person exists.

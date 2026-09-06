@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Logaffe.Domain.Tokens;
 
-namespace Logaffe.Domain.Operators;
+namespace Logaffe.Domain.Identities;
 
 /// <summary>
 /// A backup code as it is shown once and as it is typed back.
@@ -21,7 +21,7 @@ namespace Logaffe.Domain.Operators;
 /// one finger, so the characters they would confuse are not in it
 /// (<see cref="TokenAlphabet"/>). The groups are a display convenience —
 /// <see cref="TryParse"/> ignores them, along with spaces and capitals, because
-/// refusing a code over a dash is refusing the operator their way back in.
+/// refusing a code over a dash is refusing somebody their way back in.
 /// </para>
 /// <para>
 /// A class rather than a record, as everywhere else a secret is: it is compared
@@ -53,13 +53,13 @@ public sealed class BackupCodeText
     /// <summary>
     /// A single fast SHA-256, no salt, which is what a row holds. It is never
     /// recoverable: unlike a token, a backup code is precisely what stands in
-    /// when the operator can reach nothing, so there is no session that could be
+    /// when they can reach nothing, so there is no session that could be
     /// trusted to display one (ADR 0032).
     /// </summary>
     public byte[] Hash { get; }
 
     /// <summary>
-    /// Grouped for the sheet of paper the operator prints, and the only form
+    /// Grouped for the sheet of paper somebody prints, and the only form
     /// they are ever shown.
     /// </summary>
     public string Display => string.Join(
@@ -73,7 +73,7 @@ public sealed class BackupCodeText
     /// <summary>
     /// Reads a typed code, forgiving everything about how it was typed and
     /// nothing about what it is. A value that is not one of these is refused
-    /// here, before the operator's codes are fetched and without the database
+    /// here, before the user's codes are fetched and without the database
     /// being asked anything at all.
     /// </summary>
     public static bool TryParse(string? value, out BackupCodeText code)
@@ -101,7 +101,7 @@ public sealed class BackupCodeText
     /// <summary>
     /// Redacted, so that a code reaching a log line or an exception message by
     /// way of an interpolation carries nothing at all. What is shown to the
-    /// operator is asked for by name, through <see cref="Display"/>.
+    /// user is asked for by name, through <see cref="Display"/>.
     /// </summary>
     public override string ToString() => "…";
 }

@@ -50,8 +50,8 @@ message template and the rendered form, the trace and span as the byte lengths
 they actually are, the caps and the truncation, the project with its retention
 window and the group it is listed under, the two tokens with the identifier and
 the alphabet they are written in,
-the operator with the session, the backup code, the claim window and the claim
-secret, the
+the identity under which a user and an agent are the same thing, with the
+session, the password and the backup code, the
 filters with the cursor, and what a retention window costs — the per-entry and
 per-row figures [Storage](./storage.md) measured, and the arithmetic that turns a
 rate into bytes
@@ -63,7 +63,7 @@ constructed with two characters, is a rule that escaped.
 
 **`Logaffe.Application` holds the use cases and the ports.** Authenticating a
 presented token, ingesting a batch, searching, counting, fetching one entry, the
-project, group and token acts, the claim and the sign-in, the retention sweep,
+project, group and token acts, the bootstrap and the sign-in, the retention sweep,
 the backup and the recovery. Every one of them is reachable from more than one
 adapter or is a candidate to become so, and none of them knows what it is being
 called by — the first is called by both public endpoints and is the plainest
@@ -210,7 +210,7 @@ is reserved by the project that owns it.
 Domain and the use cases of Application against substituted ports. **`Logaffe.IntegrationTests`**
 brings up Postgres with Testcontainers, because ADR 0003's hand-written SQL and
 binary `COPY` are exactly the parts no substitute can vouch for — the migrations,
-the indexes doing what [Storage](./storage.md) claims, the claim flow, and the
+the indexes doing what [Storage](./storage.md) claims, the bootstrap, and the
 retention sweep. The split is by what a test needs rather than by what it covers,
 because that is the distinction CI has to act on.
 

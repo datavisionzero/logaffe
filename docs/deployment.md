@@ -106,7 +106,7 @@ logs.example.com {
 **Three headers matter, not one.** `X-Forwarded-For` is the address, and
 `X-Forwarded-Proto` and `X-Forwarded-Host` are what the installation writes into
 the blocks it hands over — the delivery snippet
-([Setup](./setup.md#after-the-claim)) and an agent's MCP configuration
+([Setup](./setup.md#after-the-exchange)) and an agent's MCP configuration
 ([MCP](./mcp.md)) carry the name the operator reached it by, which without those
 two is `http://` and a container port. Caddy sends all three; a proxy configured
 by hand is worth checking on this point.
@@ -163,42 +163,37 @@ nobody vouched for, on a host where anything else may later be running.
 
 Trusting too broadly costs both of the things the product uses a source address
 for: a sign-in throttle partitioned by a value the caller picks
-([ADR 0017](./adr/0017-a-wrong-password-never-locks-the-account.md)), and a
+([ADR 0056](./adr/0056-sign-in-is-throttled-per-account-and-per-source.md)), and a
 session list showing whatever an intruder wanted it to show
 ([Signing in](./sign-in.md#sessions)). The setting looks configured, the
 installation serves perfectly, and neither of those is doing its job.
 
-## Claiming a deployment of this shape
+## Setting up a deployment of this shape
 
 The moment the proxy obtains a certificate, the hostname is in the public
-Certificate Transparency logs, which [Setup](./setup.md#the-claim-window) names
-as *the* way a fresh installation gets found — within seconds, not within days.
-What that costs depends on which of the two guards the installation was brought
-up with.
+Certificate Transparency logs — within seconds, not within days. **That costs
+nothing here**, and it is worth saying why it used to cost something: a fresh
+installation had a claim, which was a door a stranger could walk through, and
+finding the hostname was the whole of what stood between them and it. There is no
+such door now. The first administrator comes out of the configuration on the
+first start, and the only anonymous act is a token exchange whose token was never
+on the network
+([ADR 0054](./adr/0054-the-first-administrator-comes-from-the-environment.md)).
 
-**With a claim secret**, which is the default, it costs nothing. Whoever finds
-the hostname finds a door they cannot open, the order of the steps above stops
-mattering, and the claim happens whenever the operator gets to it. This is the
-mode a deployment of this shape wants: there are four moving parts in front of
-the installation, and the one thing you do not also want is a clock.
+So the order of the steps above stops mattering, and there is no clock to race.
+Write the three `Logaffe__Bootstrap__*` values before the first start, bring the
+installation up, and exchange the token for a password whenever you get to it.
 
-**In window mode** the order is decided for you: the network, the proxy and its
-certificate first, the installation last, and the claim walked while it is all
-still fresh. The window is **30 minutes from the first run** — from when the
-installation first runs, not from when it first answers — so twenty minutes of
-DNS trouble after the container is already up is two thirds of it gone on
-something unrelated to it.
-
-A window missed, or a secret lost, is
+Losing the token before that is
 `docker compose exec logaffe logaffe recover`
-([Host Recovery](./setup.md#host-recovery)) — a nuisance rather than a loss, and
-still worth not needing.
+([Host Recovery](./setup.md#host-recovery)) — which on an installation nobody has
+signed into yet costs nothing at all, since there is nothing for it to remove.
 
-Either way, enrol the second factor while sitting there, and put its backup codes
-somewhere that is not this host. It is not part of the claim
+Enrol the second factor while sitting there, and put its backup codes somewhere
+that is not this host. It is not part of the exchange
 ([ADR 0041](./adr/0041-the-second-factor-is-offered-not-required.md)), the guide
-after the claim offers it first, and an installation of this shape — one account,
-reachable by name, on the open internet — is the case the offer is aimed at.
+after it offers it first, and an installation of this shape — reachable by name,
+on the open internet — is the case the offer is aimed at.
 
 ## The check that says it worked
 

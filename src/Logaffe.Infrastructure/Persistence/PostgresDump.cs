@@ -50,13 +50,20 @@ public sealed class PostgresDump(LogaffeDbContext context) : IDatabaseDump
     public Task<IReadOnlyList<DumpedTable>> TablesAsync(CancellationToken cancellationToken)
     {
         var ordered = new List<DumpedTable>();
-        var placed = new HashSet<IEntityType>();
+        var placed = new HashSet<string>();
 
-        foreach (var type in context.Model.GetEntityTypes()
-                     .Where(type => type.GetTableName() is not null)
-                     .OrderBy(type => type.GetTableName(), StringComparer.Ordinal))
+        // By table and not by entity type. A hierarchy in one table is several
+        // types naming one table (ADR 0052), and a dump that took them one at a
+        // time would copy that table out twice and once without the derived
+        // types' columns.
+        var byTable = context.Model.GetEntityTypes()
+            .Where(type => type.GetTableName() is not null)
+            .GroupBy(type => type.GetTableName()!, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
+
+        foreach (var table in byTable.Keys.Order(StringComparer.Ordinal))
         {
-            Place(type);
+            Place(table);
         }
 
         return Task.FromResult<IReadOnlyList<DumpedTable>>(ordered);
@@ -64,22 +71,24 @@ public sealed class PostgresDump(LogaffeDbContext context) : IDatabaseDump
         // A table after everything it points at, so that a replay filling them in
         // this order never inserts a row whose foreign key names one that is not
         // there yet.
-        void Place(IEntityType type)
+        void Place(string table)
         {
-            if (!placed.Add(type))
+            if (!placed.Add(table))
             {
                 return;
             }
 
-            foreach (var principal in type.GetForeignKeys()
-                         .Select(key => key.PrincipalEntityType)
-                         .Where(principal => principal != type
-                             && principal.GetTableName() is not null))
+            foreach (var principal in byTable[table]
+                         .SelectMany(type => type.GetForeignKeys())
+                         .Select(key => key.PrincipalEntityType.GetTableName())
+                         .OfType<string>()
+                         .Where(principal => !string.Equals(
+                             principal, table, StringComparison.Ordinal)))
             {
                 Place(principal);
             }
 
-            ordered.Add(Describe(type));
+            ordered.Add(Describe(table, byTable[table]));
         }
     }
 
@@ -166,17 +175,34 @@ public sealed class PostgresDump(LogaffeDbContext context) : IDatabaseDump
     /// The columns in model order, which is the order the bytes are in and the
     /// order the manifest records.
     /// </summary>
-    private static DumpedTable Describe(IEntityType type)
+    /// <summary>
+    /// One table, with the columns of every type mapped to it — which for a
+    /// hierarchy in one table is the union rather than the base type's own, or
+    /// the columns a derived type adds would be dumped by nobody.
+    /// </summary>
+    private static DumpedTable Describe(string name, IReadOnlyList<IEntityType> types)
     {
-        var table = StoreObjectIdentifier.Create(type, StoreObjectType.Table)
-            ?? throw new InvalidOperationException(
-                $"{type.DisplayName()} is mapped to no table.");
+        var columns = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
-        return new DumpedTable(
-            type.GetTableName()!,
-            [.. type.GetProperties()
-                .Select(property => property.GetColumnName(table))
-                .OfType<string>()]);
+        foreach (var type in types)
+        {
+            var table = StoreObjectIdentifier.Create(type, StoreObjectType.Table)
+                ?? throw new InvalidOperationException(
+                    $"{type.DisplayName()} is mapped to no table.");
+
+            foreach (var column in type.GetProperties()
+                         .Select(property => property.GetColumnName(table))
+                         .OfType<string>())
+            {
+                if (seen.Add(column))
+                {
+                    columns.Add(column);
+                }
+            }
+        }
+
+        return new DumpedTable(name, columns);
     }
 
     internal static string Columns(DumpedTable table) =>

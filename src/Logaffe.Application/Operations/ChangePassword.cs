@@ -1,5 +1,5 @@
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.Application.Operations;
 
@@ -57,7 +57,7 @@ public enum PasswordChangeOutcome
 /// </para>
 /// </remarks>
 public sealed class ChangePassword(
-    IOperators operators,
+    IIdentities identities,
     ISessions sessions,
     IPasswordHasher hasher)
 {
@@ -65,6 +65,7 @@ public sealed class ChangePassword(
     /// The session making the request, which is the one that survives.
     /// </param>
     public async Task<PasswordChangeOutcome> ExecuteAsync(
+        User user,
         string? currentPassword,
         string? chosenPassword,
         Session keeping,
@@ -84,15 +85,14 @@ public sealed class ChangePassword(
             return PasswordChangeOutcome.CurrentPasswordRefused;
         }
 
-        var theOperator = await operators.FindAsync(cancellationToken);
-        if (theOperator is null
-            || hasher.Verify(theOperator.PasswordHash, presented) is PasswordCheck.Wrong)
+        if (user.PasswordHash is null
+            || hasher.Verify(user.PasswordHash, presented) is PasswordCheck.Wrong)
         {
             return PasswordChangeOutcome.CurrentPasswordRefused;
         }
 
-        theOperator.ChangePasswordTo(hasher.Hash(chosen));
-        await operators.RecordAsync(theOperator, cancellationToken);
+        user.ChangePasswordTo(hasher.Hash(chosen));
+        await identities.RecordAsync(user, cancellationToken);
 
         await sessions.RemoveEveryOtherAsync(keeping, cancellationToken);
 

@@ -1,12 +1,13 @@
 using Logaffe.Application.Operations;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.UnitTests.Application;
 
 public sealed class AuthenticateSessionTests
 {
     private static readonly DateTimeOffset Started = new(2026, 8, 7, 9, 0, 0, TimeSpan.Zero);
-    private static readonly Guid TheOperator = Guid.CreateVersion7();
+
+    private static readonly User TheUser = Signed_in_user();
 
     [Fact]
     public async Task A_secret_admits_the_session_it_belongs_to()
@@ -14,7 +15,7 @@ public sealed class AuthenticateSessionTests
         var (sessions, secret, session) = Signed_in_browser();
         var clock = new StoppedClock(Started);
 
-        var admitted = await new AuthenticateSession(sessions, clock).ExecuteAsync(
+        var admitted = await new AuthenticateSession(sessions, Identities(), clock).ExecuteAsync(
             secret.Text, "203.0.113.7", TestContext.Current.CancellationToken);
 
         Assert.NotNull(admitted);
@@ -25,20 +26,20 @@ public sealed class AuthenticateSessionTests
     public async Task A_secret_is_found_wherever_in_the_list_it_sits()
     {
         // There is no identifier naming a row here the way there is on a token
-        // (ADR 0031): one account holds a handful of sessions and the presented
-        // value is compared against all of them.
+        // (ADR 0031): an installation holds a handful of sessions and the
+        // presented value is compared against all of them.
         var sessions = new InMemorySessions();
 
         var wanted = SessionSecret.Mint();
-        sessions.Seed(Session.Start(TheOperator, wanted, "203.0.113.7", Started));
+        sessions.Seed(Session.Start(TheUser.Id, wanted, "203.0.113.7", Started));
 
         for (var other = 0; other < 4; other++)
         {
             sessions.Seed(
-                Session.Start(TheOperator, SessionSecret.Mint(), "198.51.100.4", Started));
+                Session.Start(TheUser.Id, SessionSecret.Mint(), "198.51.100.4", Started));
         }
 
-        Assert.NotNull(await new AuthenticateSession(sessions, new StoppedClock(Started))
+        Assert.NotNull(await new AuthenticateSession(sessions, Identities(), new StoppedClock(Started))
             .ExecuteAsync(wanted.Text, null, TestContext.Current.CancellationToken));
     }
 
@@ -46,7 +47,7 @@ public sealed class AuthenticateSessionTests
     public async Task Something_that_is_not_a_secret_admits_nothing_and_reads_nothing()
     {
         var (sessions, _, _) = Signed_in_browser();
-        var authenticate = new AuthenticateSession(sessions, new StoppedClock(Started));
+        var authenticate = new AuthenticateSession(sessions, Identities(), new StoppedClock(Started));
 
         foreach (var presented in new[] { null, string.Empty, "not-a-session-secret", "!!!" })
         {
@@ -64,7 +65,7 @@ public sealed class AuthenticateSessionTests
     {
         var (sessions, _, _) = Signed_in_browser();
 
-        Assert.Null(await new AuthenticateSession(sessions, new StoppedClock(Started))
+        Assert.Null(await new AuthenticateSession(sessions, Identities(), new StoppedClock(Started))
             .ExecuteAsync(
                 SessionSecret.Mint().Text, null, TestContext.Current.CancellationToken));
     }
@@ -73,9 +74,9 @@ public sealed class AuthenticateSessionTests
     public async Task A_session_left_untouched_past_its_deadline_admits_nothing()
     {
         var (sessions, secret, _) = Signed_in_browser();
-        var lapsed = new StoppedClock(Started + Session.SlidingLifetime);
+        var lapsed = new StoppedClock(Started + Session.IdleLifetime);
 
-        Assert.Null(await new AuthenticateSession(sessions, lapsed).ExecuteAsync(
+        Assert.Null(await new AuthenticateSession(sessions, Identities(), lapsed).ExecuteAsync(
             secret.Text, null, TestContext.Current.CancellationToken));
 
         // The row is left where it is: removing the ones nobody touched is
@@ -91,7 +92,7 @@ public sealed class AuthenticateSessionTests
         var clock = new StoppedClock(
             Started + AuthenticateSession.UseWriteInterval - TimeSpan.FromSeconds(1));
 
-        var admitted = await new AuthenticateSession(sessions, clock).ExecuteAsync(
+        var admitted = await new AuthenticateSession(sessions, Identities(), clock).ExecuteAsync(
             secret.Text, "198.51.100.4", TestContext.Current.CancellationToken);
 
         // ADR 0033's reasoning, applied to the row a live-tailing log view
@@ -109,16 +110,16 @@ public sealed class AuthenticateSessionTests
         var later = Started + AuthenticateSession.UseWriteInterval;
         var clock = new StoppedClock(later);
 
-        var admitted = await new AuthenticateSession(sessions, clock).ExecuteAsync(
+        var admitted = await new AuthenticateSession(sessions, Identities(), clock).ExecuteAsync(
             secret.Text, "198.51.100.4", TestContext.Current.CancellationToken);
 
         Assert.NotNull(admitted);
         Assert.True(admitted.DeadlineMoved);
         Assert.Equal(1, sessions.Writes);
         Assert.Equal(later, session.LastUsedAt);
-        Assert.Equal(later + Session.SlidingLifetime, session.ExpiresAt);
+        Assert.Equal(later + Session.IdleLifetime, session.ExpiresAt);
 
-        // The column the operator reads for anything unfamiliar, accurate to
+        // The column a person reads for anything unfamiliar, accurate to
         // within the same five minutes and not to be shown as finer.
         Assert.Equal("198.51.100.4", session.LastSeenFrom);
     }
@@ -128,13 +129,33 @@ public sealed class AuthenticateSessionTests
     {
         var sessions = new InMemorySessions();
         var secret = SessionSecret.Mint();
-        sessions.Seed(Session.Start(TheOperator, secret, null, Started));
+        sessions.Seed(Session.Start(TheUser.Id, secret, null, Started));
 
-        var admitted = await new AuthenticateSession(sessions, new StoppedClock(Started))
+        var admitted = await new AuthenticateSession(sessions, Identities(), new StoppedClock(Started))
             .ExecuteAsync(secret.Text, null, TestContext.Current.CancellationToken);
 
         Assert.NotNull(admitted);
         Assert.Equal("unknown", admitted.Session.LastSeenFrom);
+    }
+
+    /// <summary>
+    /// The account every session here belongs to. Authentication resolves it on
+    /// every request, which is what makes a deactivation immediate (ADR 0052).
+    /// </summary>
+    private static User Signed_in_user()
+    {
+        var user = User.Bootstrap("The Administrator", "somebody@example.com", Started);
+        user.ActivateWith("$argon2id$v=19$m=19456,t=2,p=1$not-a-real-hash");
+
+        return user;
+    }
+
+    private static InMemoryIdentities Identities()
+    {
+        var identities = new InMemoryIdentities();
+        identities.Seed(TheUser);
+
+        return identities;
     }
 
     private static (InMemorySessions Sessions, SessionSecret Secret, Session Session)
@@ -146,6 +167,6 @@ public sealed class AuthenticateSessionTests
         return (
             sessions,
             secret,
-            sessions.Seed(Session.Start(TheOperator, secret, "203.0.113.7", Started)));
+            sessions.Seed(Session.Start(TheUser.Id, secret, "203.0.113.7", Started)));
     }
 }

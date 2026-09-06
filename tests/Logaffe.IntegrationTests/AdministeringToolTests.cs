@@ -104,7 +104,7 @@ public sealed class AdministeringToolTests(PostgresFixture postgres) : IAsyncLif
         using var client = _installation.CreateClient();
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
 
-        var enrolled = await AClaimedInstallation.ClaimAsync(_installation, _volume);
+        var enrolled = await ABootstrappedInstallation.SignInAsync(_installation);
         _secondFactorSecret = enrolled.SecondFactorSecret;
 
         using var operatorClient = await SignedInAsync();
@@ -773,6 +773,7 @@ public sealed class AdministeringToolTests(PostgresFixture postgres) : IAsyncLif
             "/sign-in",
             new
             {
+                email = ABootstrappedInstallation.TheirAddress,
                 password = TheirPassword,
                 secondFactorCode = Authenticator.CodeFor(_secondFactorSecret),
             },

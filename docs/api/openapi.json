@@ -23,77 +23,12 @@
         }
       }
     },
-    "/claim": {
-      "get": {
-        "tags": [
-          "logaffe"
-        ],
-        "summary": "Whether this installation has an operator, and how it can be claimed.",
-        "operationId": "CheckTheClaim",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClaimStateResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "logaffe"
-        ],
-        "summary": "Gives this installation an operator, and signs them in.",
-        "operationId": "Claim",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ClaimRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "409": {
-            "description": "Conflict"
-          },
-          "429": {
-            "description": "Too Many Requests"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/sign-in": {
       "post": {
         "tags": [
           "logaffe"
         ],
-        "summary": "Starts a session for the operator.",
+        "summary": "Starts a session for the user behind an address and a password.",
         "operationId": "SignIn",
         "requestBody": {
           "content": {
@@ -121,6 +56,43 @@
           },
           "429": {
             "description": "Too Many Requests"
+          }
+        }
+      }
+    },
+    "/bootstrap": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Exchanges the bootstrap token for the first administrator's password and a session.",
+        "operationId": "ExchangeBootstrapToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BootstrapExchangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -239,7 +211,7 @@
         "tags": [
           "logaffe"
         ],
-        "summary": "The operator's signed-in browsers.",
+        "summary": "The signed-in user's own browsers.",
         "operationId": "ListSessions",
         "responses": {
           "200": {
@@ -383,7 +355,7 @@
         "tags": [
           "logaffe"
         ],
-        "summary": "Whether the operator has a second factor, and since when.",
+        "summary": "Whether the signed-in user has a second factor, and since when.",
         "operationId": "CheckSecondFactor",
         "responses": {
           "200": {
@@ -395,9 +367,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Unauthorized"
           }
         }
       },
@@ -2622,6 +2591,27 @@
           "mountAbsent"
         ]
       },
+      "BootstrapExchangeRequest": {
+        "required": [
+          "token",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ChangePasswordRequest": {
         "required": [
           "currentPassword",
@@ -2640,54 +2630,6 @@
               "null",
               "string"
             ]
-          }
-        }
-      },
-      "ClaimRequest": {
-        "required": [
-          "password",
-          "secret"
-        ],
-        "type": "object",
-        "properties": {
-          "password": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "secret": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
-      "ClaimStateResponse": {
-        "required": [
-          "isClaimed",
-          "canBeClaimed",
-          "needsSecret",
-          "closesAt"
-        ],
-        "type": "object",
-        "properties": {
-          "isClaimed": {
-            "type": "boolean"
-          },
-          "canBeClaimed": {
-            "type": "boolean"
-          },
-          "needsSecret": {
-            "type": "boolean"
-          },
-          "closesAt": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "format": "date-time"
           }
         }
       },
@@ -4336,12 +4278,19 @@
       },
       "SignInRequest": {
         "required": [
+          "email",
           "password",
           "secondFactorCode",
           "backupCode"
         ],
         "type": "object",
         "properties": {
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "password": {
             "type": [
               "null",

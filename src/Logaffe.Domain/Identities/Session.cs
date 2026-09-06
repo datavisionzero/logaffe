@@ -1,18 +1,17 @@
 using System.Security.Cryptography;
 
-namespace Logaffe.Domain.Operators;
+namespace Logaffe.Domain.Identities;
 
 /// <summary>
-/// One signed-in browser's standing permission to act as the operator.
+/// One signed-in browser's standing permission to act as a user.
 /// </summary>
 /// <remarks>
 /// <para>
 /// Several exist at once, because one person with a desktop and a laptop is the
 /// normal case; each is listed with where and when it was last used, and each
-/// can be ended on its own (<c>docs/sign-in.md</c>). With no email in the
-/// product that list is the only way the operator can ever notice a session that
-/// is not theirs, which makes <see cref="LastSeenFrom"/> a security surface
-/// rather than a decoration.
+/// can be ended on its own (<c>docs/sign-in.md</c>). That list is how somebody
+/// notices a session that is not theirs, which makes <see cref="LastSeenFrom"/>
+/// a security surface rather than a decoration.
 /// </para>
 /// <para>
 /// The session <em>is</em> the remembering: there is no "trust this browser"
@@ -22,19 +21,27 @@ namespace Logaffe.Domain.Operators;
 /// </para>
 /// <para>
 /// Ending one is removing the row, as revoking a token is: a session that is
-/// signed out, revoked from the list, or left behind by a password change is
-/// gone rather than marked. What expiry does is make a row that nobody removed
-/// stop admitting anything.
+/// signed out, revoked from the list, or left behind by a password change or a
+/// deactivation is gone rather than marked. What expiry does is make a row that
+/// nobody removed stop admitting anything.
 /// </para>
 /// </remarks>
 public sealed class Session
 {
     /// <summary>
-    /// Thirty days, and every use pushes the deadline forward, so an
-    /// installation in regular use is not a place where the operator keeps
+    /// Seven days without a use, and every use pushes that deadline forward, so
+    /// an installation somebody works in daily is not a place where they keep
     /// re-authenticating.
     /// </summary>
-    public static readonly TimeSpan SlidingLifetime = TimeSpan.FromDays(30);
+    public static readonly TimeSpan IdleLifetime = TimeSpan.FromDays(7);
+
+    /// <summary>
+    /// Thirty days from the sign-in, whatever happens in between. Nothing pushes
+    /// this one: a session that has been alive for a month is asked for the
+    /// password again, which is what keeps a cookie somebody took from being
+    /// permanent as long as it is used.
+    /// </summary>
+    public static readonly TimeSpan AbsoluteLifetime = TimeSpan.FromDays(30);
 
     /// <summary>
     /// Enough for an IPv6 address written out in full, which is what this holds.
@@ -48,13 +55,13 @@ public sealed class Session
 
     private Session(
         Guid id,
-        Guid operatorId,
+        Guid userId,
         byte[] secretHash,
         string seenFrom,
         DateTimeOffset startedAt)
     {
         Id = id;
-        OperatorId = operatorId;
+        UserId = userId;
         SecretHash = secretHash;
         LastSeenFrom = seenFrom;
         StartedAt = startedAt;
@@ -64,11 +71,11 @@ public sealed class Session
     public Guid Id { get; private init; }
 
     /// <summary>
-    /// Whose session this is. There is exactly one operator, so this says
-    /// nothing about which account — it is what makes Host Recovery removing the
-    /// account take every session with it (<c>docs/setup.md</c>).
+    /// Whose session this is. It is what the request is authenticated as, what
+    /// narrows the list a person is shown to their own, and what makes
+    /// deactivating a user end their sessions.
     /// </summary>
-    public Guid OperatorId { get; private init; }
+    public Guid UserId { get; private init; }
 
     /// <inheritdoc cref="SessionSecret.Hash"/>
     public byte[] SecretHash { get; private init; } = null!;
@@ -76,9 +83,9 @@ public sealed class Session
     public DateTimeOffset StartedAt { get; private init; }
 
     /// <summary>
-    /// When this session last acted. It is both halves of what the operator is
+    /// When this session last acted. It is both halves of what a person is
     /// shown and what decides whether the session is still alive, since the
-    /// deadline is measured from here.
+    /// idle deadline is measured from here.
     /// </summary>
     public DateTimeOffset LastUsedAt { get; private set; }
 
@@ -90,22 +97,32 @@ public sealed class Session
     public string LastSeenFrom { get; private set; } = null!;
 
     /// <summary>
-    /// When this session stops admitting anything if nothing touches it — the
-    /// sliding deadline, derived rather than stored so that it cannot disagree
-    /// with the last use it is measured from.
+    /// When this session stops admitting anything: the earlier of the idle
+    /// deadline and the absolute one. Both are derived rather than stored, so
+    /// that neither can disagree with the dates they are measured from.
     /// </summary>
-    public DateTimeOffset ExpiresAt => LastUsedAt + SlidingLifetime;
+    public DateTimeOffset ExpiresAt
+    {
+        get
+        {
+            var idle = LastUsedAt + IdleLifetime;
+            var absolute = StartedAt + AbsoluteLifetime;
+
+            return idle < absolute ? idle : absolute;
+        }
+    }
 
     public bool HasExpiredAt(DateTimeOffset when) => when >= ExpiresAt;
 
     /// <summary>
-    /// Starts a session for a browser that has just proved both factors.
+    /// Starts a session for a browser that has just proved what the account
+    /// asks for.
     /// </summary>
     public static Session Start(
-        Guid operatorId, SessionSecret secret, string? seenFrom, DateTimeOffset startedAt) =>
+        Guid userId, SessionSecret secret, string? seenFrom, DateTimeOffset startedAt) =>
         new(
             Guid.CreateVersion7(),
-            operatorId,
+            userId,
             secret.Hash,
             Normalize(seenFrom),
             startedAt);
@@ -129,9 +146,11 @@ public sealed class Session
     /// Time only moves forward here, as it does on a token, so two requests
     /// arriving out of order cannot make a session look older than it is. How
     /// often a use is worth writing back is the caller's question and has the
-    /// same answer as ADR 0033's: this row exists to be read by one human,
+    /// same answer as ADR 0033's: this row exists to be read by a human,
     /// occasionally, and a live-tailing browser asking every few seconds must
-    /// not be an <c>UPDATE</c> every few seconds.
+    /// not be an <c>UPDATE</c> every few seconds. It never touches
+    /// <see cref="StartedAt"/>, which is what makes the absolute deadline
+    /// absolute.
     /// </remarks>
     public void WasUsedAt(DateTimeOffset when, string? seenFrom)
     {

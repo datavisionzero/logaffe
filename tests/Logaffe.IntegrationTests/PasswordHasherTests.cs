@@ -1,5 +1,5 @@
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 using Logaffe.Infrastructure.Secrets;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;

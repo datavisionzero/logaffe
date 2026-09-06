@@ -140,7 +140,7 @@ ends when [Host Recovery](./setup.md#host-recovery) hands the installation to a
 new operator, which is the one act that removes every agent token at once — a
 credential that reads every project, or administers the installation, must not
 outlive the operator who issued it
-([ADR 0013](./adr/0013-host-recovery-returns-the-installation-to-unclaimed.md)).
+([ADR 0058](./adr/0058-host-recovery-removes-every-identity.md)).
 A password change does **not** end it: an operator who has to
 reconnect every agent whenever they change their password is an operator who
 changes their password less often.

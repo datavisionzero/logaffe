@@ -1,4 +1,4 @@
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.Application.Ports;
 
@@ -8,9 +8,8 @@ namespace Logaffe.Application.Ports;
 public enum PasswordCheck
 {
     /// <summary>
-    /// Not the password. It says nothing further, and nothing above it acts on
-    /// it beyond refusing: a wrong password never locks the account
-    /// (ADR 0017).
+    /// Not the password. It says nothing further; what an accumulation of these
+    /// costs is decided by the throttle and not here (ADR 0056).
     /// </summary>
     Wrong,
 
@@ -18,10 +17,11 @@ public enum PasswordCheck
     Right,
 
     /// <summary>
-    /// The password, against a hash written by older parameters. It admits
-    /// exactly as <see cref="Right"/> does — the difference is that the caller
-    /// owes the row a rewrite at the current cost, which is what makes raising
-    /// that cost later a path rather than an intention (ADR 0032).
+    /// The password, against a hash written by older parameters — a different
+    /// algorithm included. It admits exactly as <see cref="Right"/> does; the
+    /// difference is that the caller owes the row a rewrite at the current cost,
+    /// which is what carries an installation from PBKDF2 to Argon2id without
+    /// anybody resetting anything (ADR 0057).
     /// </summary>
     RightAndOutOfDate,
 }
@@ -32,17 +32,16 @@ public enum PasswordCheck
 /// </summary>
 /// <remarks>
 /// <para>
-/// It is a port because the algorithm is the part that gets replaced: today it
-/// is the framework's PBKDF2-HMAC-SHA512, chosen for arriving with the shared
-/// framework at no dependency cost, and a move to Argon2id later is this port
-/// answered differently plus a verifier that reads one more format (ADR 0032).
-/// The rule that does not move — how short a password may be — is
+/// It is a port because the algorithm is the part that gets replaced, and it has
+/// been: it was the framework's PBKDF2-HMAC-SHA512 and it is Argon2id, with a
+/// verifier that still reads the older format so that nobody is locked out
+/// (ADR 0057). The rule that does not move — how short a password may be — is
 /// <see cref="Password"/> and lives in Domain.
 /// </para>
 /// <para>
-/// It is also a port because <c>PasswordHasher&lt;T&gt;</c> lives in the ASP.NET
-/// Core shared framework, which <c>Logaffe.Domain</c> does not have and must not
-/// acquire (ADR 0030).
+/// It is also a port because the hashing packages live outside
+/// <c>Logaffe.Domain</c>, which carries no package references at all
+/// (ADR 0030).
 /// </para>
 /// </remarks>
 public interface IPasswordHasher
@@ -60,9 +59,9 @@ public interface IPasswordHasher
     /// <remarks>
     /// A stored hash this port cannot read — a format from a version that is not
     /// this one, or a corrupt row — is <see cref="PasswordCheck.Wrong"/> rather
-    /// than an exception. There is one account and no reset over the network, so
-    /// an unreadable hash is the same event as a forgotten password and has the
-    /// same answer: the host (ADR 0015).
+    /// than an exception. An unreadable hash is then the same event as a
+    /// forgotten password and has the same answer: recovery by mail, or the host
+    /// when that is gone too.
     /// </remarks>
     PasswordCheck Verify(string storedHash, Password presented);
 }

@@ -1,7 +1,7 @@
 using Logaffe.Api.Hosting;
 using Logaffe.Application.Operations;
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 using Logaffe.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -14,17 +14,18 @@ namespace Logaffe.Api.Cli;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Returns the installation to unclaimed and arms a fresh claim window, keeping
-/// its projects, ingest tokens and entries (ADR 0013). It is the only route back
-/// into a claimed installation, and every use is written to logaffe's own file
-/// log, which is the one place a record of it survives the reset it performs
-/// (ADR 0002).
+/// Removes every identity on the installation — every user and every agent
+/// token — keeping its projects, groups, ingest tokens, settings and entries
+/// (ADR 0058). It is the only route back into an installation nobody can sign in
+/// to, and every use is written to logaffe's own file log, which is the one
+/// place a record of it survives the removal it performs (ADR 0002).
 /// </para>
 /// <para>
-/// <b>It asks first.</b> Somebody reading the command name will expect the
-/// smaller thing — a password reset — and this removes the account, so the
-/// product says plainly what it does before it does it. <c>--yes</c> answers the
-/// question for a caller that has no terminal to answer it from.
+/// <b>It asks first, and it has more to ask about than it used to.</b> Somebody
+/// reading the command name will expect the smaller thing — a password reset —
+/// and this removes not one account but all of them, so the product says plainly
+/// what it does before it does it. <c>--yes</c> answers the question for a caller
+/// that has no terminal to answer it from.
 /// </para>
 /// <para>
 /// It builds its own host rather than the web one: there is no server here, no
@@ -52,38 +53,20 @@ public static class RecoverCommand
 
         var volumePath = HostConfiguration.VolumePath(builder.Configuration);
 
-        // Read here as the server reads it, because this command opens whichever
-        // door the installation is configured for and a verb that read it
-        // differently would open the other one (ADR 0040). A refusal is said
-        // plainly: the operator is at a keyboard and the fix is in a file they
-        // have open.
-        ClaimSettings claim;
-        try
-        {
-            claim = HostConfiguration.Claim(builder.Configuration);
-        }
-        catch (InvalidOperationException cause)
-        {
-            Console.Error.WriteLine($"\n{cause.Message}");
-
-            return Failed;
-        }
-
         builder.Services.AddLogaffeInfrastructure(builder.Configuration);
         builder.Services.AddSingleton(TimeProvider.System);
-        builder.Services.AddSingleton(claim);
         builder.Services.AddScoped<Recover>();
 
-        // The operator ran a command and wants two lines back, not the SQL it
-        // took to get there. What is worth keeping goes to the file log below,
-        // which is where a record of this has to survive anyway (ADR 0002).
+        // Whoever ran a command wants two lines back, not the SQL it took to get
+        // there. What is worth keeping goes to the file log below, which is where
+        // a record of this has to survive anyway (ADR 0002).
         builder.Logging.ClearProviders();
 
         using var log = new LoggerConfiguration()
             .WriteTo.WriteToLogaffeFile(volumePath)
             .CreateLogger();
 
-        if (!Agreed(args, claim.Mode))
+        if (!Agreed(args))
         {
             return Declined;
         }
@@ -97,82 +80,56 @@ public static class RecoverCommand
                 .GetRequiredService<Recover>()
                 .ExecuteAsync(CancellationToken.None);
 
-            var handoverPath = scope.ServiceProvider
-                .GetRequiredService<IClaimSecretHandover>()
-                .Path;
-
             // Written before anything is said on the terminal, because the
-            // terminal is not where this has to survive. The secret itself is
-            // not written here: the file log is the one place a record of this
-            // command survives, and a record is not a place for a live
-            // credential.
+            // terminal is not where this has to survive.
             log.Warning(
-                "Host Recovery returned this installation to unclaimed. There "
-                + "{ThereWasAnOperator} an operator account, and it is gone along with its "
-                + "sessions and backup codes. {AgentTokens} agent tokens were removed with "
-                + "it. Projects, ingest tokens and entries are untouched. {HowItIsGuarded}",
-                recovered.ThereWasAnOperator ? "was" : "was no",
-                recovered.AgentTokensRemoved,
-                recovered.DrawnSecret is not null
-                    ? "A fresh claim secret was drawn and printed on the terminal."
-                    : claim.Mode is ClaimMode.Secret
-                        ? "It is claimable by whoever presents the claim secret the "
-                        + "configuration names."
-                        : "It can be claimed by anyone who can reach it until "
-                        + $"{recovered.Guard.WindowClosesAt:u}.");
+                "Host Recovery removed every identity on this installation. "
+                + "{Identities} users and agents are gone, along with their sessions, "
+                + "backup codes and project assignments, and {AgentTokens} agent tokens "
+                + "were removed with them. Projects, groups, ingest tokens, settings and "
+                + "entries are untouched. The way back in is the bootstrap from "
+                + "configuration.",
+                recovered.IdentitiesRemoved,
+                recovered.AgentTokensRemoved);
 
             Console.WriteLine(
-                recovered.ThereWasAnOperator
-                    ? "The operator account is gone, along with its sessions and backup codes."
-                    : "There was no operator account; this installation was already unclaimed.");
+                recovered.IdentitiesRemoved == 0
+                    ? "There were no identities; this installation was already unreachable."
+                    : recovered.IdentitiesRemoved == 1
+                        ? "The one identity is gone, along with its sessions, backup codes "
+                        + "and project assignments."
+                        : $"All {recovered.IdentitiesRemoved} identities are gone, along "
+                        + "with their sessions, backup codes and project assignments.");
 
             // Said as its own line and with the number in it, because it is the
             // one consequence of this command that leaves work behind: each of
             // these is a client configuration to go and replace. What each of
             // them stops doing is not said, because the count covers both kinds
-            // and the operator knows which they issued (ADR 0046).
+            // and whoever issued them knows which (ADR 0046).
             if (recovered.AgentTokensRemoved > 0)
             {
                 Console.WriteLine(
                     recovered.AgentTokensRemoved == 1
-                        ? "Its one agent token went with it, and that agent can do nothing "
+                        ? "One agent token went with them, and that agent can do nothing "
                         + "here until it is given a new one."
-                        : $"Its {recovered.AgentTokensRemoved} agent tokens went with it, and "
+                        : $"{recovered.AgentTokensRemoved} agent tokens went with them, and "
                         + "those agents can do nothing here until they are given new ones.");
             }
 
-            if (recovered.DrawnSecret is not null)
-            {
-                // The one moment this value is ever handed over. The operator
-                // running this command is at the keyboard, which is the whole
-                // reason it can be said out loud here and nowhere else.
-                Console.WriteLine(
-                    $"\nThis installation is claimed by presenting its claim secret, and a "
-                    + $"fresh one has been drawn:\n\n    {recovered.DrawnSecret.Text}\n\n"
-                    + $"It is also in {handoverPath}, and the previous one no longer opens "
-                    + "anything. There is no deadline.");
-            }
-            else if (claim.Mode is ClaimMode.Secret)
-            {
-                Console.WriteLine(
-                    "\nThis installation is claimed by presenting the claim secret its "
-                    + "configuration names, which this command does not change. There is no "
-                    + "deadline.");
-            }
-            else
-            {
-                Console.WriteLine(
-                    $"\nAnyone who can reach this installation can claim it until "
-                    + $"{recovered.Guard.WindowClosesAt:u}. Claim it now.");
-            }
+            Console.WriteLine(
+                "\nSet Logaffe__Bootstrap__Administrator, Logaffe__Bootstrap__Email and "
+                + "Logaffe__Bootstrap__Token\nin the compose file and start the "
+                + "installation again. It will create the first\nadministrator from them, "
+                + "and the token is exchanged once in the browser for a\npassword. See "
+                + "docs/setup.md.");
 
             return 0;
         }
         catch (Exception exception)
         {
-            // A database that cannot be reached, most likely. The operator is at
-            // the keyboard of a container they own, so they get the sentence and
-            // the log file gets the rest.
+            // A database that cannot be reached, most likely. Whoever ran this is
+            // at the keyboard of a container they own, so they get the sentence
+            // and the log file gets the rest.
             log.Error(exception, "Host Recovery did not finish.");
 
             Console.Error.WriteLine(
@@ -192,29 +149,24 @@ public static class RecoverCommand
     /// <c>--yes</c>, because a prompt nobody can answer would hang the container
     /// rather than protect anything.
     /// </remarks>
-    private static bool Agreed(string[] args, ClaimMode mode)
+    private static bool Agreed(string[] args)
     {
         Console.Error.WriteLine(
             """
-            This does not reset a password.
+            This does not reset a password, and it does not pick an account.
 
-            It removes the operator account. The sessions, the backup codes and the
-            agent tokens go with it — both kinds — so every agent connected to this
-            installation stops, whether it was reading entries or working the settings,
-            until it is given a new one. Projects, ingest tokens and log entries are
-            untouched — the installation changes hands, it does not lose what it holds,
-            and an application shipping logs through it does not notice.
+            It removes every user on this installation and every agent token — both
+            kinds — so everybody signed in is signed out and every agent connected here
+            stops, whether it was reading entries or working the settings, until it is
+            given a new one. Sessions, backup codes, second factors and project
+            assignments go with the accounts. Projects, groups, ingest tokens, settings
+            and log entries are untouched — the installation loses its people, it does
+            not lose what it holds, and an application shipping logs through it does not
+            notice.
+
+            The way back in afterwards is the bootstrap from configuration: the first
+            administrator is created from the environment on the next start.
             """);
-
-        // Which door this is about to open, said before it is opened, because the
-        // two are a different thing to agree to: one of them is a deadline the
-        // operator is about to start racing.
-        Console.Error.WriteLine(
-            mode is ClaimMode.Secret
-                ? "\nThe installation then belongs to nobody, and whoever holds its claim\n"
-                + "secret can claim it. There is no deadline."
-                : "\nThe installation then belongs to nobody for the next 30 minutes, and "
-                + "anyone\nwho can reach it in that time can claim it.");
 
         if (args.Contains("--yes") || args.Contains("-y"))
         {

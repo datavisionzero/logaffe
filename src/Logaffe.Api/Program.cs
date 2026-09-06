@@ -100,26 +100,26 @@ builder.Services.AddScoped<IngestBatch>();
 // what it may write to, and nothing that reads.
 builder.Services.AddScoped<IngestSample>();
 
-// The claim, which is the whole reachable surface of an installation nobody
-// owns. `Recover` is the other half of the same guard and is registered by the
-// command line rather than here, because it is host-local and never reachable
-// over the network (ADR 0013).
-builder.Services.AddSingleton(HostConfiguration.Claim(builder.Configuration));
-builder.Services.AddScoped<OpenTheClaim>();
-builder.Services.AddScoped<CheckTheClaim>();
-builder.Services.AddScoped<ClaimTheInstallation>();
+// The bootstrap: the first administrator out of the configuration, and the one
+// exchange that turns its token into a password (ADR 0054). `Recover` is the
+// other end of the same story and is registered by the command line rather than
+// here, because it is host-local and never reachable over the network
+// (ADR 0058).
+builder.Services.AddSingleton(HostConfiguration.Bootstrap(builder.Configuration));
+builder.Services.AddScoped<BootstrapTheInstallation>();
+builder.Services.AddScoped<ExchangeBootstrapToken>();
 
-// The operator's door. Authenticating a session is the counterpart of
-// authenticating a token — one credential a person carries, one a machine does —
-// and everything the operator can do stands behind it.
+// The human door. Authenticating a session is the counterpart of authenticating
+// a token — one credential a person carries, one a machine does — and everything
+// a person can do stands behind it.
 builder.Services.AddScoped<SignIn>();
 builder.Services.AddScoped<AuthenticateSession>();
 builder.Services.AddScoped<SignOut>();
 
-// The list, and the ways a session ends that are not a sign-out. With no email
-// anywhere in the product the list is the only way the operator can ever notice
-// a session that is not theirs (ADR 0015), which makes these a security surface
-// rather than a convenience.
+// The list, and the ways a session ends that are not a sign-out. The list is how
+// somebody notices a session that is not theirs, which makes these a security
+// surface rather than a convenience — and it is each user's own, never anybody
+// else's (ADR 0055).
 builder.Services.AddScoped<ListSessions>();
 builder.Services.AddScoped<RevokeSession>();
 builder.Services.AddScoped<EndEveryOtherSession>();
@@ -253,6 +253,7 @@ builder.Services.AddScoped<ReadTokenBack>();
 // identifier named no row is compared against this, so that the miss costs what
 // a mismatch costs (ADR 0031).
 builder.Services.AddSingleton<DummySecret>();
+builder.Services.AddSingleton<DummyPasswordHash>();
 
 // Order is start order. This one is first because what it has to say is about
 // where everything after it is written.
@@ -263,9 +264,10 @@ builder.Services.AddHostedService<FileLogService>();
 builder.Services.AddHostedService<SchemaMigrationService>();
 builder.Services.AddHostedService<KeyFitsService>();
 
-// Last, so that an installation about to refuse to start does not first open a
-// claim it will never serve, or draw a secret nobody will be able to use.
-builder.Services.AddHostedService<ClaimService>();
+// Last, so that an installation about to refuse to start does not first write an
+// administrator it will never serve. It runs after the migrations for the plainer
+// reason too: the table it writes to is one they create.
+builder.Services.AddHostedService<BootstrapService>();
 
 // After the migrations, whose service has finished before these start: the
 // first pass reads a table a migration may have been about to create. Each has
@@ -324,9 +326,8 @@ app.UseAuthorization();
 
 app.MapOpenApi();
 app.MapHealth();
-app.MapClaim();
 app.MapSessions();
-app.MapOperator();
+app.MapAccount();
 app.MapProjects();
 app.MapGroups();
 app.MapEntries();

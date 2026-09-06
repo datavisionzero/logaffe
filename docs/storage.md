@@ -11,8 +11,9 @@ This document is the log entry table — what each column is for, which indexes
 exist and why, and what the whole thing costs — and, at the end, the two small
 tables that hold samples ([Metrics](./metrics.md)) and the smaller one that holds
 the tally, which are here because their shape was decided rather than because
-their size demands it. The operator account, the projects, the tokens and the
-settings are ordinary relational rows and need no document of their own.
+their size demands it, and the one that holds the identities. The projects, the
+tokens and the settings are ordinary relational rows and need no document of
+their own.
 
 The numbers quoted below were measured on a containerised Postgres capped at two
 cores and 4 GB, holding ten million entries across twenty projects — the shape of
@@ -446,6 +447,89 @@ a uuid, a timestamp and two bigints, so twenty projects for 400 days is about
 11.84 GiB above that is under a thousandth, which is why it gets a period of its
 own without an argument about what it costs.
 
+## The identity table
+
+Everything that acts on an installation is a row here: a **user** or an **agent**,
+in one table split on a `kind` column
+([ADR 0052](./adr/0052-a-user-and-an-agent-are-one-identity.md)). One table
+because everything that records *who* — a session, a backup code, a project
+assignment, a record of a changed setting — has to point at one place, and
+because a hierarchy in two tables makes every one of those relations exist twice.
+
+```
+identity
+  id                         uuid, primary key
+  kind                       0 user, 1 agent
+  name                       what a list shows
+  administrator              runs the installation; never true for an agent
+  owner_id                   the user an agent belongs to; null on a user
+  created_at
+
+  -- a user's, and null on an agent
+  email                      as it was written
+  normalized_email           unique; what a sign-in looks up
+  state                      0 invited, 1 active, 2 deactivated
+  password_hash              null until the first password is set
+  second_factor_secret       sealed under the key on the host volume
+  second_factor_enrolled_at
+```
+
+**The columns a user has and an agent does not are nullable, and three check
+constraints keep that from meaning nothing.** `ck_identity_kind` holds the
+discriminator to the two values there are; `ck_identity_owner` says an agent has
+an owner and is never an administrator, and a user has no owner;
+`ck_identity_user` says a user carries an address and a state and an agent
+carries neither, nor a password, nor a second factor. They are on the table
+rather than only on the write path because that is the half a query written later
+cannot go around.
+
+**The unique index is over the normalized address**, not the written one. The
+address is trimmed, Unicode-normalized and lowercased before the transaction, so
+this index is the last line rather than the first — what it catches is two
+requests arriving at once, and what it means is that two spellings of one address
+are one account.
+
+**Nothing here is ever deleted, except all of it at once.** A user who should not
+sign in is `deactivated`, so that everything pointing at them keeps pointing at
+something; the one statement that removes a row is Host Recovery, which removes
+every row
+([ADR 0058](./adr/0058-host-recovery-removes-every-identity.md)). The sessions,
+the backup codes and an agent's row follow on the cascade.
+
+**It costs nothing worth measuring.** An installation of the size `VISION.md`
+targets holds a handful of these rows against the 11.84 GiB above, which is why
+this section is about shape and constraints and not about bytes.
+
+### The sessions and the backup codes hang off it
+
+```
+session                                backup_code
+  id            uuid, primary key        id        uuid, primary key
+  user_id       cascades                 user_id   cascades
+  secret_hash   unique; SHA-256          hash      unique; SHA-256
+  started_at    the absolute deadline    issued_at
+  last_used_at  the idle deadline        used_at   null until spent
+  last_seen_from
+```
+
+Neither table is looked up by its secret: a session secret and a backup code
+carry all of their own entropy and name no row, so the handful an installation
+holds are read and compared in constant time — which is the deliberate opposite
+of a token, and for the reason
+[ADR 0031](./adr/0031-a-token-names-its-own-row.md) gives from the other side.
+
+**Both deadlines on a session are derived rather than stored**, from
+`last_used_at` and `started_at`, so neither can disagree with the date it is
+measured from. A use writes `last_used_at` at most every five minutes
+([ADR 0033](./adr/0033-the-last-use-of-a-token-is-written-coarsely.md)) and never
+touches `started_at`, which is what makes the absolute deadline absolute.
+
+**A backup code is consumed by a timestamp and not by a deletion**, so *how many
+remain* is a filtered count and a spent code stays visibly spent
+([ADR 0057](./adr/0057-a-users-secrets-are-stored-for-what-they-are-and-the-password-is-argon2id.md)).
+The index on `user_id` is the cascade's and every read's: a set belongs to one
+person and is only ever counted for that person.
+
 ## What is deliberately not here
 
 - **No partitioning.** Settled in ADR 0023: per-project retention means a
@@ -466,6 +550,11 @@ own without an argument about what it costs.
   correction, no reprocessing, and no backfill.
 - **No second copy for the agent.** MCP reads the same table through the same
   query surface as the web UI ([Querying](./querying.md)).
+- **No deleted identity, and no `deleted_at` on one.** An account that should not
+  be used is deactivated. Deleting would mean either orphaned history or a
+  cascade that erases the record of what somebody did.
+- **No second table for agents.** Covered above: one hierarchy, one table, one
+  thing for everything to point at.
 - **No index on the tally beyond its key, and no query surface over it.** One
   project over a range of hours is the whole of what is asked, which is the key's
   leading column and then a range on the second — plus the oldest hour one

@@ -4,7 +4,7 @@ using System.Text;
 using Logaffe.Application.Operations;
 using Logaffe.Application.Ports;
 using Logaffe.Domain.Entries;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
@@ -31,6 +31,8 @@ namespace Logaffe.IntegrationTests;
 public sealed class RestoreTests(PostgresFixture postgres) : IDisposable
 {
     private const string TheirPassword = "a passphrase they typed";
+
+    private const string TheirAddress = "administrator@example.com";
 
     /// <summary>RFC 6238's own secret, in the base32 an app is enrolled with.</summary>
     private const string SecondFactorSecret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
@@ -61,7 +63,7 @@ public sealed class RestoreTests(PostgresFixture postgres) : IDisposable
 
         var restored = await RestoreIntoAsync(elsewhere, into, artifact);
 
-        Assert.Equal(16, restored.Tables);
+        Assert.Equal(15, restored.Tables);
         Assert.Equal(original.Migration, restored.Manifest.Migration);
 
         await using var context = ContextFor(elsewhere.ConnectionString);
@@ -110,15 +112,17 @@ public sealed class RestoreTests(PostgresFixture postgres) : IDisposable
 
         // And the person: the password hash and the second factor's secret came
         // back together, which is the other thing losing a volume costs.
+        var hasher = new FrameworkPasswordHasher();
         var signedIn = await new SignIn(
-                new Operators(context),
+                new Identities(context),
                 new Sessions(context),
-                new FrameworkPasswordHasher(),
+                hasher,
+                new DummyPasswordHash(hasher),
                 new Rfc6238SecondFactor(),
                 cipher,
                 At(Claimed))
             .ExecuteAsync(
-                TheirPassword, CodeAt(Claimed), null, "203.0.113.7",
+                TheirAddress, TheirPassword, CodeAt(Claimed), null, "203.0.113.7",
                 TestContext.Current.CancellationToken);
 
         Assert.NotNull(signedIn);
@@ -173,15 +177,16 @@ public sealed class RestoreTests(PostgresFixture postgres) : IDisposable
 
         var cipher = CipherOn(volume);
 
-        var theOperator = Operator.Claim(
-            new FrameworkPasswordHasher().Hash(Password.Create(TheirPassword)), Claimed);
-        theOperator.EnrolSecondFactor(cipher.Encrypt(SecondFactorSecret), Claimed);
+        var user = User.Bootstrap("The Administrator", TheirAddress, Claimed);
+        user.ActivateWith(
+            new FrameworkPasswordHasher().Hash(Password.Create(TheirPassword)));
+        user.EnrolSecondFactor(cipher.Encrypt(SecondFactorSecret), Claimed);
 
-        var operators = new Operators(context);
-        Assert.True(await operators.TryClaimAsync(
-            theOperator, TestContext.Current.CancellationToken));
-        await operators.ReplaceBackupCodesAsync(
-            BackupCode.MintSet(theOperator.Id, Claimed).Stored,
+        var identities = new Identities(context);
+        Assert.True(await identities.TryAddAsync(user, TestContext.Current.CancellationToken));
+        await identities.ReplaceBackupCodesAsync(
+            user.Id,
+            BackupCode.MintSet(user.Id, Claimed).Stored,
             TestContext.Current.CancellationToken);
 
         var project = Project.Create(projectName, RetentionWindow.OfDays(14), Claimed);
