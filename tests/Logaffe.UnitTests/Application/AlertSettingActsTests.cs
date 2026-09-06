@@ -109,7 +109,8 @@ public sealed class AlertSettingActsTests
             await act.ExecuteAsync(
                 host.Id, "/var/lib/postgresql", TestContext.Current.CancellationToken));
 
-        var settings = await _scene.Settings.ExecuteAsync(TestContext.Current.CancellationToken);
+        var settings = await _scene.Settings.ExecuteAsync(Reach.TheInstallation,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(Blindness.MountAbsent, settings.Store.Blindness);
     }
@@ -147,11 +148,13 @@ public sealed class MuteAProjectTests
 
         Assert.Equal(
             MuteAProjectOutcome.Muted,
-            await mute.ExecuteAsync(project.Id, true, TestContext.Current.CancellationToken));
+            await mute.ExecuteAsync(Reach.TheInstallation,
+                project.Id, true, TestContext.Current.CancellationToken));
 
         Assert.True(project.Muted);
 
-        await mute.ExecuteAsync(project.Id, false, TestContext.Current.CancellationToken);
+        await mute.ExecuteAsync(Reach.TheInstallation,
+            project.Id, false, TestContext.Current.CancellationToken);
 
         Assert.False(project.Muted);
     }
@@ -163,11 +166,13 @@ public sealed class MuteAProjectTests
             "api", RetentionWindow.OfDays(30), DateTimeOffset.UnixEpoch);
 
         var mute = new MuteAProject(_projects);
-        await mute.ExecuteAsync(project.Id, true, TestContext.Current.CancellationToken);
+        await mute.ExecuteAsync(Reach.TheInstallation,
+            project.Id, true, TestContext.Current.CancellationToken);
 
         var writes = _projects.Writes;
 
-        await mute.ExecuteAsync(project.Id, true, TestContext.Current.CancellationToken);
+        await mute.ExecuteAsync(Reach.TheInstallation,
+            project.Id, true, TestContext.Current.CancellationToken);
 
         Assert.Equal(writes, _projects.Writes);
     }
@@ -177,7 +182,7 @@ public sealed class MuteAProjectTests
     {
         Assert.Equal(
             MuteAProjectOutcome.NoSuchProject,
-            await new MuteAProject(_projects).ExecuteAsync(
+            await new MuteAProject(_projects).ExecuteAsync(Reach.TheInstallation, 
                 Guid.NewGuid(), true, TestContext.Current.CancellationToken));
     }
 }
@@ -200,7 +205,8 @@ public sealed class ReadTheAlertSettingsTests
     [Fact]
     public async Task An_installation_that_has_been_asked_nothing_says_so_at_every_end()
     {
-        var settings = await _scene.Settings.ExecuteAsync(TestContext.Current.CancellationToken);
+        var settings = await _scene.Settings.ExecuteAsync(Reach.TheInstallation,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(AlertSwitches.AllOff, settings.Switches);
         Assert.Null(settings.Host);
@@ -226,7 +232,8 @@ public sealed class ReadTheAlertSettingsTests
             _scene.ClosedHour,
             hour => hour.Hour is >= 1 and <= 5 ? 0 : 10);
 
-        var settings = await _scene.Settings.ExecuteAsync(TestContext.Current.CancellationToken);
+        var settings = await _scene.Settings.ExecuteAsync(Reach.TheInstallation,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("api", settings.Quiet.Busiest?.Name);
         Assert.Equal(Quiet.LeastTolerated, settings.Quiet.Busiest?.ToleratedHours);
@@ -242,7 +249,8 @@ public sealed class ReadTheAlertSettingsTests
         await _scene.DeliveringAsync(
             young, _scene.ClosedHour.AddDays(-2), _scene.ClosedHour, _ => 10);
 
-        var settings = await _scene.Settings.ExecuteAsync(TestContext.Current.CancellationToken);
+        var settings = await _scene.Settings.ExecuteAsync(Reach.TheInstallation,
+            TestContext.Current.CancellationToken);
 
         // It has no normal to have departed from, so it is neither end of the
         // sentence and is the number beside it instead.
@@ -257,7 +265,8 @@ public sealed class ReadTheAlertSettingsTests
         muted.Mute(true);
         await _scene.DeliveringEveryHourAsync(muted, _scene.ClosedHour);
 
-        var settings = await _scene.Settings.ExecuteAsync(TestContext.Current.CancellationToken);
+        var settings = await _scene.Settings.ExecuteAsync(Reach.TheInstallation,
+            TestContext.Current.CancellationToken);
 
         // Putting it forward as what this switch will do would be describing the
         // one project the switch will never say anything about.
@@ -270,7 +279,8 @@ public sealed class ReadTheAlertSettingsTests
     {
         var host = _scene.Sitting(percent: 87);
 
-        var settings = await _scene.Settings.ExecuteAsync(TestContext.Current.CancellationToken);
+        var settings = await _scene.Settings.ExecuteAsync(Reach.TheInstallation,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(Blindness.None, settings.Store.Blindness);
         Assert.Equal(87, settings.Store.Percent);
@@ -283,7 +293,8 @@ public sealed class ReadTheAlertSettingsTests
         _scene.Sitting(percent: 40);
         _scene.Clock.Now = _scene.Clock.Now.Add(Alerting.Reporting).AddMinutes(1);
 
-        var settings = await _scene.Settings.ExecuteAsync(TestContext.Current.CancellationToken);
+        var settings = await _scene.Settings.ExecuteAsync(Reach.TheInstallation,
+            TestContext.Current.CancellationToken);
 
         // Yesterday's per cent presented as today's is the number that would be
         // believed, so a stale report is no report.
@@ -301,7 +312,8 @@ public sealed class ReadTheAlertSettingsTests
 
         await _scene.RunAsync();
 
-        var settings = await _scene.Settings.ExecuteAsync(TestContext.Current.CancellationToken);
+        var settings = await _scene.Settings.ExecuteAsync(Reach.TheInstallation,
+            TestContext.Current.CancellationToken);
 
         var fired = Assert.Single(settings.Fired);
 
@@ -321,7 +333,8 @@ public sealed class ReadTheAlertSettingsTests
 
         await _scene.RunAsync();
 
-        var settings = await _scene.Settings.ExecuteAsync(TestContext.Current.CancellationToken);
+        var settings = await _scene.Settings.ExecuteAsync(Reach.TheInstallation,
+            TestContext.Current.CancellationToken);
 
         // The row exists because the latch came down; a screen has nothing to
         // say about one, and "never" is not a date.
@@ -339,7 +352,8 @@ public sealed class ReadTheAlertSettingsTests
 
         await _scene.Projects.RemoveAsync(project, TestContext.Current.CancellationToken);
 
-        var settings = await _scene.Settings.ExecuteAsync(TestContext.Current.CancellationToken);
+        var settings = await _scene.Settings.ExecuteAsync(Reach.TheInstallation,
+            TestContext.Current.CancellationToken);
 
         // Deleting a project leaves its rows behind, exactly as it leaves its
         // tally: what they are is history about something that no longer exists.

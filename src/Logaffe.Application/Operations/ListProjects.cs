@@ -69,9 +69,9 @@ public sealed record ListedProject(
 public sealed class ListProjects(IProjects projects, ITokens tokens, IEntryReader entries)
 {
     public async Task<IReadOnlyList<ListedProject>> ExecuteAsync(
-        CancellationToken cancellationToken)
+        Reach reach, CancellationToken cancellationToken)
     {
-        var held = await projects.ListAsync(cancellationToken);
+        var held = await projects.ListAsync(reach, cancellationToken);
         var heldTokens = await tokens.ListIngestTokensAsync(cancellationToken);
 
         var listed = new List<ListedProject>(held.Count);

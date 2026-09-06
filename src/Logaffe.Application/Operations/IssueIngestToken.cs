@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 
 namespace Logaffe.Application.Operations;
@@ -82,9 +83,9 @@ public sealed class IssueIngestToken(
     /// </para>
     /// </remarks>
     public async Task<IssueAttempt> ExecuteAsync(
-        Guid projectId, CancellationToken cancellationToken)
+        Reach reach, Guid projectId, CancellationToken cancellationToken)
     {
-        if (await projects.FindAsync(projectId, cancellationToken) is null)
+        if (await projects.FindAsync(reach, projectId, cancellationToken) is null)
         {
             return new IssueAttempt(IssueOutcome.NoSuchProject, null);
         }

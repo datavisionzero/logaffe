@@ -47,8 +47,14 @@ public static class HostAdministration
         CreateHost create,
         [Description("What the operator calls this machine. Unique across the installation.")]
         string name,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default)
     {
+        if (!agent.Administers)
+        {
+            throw Refused.NotAnAdministrator("Managing hosts and the sample window");
+        }
+
         var wanted = Given.AName(name, Host.NameMaxLength);
 
         var created = await create.ExecuteAsync(wanted, cancellationToken);
@@ -78,14 +84,20 @@ public static class HostAdministration
         Guid hostId,
         [Description("What it should be called instead.")]
         string name,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default)
     {
+        if (!agent.Administers)
+        {
+            throw Refused.NotAnAdministrator("Managing hosts and the sample window");
+        }
+
         var wanted = Given.AName(name, Host.NameMaxLength);
 
         return await rename.ExecuteAsync(hostId, wanted, cancellationToken) switch
         {
             RenameHostOutcome.Renamed => AdministeredHost.Of(
-                await FoundAsync(hosts, hostId, cancellationToken)),
+                await FoundAsync(hosts, hostId, agent, cancellationToken)),
             RenameHostOutcome.NameTaken => throw Refused.HostNameTaken(wanted),
             _ => throw Refused.NoSuchHost(hostId),
         };
@@ -111,8 +123,14 @@ public static class HostAdministration
         ChangeSampleRetention change,
         [Description("The new window, between 1 and 90 days, and not below the current one.")]
         int retentionDays,
+        TheCallingAgent agent,
         CancellationToken cancellationToken = default)
     {
+        if (!agent.Administers)
+        {
+            throw Refused.NotAnAdministrator("Managing hosts and the sample window");
+        }
+
         var wanted = Given.AWindow(retentionDays);
         var now = await change.ReadAsync(cancellationToken);
 
@@ -135,7 +153,9 @@ public static class HostAdministration
     /// same reading <c>GroupAdministration</c> makes, for the same reason.
     /// </remarks>
     internal static async Task<ListedHost> FoundAsync(
-        ListHosts hosts, Guid hostId, CancellationToken cancellationToken) =>
-        (await hosts.ExecuteAsync(cancellationToken)).FirstOrDefault(host => host.Id == hostId)
+        ListHosts hosts, Guid hostId, TheCallingAgent agent,
+        CancellationToken cancellationToken) =>
+        (await hosts.ExecuteAsync(agent.Reach,
+            cancellationToken)).FirstOrDefault(host => host.Id == hostId)
         ?? throw Refused.NoSuchHost(hostId);
 }

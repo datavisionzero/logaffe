@@ -200,7 +200,7 @@ public sealed class TailActsTests
 
     private Task<Read<Arrivals>?> Tail(
         Guid projectId, EntryFilters? filters = null, TailCursor? since = null) =>
-        new TailEntries(_projects, _reader).ExecuteAsync(
+        new TailEntries(_projects, _reader).ExecuteAsync(Reach.TheInstallation, 
             projectId,
             filters ?? EntryFilters.None,
             since,

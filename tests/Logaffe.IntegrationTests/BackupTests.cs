@@ -52,7 +52,7 @@ public sealed class BackupTests(PostgresFixture postgres)
                 "agent_token", "alert_condition_state", "backup_code",
                 "filesystem_reading", "host", "host_sample", "host_token", "identity",
                 "ingest_token", "installation_settings", "log_entry",
-                "project", "project_group", "project_tally", "session",
+                "project", "project_access", "project_group", "project_tally", "session",
             ],
             names.Order(StringComparer.Ordinal));
 
@@ -61,6 +61,8 @@ public sealed class BackupTests(PostgresFixture postgres)
         Assert.True(Array.IndexOf(names, "project_group") < Array.IndexOf(names, "project"));
         Assert.True(Array.IndexOf(names, "identity") < Array.IndexOf(names, "session"));
         Assert.True(Array.IndexOf(names, "identity") < Array.IndexOf(names, "backup_code"));
+        Assert.True(Array.IndexOf(names, "identity") < Array.IndexOf(names, "project_access"));
+        Assert.True(Array.IndexOf(names, "project") < Array.IndexOf(names, "project_access"));
 
         // The host is pointed at by four things, one of them the project — which
         // is why it has to be restored before a table that was already in this

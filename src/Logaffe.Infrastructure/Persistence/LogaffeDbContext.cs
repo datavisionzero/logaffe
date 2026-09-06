@@ -73,6 +73,12 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
     /// </summary>
     public DbSet<Identity> Identities => Set<Identity>();
 
+    /// <summary>
+    /// Which user reaches which project — the one filter every read narrows to
+    /// (ADR 0055).
+    /// </summary>
+    public DbSet<ProjectAccess> ProjectAccess => Set<ProjectAccess>();
+
     public DbSet<Session> Sessions => Set<Session>();
 
     public DbSet<BackupCode> BackupCodes => Set<BackupCode>();

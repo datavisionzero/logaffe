@@ -106,7 +106,8 @@ public sealed class IngestTokenActsTests
 
         // The rotation model saying what it is for: the operator revokes the
         // one they are retiring rather than collecting a third.
-        var third = await Issuing().ExecuteAsync(_project, TestContext.Current.CancellationToken);
+        var third = await Issuing().ExecuteAsync(Reach.TheInstallation,
+            _project, TestContext.Current.CancellationToken);
 
         Assert.Equal(IssueOutcome.AlreadyHoldsTwo, third.Outcome);
         Assert.Null(third.Token);
@@ -119,7 +120,7 @@ public sealed class IngestTokenActsTests
     {
         // The foreign key would refuse it as a failure of the installation;
         // what happened is that the operator named something that is gone.
-        var attempt = await Issuing().ExecuteAsync(
+        var attempt = await Issuing().ExecuteAsync(Reach.TheInstallation, 
             Guid.CreateVersion7(), TestContext.Current.CancellationToken);
 
         Assert.Equal(IssueOutcome.NoSuchProject, attempt.Outcome);
@@ -134,7 +135,9 @@ public sealed class IngestTokenActsTests
         // A closed door and a deleted project are two different readings, and
         // an empty list for both is the settings of something gone.
         Assert.Null(await Listing().ExecuteAsync(
-            Guid.CreateVersion7(), TestContext.Current.CancellationToken));
+            Reach.TheInstallation,
+            Guid.CreateVersion7(),
+            TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -144,7 +147,8 @@ public sealed class IngestTokenActsTests
         await IssueAsync();
         await IssueAsync();
 
-        var elsewhere = await Issuing().ExecuteAsync(other, TestContext.Current.CancellationToken);
+        var elsewhere = await Issuing().ExecuteAsync(Reach.TheInstallation,
+            other, TestContext.Current.CancellationToken);
 
         Assert.Equal(IssueOutcome.Issued, elsewhere.Outcome);
         Assert.Equal(
@@ -241,12 +245,14 @@ public sealed class IngestTokenActsTests
 
         foreach (var project in many)
         {
-            await Issuing().ExecuteAsync(project, TestContext.Current.CancellationToken);
+            await Issuing().ExecuteAsync(Reach.TheInstallation,
+                project, TestContext.Current.CancellationToken);
         }
 
         var readsBefore = _tokens.Reads;
 
-        var held = await Listing().ExecuteAsync(TestContext.Current.CancellationToken);
+        var held = await Listing().ExecuteAsync(
+            Reach.TheInstallation, TestContext.Current.CancellationToken);
 
         Assert.Equal(readsBefore + 1, _tokens.Reads);
 
@@ -269,7 +275,8 @@ public sealed class IngestTokenActsTests
         _clock.Now = Now.AddHours(1);
         var second = await IssueAsync();
 
-        var held = await Listing().ExecuteAsync(TestContext.Current.CancellationToken);
+        var held = await Listing().ExecuteAsync(
+            Reach.TheInstallation, TestContext.Current.CancellationToken);
 
         Assert.Equal(
             [first!.Id, second!.Id], held[_project].Select(token => token.Id));
@@ -280,10 +287,12 @@ public sealed class IngestTokenActsTests
     /// two that are about the project rather than the token.
     /// </summary>
     private async Task<IssuedToken?> IssueAsync() =>
-        (await Issuing().ExecuteAsync(_project, TestContext.Current.CancellationToken)).Token;
+        (await Issuing().ExecuteAsync(Reach.TheInstallation,
+            _project, TestContext.Current.CancellationToken)).Token;
 
     private async Task<IReadOnlyList<ListedIngestToken>> ListedAsync(Guid project) =>
-        await Listing().ExecuteAsync(project, TestContext.Current.CancellationToken)
+        await Listing().ExecuteAsync(
+            Reach.TheInstallation, project, TestContext.Current.CancellationToken)
         ?? throw new InvalidOperationException("The project is there.");
 
     private IssueIngestToken Issuing() => new(_projects, _tokens, _cipher, _clock);

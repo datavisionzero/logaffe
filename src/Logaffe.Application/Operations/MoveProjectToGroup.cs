@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
 
@@ -51,9 +52,9 @@ public sealed class MoveProjectToGroup(IProjects projects, IGroups groups)
 {
     /// <param name="groupId">The group to list it under, or <c>null</c> for none.</param>
     public async Task<MoveProjectOutcome> ExecuteAsync(
-        Guid id, Guid? groupId, CancellationToken cancellationToken)
+        Reach reach, Guid id, Guid? groupId, CancellationToken cancellationToken)
     {
-        var project = await projects.FindAsync(id, cancellationToken);
+        var project = await projects.FindAsync(reach, id, cancellationToken);
         if (project is null)
         {
             return MoveProjectOutcome.NoSuchProject;

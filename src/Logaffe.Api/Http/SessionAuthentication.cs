@@ -3,6 +3,7 @@ using System.Text.Encodings.Web;
 using Logaffe.Api.Hosting;
 using Logaffe.Application.Operations;
 using Logaffe.Domain.Identities;
+using Logaffe.Domain.Projects;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
@@ -39,9 +40,18 @@ public static class SessionAuthentication
     /// </summary>
     public const string Administrator = "administrator";
 
+    /// <summary>
+    /// What the installation-wide acts ask for: inviting somebody, handing out
+    /// a role, assigning a project. <b>Never what a read asks for</b> — a read
+    /// narrows to the caller's reach and the role does not widen it.
+    /// </summary>
+    public const string AdministratorPolicy = "logaffe:administrator";
+
     private const string SessionItemKey = "logaffe.session";
 
     private const string UserItemKey = "logaffe.user";
+
+    private const string ReachItemKey = "logaffe.reach";
 
     public static IServiceCollection AddLogaffeSessionAuthentication(
         this IServiceCollection services)
@@ -50,7 +60,14 @@ public static class SessionAuthentication
             .AddAuthentication(Scheme)
             .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(Scheme, null);
 
-        return services.AddAuthorization();
+        services
+            .AddAuthorizationBuilder()
+            .AddPolicy(AdministratorPolicy, policy => policy
+                .AddAuthenticationSchemes(Scheme)
+                .RequireAuthenticatedUser()
+                .RequireRole(Administrator));
+
+        return services;
     }
 
     /// <summary>
@@ -76,10 +93,26 @@ public static class SessionAuthentication
         context.Items[UserItemKey] as User
         ?? throw new InvalidOperationException("This request was not admitted by a session.");
 
-    internal static void SetCurrentIdentity(this HttpContext context, Session session, User user)
+    /// <summary>
+    /// The projects this request may see, resolved once by the door rather than
+    /// by every act behind it (ADR 0055).
+    /// </summary>
+    /// <remarks>
+    /// Once per request and not once per read: a reach resolved twice inside one
+    /// request could answer differently in the middle of it, and a screen
+    /// assembled out of two answers is a screen that contradicts itself.
+    /// </remarks>
+    /// <inheritdoc cref="CurrentSession" path="/exception"/>
+    public static Reach Reach(this HttpContext context) =>
+        context.Items[ReachItemKey] as Reach
+        ?? throw new InvalidOperationException("This request was not admitted by a session.");
+
+    internal static void SetCurrentIdentity(
+        this HttpContext context, Session session, User user, Reach reach)
     {
         context.Items[SessionItemKey] = session;
         context.Items[UserItemKey] = user;
+        context.Items[ReachItemKey] = reach;
     }
 }
 
@@ -120,7 +153,11 @@ public sealed class SessionAuthenticationHandler(
             SessionCookie.Issue(Response, presented);
         }
 
-        Context.SetCurrentIdentity(admitted.Session, admitted.User);
+        var reach = await Context.RequestServices
+            .GetRequiredService<ResolveReach>()
+            .ExecuteAsync(admitted.User, Context.RequestAborted);
+
+        Context.SetCurrentIdentity(admitted.Session, admitted.User, reach);
 
         // What identifies the row, and the one role there is. Project access is
         // deliberately not here: it is a set that every read narrows to and not

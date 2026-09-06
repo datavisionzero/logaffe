@@ -95,5 +95,6 @@ public sealed class CountEntriesOutsideWindowTests
 
     private Task<long?> Count(Guid id, RetentionWindow proposed) =>
         new CountEntriesOutsideWindow(_projects, _entries, _clock)
-            .ExecuteAsync(id, proposed, TestContext.Current.CancellationToken);
+            .ExecuteAsync(Reach.TheInstallation,
+                id, proposed, TestContext.Current.CancellationToken);
 }

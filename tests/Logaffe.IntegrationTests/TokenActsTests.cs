@@ -115,7 +115,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
 
         await using var reader = ContextFor(installation);
         var listed = await new ListIngestTokens(new Projects(reader), new Tokens(reader))
-            .ExecuteAsync(project, TestContext.Current.CancellationToken);
+            .ExecuteAsync(Reach.TheInstallation, project, TestContext.Current.CancellationToken);
 
         Assert.Equal([first!.Id, second.Id], listed!.Select(token => token.Id));
         Assert.Equal(
@@ -191,7 +191,8 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
         await using (var context = ContextFor(installation))
         {
             Assert.True(await new DeleteProject(new Projects(context))
-                .ExecuteAsync(project, TestContext.Current.CancellationToken));
+                .ExecuteAsync(
+                    Reach.TheInstallation, project, TestContext.Current.CancellationToken));
         }
 
         // The project, its tokens and its visibility go at once (ADR 0019), and
@@ -237,7 +238,8 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
         var issue = new IssueIngestToken(
             new Projects(context), new Tokens(context), cipher, At(now));
 
-        return (await issue.ExecuteAsync(project, TestContext.Current.CancellationToken)).Token;
+        return (await issue.ExecuteAsync(
+            Reach.TheInstallation, project, TestContext.Current.CancellationToken)).Token;
     }
 
     private async Task<Guid?> DeliverAsync(

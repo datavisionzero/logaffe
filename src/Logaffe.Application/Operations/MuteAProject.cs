@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
 
@@ -47,9 +48,9 @@ public sealed class MuteAProject(IProjects projects)
     /// start again — which is the state every project is created in.
     /// </param>
     public async Task<MuteAProjectOutcome> ExecuteAsync(
-        Guid id, bool muted, CancellationToken cancellationToken)
+        Reach reach, Guid id, bool muted, CancellationToken cancellationToken)
     {
-        var project = await projects.FindAsync(id, cancellationToken);
+        var project = await projects.FindAsync(reach, id, cancellationToken);
         if (project is null)
         {
             return MuteAProjectOutcome.NoSuchProject;

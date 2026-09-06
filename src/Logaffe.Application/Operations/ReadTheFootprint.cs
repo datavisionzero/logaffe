@@ -54,9 +54,9 @@ public sealed class ReadTheFootprint(
     /// looks like.
     /// </summary>
     public async Task<Footprint?> OfProjectAsync(
-        Guid id, RetentionWindow proposed, CancellationToken cancellationToken)
+        Reach reach, Guid id, RetentionWindow proposed, CancellationToken cancellationToken)
     {
-        var project = await projects.FindAsync(id, cancellationToken);
+        var project = await projects.FindAsync(reach, id, cancellationToken);
         if (project is null)
         {
             return null;

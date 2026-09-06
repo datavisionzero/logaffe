@@ -500,6 +500,31 @@ the backup codes and an agent's row follow on the cascade.
 targets holds a handful of these rows against the 11.84 GiB above, which is why
 this section is about shape and constraints and not about bytes.
 
+### Who reaches which project
+
+```
+project_access
+  project_id   cascades with the project
+  user_id      cascades with the identity
+  granted_by   who handed it out
+  granted_at
+```
+
+**The pair is the key.** One user reaches one project once, and a second grant of
+the same pair is the same state rather than a second row — a synthetic id would
+have bought a second way to say one thing and a unique index to keep it honest.
+The index on `user_id` is the one every request uses: a reach is resolved once
+per request from the identity behind it, and every read narrows to it
+([ADR 0055](./adr/0055-project-access-is-one-filter.md)).
+
+**An agent has no row here.** It reaches exactly what its owner reaches, resolved
+through the owner on every call rather than copied when its token was issued — a
+copy would go stale in the one direction that matters, an assignment taken away.
+
+**`granted_by` and `granted_at` are read by nothing today.** They are here
+because *who gave this person access* is a question a multi-user installation
+gets asked, and the row is the only place the answer could be.
+
 ### The sessions and the backup codes hang off it
 
 ```

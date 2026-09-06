@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
 
@@ -44,9 +45,10 @@ public sealed class DeleteProject(IProjects projects)
     /// Whether there was a project to delete. <c>false</c> is a project already
     /// gone — a second click, or another tab — and not a failure of anything.
     /// </summary>
-    public async Task<bool> ExecuteAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(
+        Reach reach, Guid id, CancellationToken cancellationToken)
     {
-        var project = await projects.FindAsync(id, cancellationToken);
+        var project = await projects.FindAsync(reach, id, cancellationToken);
         if (project is null)
         {
             return false;

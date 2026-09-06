@@ -41,9 +41,9 @@ public sealed class RenameProject(IProjects projects)
     /// <see cref="Project.NameMaxLength"/>.
     /// </exception>
     public async Task<RenameOutcome> ExecuteAsync(
-        Guid id, string name, CancellationToken cancellationToken)
+        Reach reach, Guid id, string name, CancellationToken cancellationToken)
     {
-        var project = await projects.FindAsync(id, cancellationToken);
+        var project = await projects.FindAsync(reach, id, cancellationToken);
         if (project is null)
         {
             return RenameOutcome.NoSuchProject;

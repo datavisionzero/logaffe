@@ -64,12 +64,17 @@ public static class ProjectAdministration
             "The group to list it under, or nothing for none — which is where "
             + "most projects are. Groups are on get_settings.")]
         Guid? groupId = null,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default)
     {
         var wanted = Given.AName(name, Project.NameMaxLength);
         var window = Given.AWindow(retentionDays);
 
-        var created = await create.ExecuteAsync(wanted, window, groupId, cancellationToken);
+        // Created as the person this agent acts for, who reaches it from that
+        // moment — the agent inherits it because it inherits their whole set
+        // (ADR 0052, ADR 0055).
+        var created = await create.ExecuteAsync(
+            agent.Owner.Id, wanted, window, groupId, cancellationToken);
 
         // Named one by one, the way the move below names them: the group is
         // only missing when one was given, so a catch-all standing for it would
@@ -109,13 +114,15 @@ public static class ProjectAdministration
         Guid projectId,
         [Description("What it should be called instead.")]
         string name,
+        TheCallingAgent agent,
         CancellationToken cancellationToken = default)
     {
         var wanted = Given.AName(name, Project.NameMaxLength);
 
-        return await rename.ExecuteAsync(projectId, wanted, cancellationToken) switch
+        return await rename.ExecuteAsync(agent.Reach, projectId, wanted, cancellationToken) switch
         {
-            RenameOutcome.Renamed => await AsItStandsAsync(read, projectId, cancellationToken),
+            RenameOutcome.Renamed =>
+                await AsItStandsAsync(read, projectId, agent, cancellationToken),
             RenameOutcome.NameTaken => throw Refused.ProjectNameTaken(wanted),
             _ => throw Refused.NoSuchProject(projectId),
         };
@@ -147,10 +154,12 @@ public static class ProjectAdministration
             "The group to list it under, or nothing to take it out of every "
             + "group. Groups are on get_settings; create_group makes one.")]
         Guid? groupId = null,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default) =>
-        await move.ExecuteAsync(projectId, groupId, cancellationToken) switch
+        await move.ExecuteAsync(agent.Reach, projectId, groupId, cancellationToken) switch
         {
-            MoveProjectOutcome.Moved => await AsItStandsAsync(read, projectId, cancellationToken),
+            MoveProjectOutcome.Moved =>
+                await AsItStandsAsync(read, projectId, agent, cancellationToken),
             MoveProjectOutcome.NoSuchGroup => throw Refused.NoSuchGroup(groupId!.Value),
             MoveProjectOutcome.NameTaken => throw Refused.NameTakenWhereItWasGoing(),
             _ => throw Refused.NoSuchProject(projectId),
@@ -181,11 +190,12 @@ public static class ProjectAdministration
             "The machine it runs on, or nothing to track none. Hosts are on "
             + "get_settings; create_host makes one.")]
         Guid? hostId = null,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default) =>
-        await put.ExecuteAsync(projectId, hostId, cancellationToken) switch
+        await put.ExecuteAsync(agent.Reach, projectId, hostId, cancellationToken) switch
         {
             PutProjectOnHostOutcome.PutOn =>
-                await AsItStandsAsync(read, projectId, cancellationToken),
+                await AsItStandsAsync(read, projectId, agent, cancellationToken),
             PutProjectOnHostOutcome.NoSuchHost => throw Refused.NoSuchHost(hostId!.Value),
             _ => throw Refused.NoSuchProject(projectId),
         };
@@ -213,10 +223,11 @@ public static class ProjectAdministration
         Guid projectId,
         [Description("The new window, between 1 and 90 days, and not below the current one.")]
         int retentionDays,
+        TheCallingAgent agent,
         CancellationToken cancellationToken = default)
     {
         var wanted = Given.AWindow(retentionDays);
-        var project = await read.ExecuteAsync(projectId, cancellationToken)
+        var project = await read.ExecuteAsync(agent.Reach, projectId, cancellationToken)
             ?? throw Refused.NoSuchProject(projectId);
 
         // Equal is neither direction and is a no-op, not a refusal: an agent
@@ -229,9 +240,9 @@ public static class ProjectAdministration
                 project.Retention.Days, wanted.Days, "shorten_project_retention");
         }
 
-        await change.ExecuteAsync(projectId, wanted, cancellationToken);
+        await change.ExecuteAsync(agent.Reach, projectId, wanted, cancellationToken);
 
-        return await AsItStandsAsync(read, projectId, cancellationToken);
+        return await AsItStandsAsync(read, projectId, agent, cancellationToken);
     }
 
     [McpServerTool(
@@ -257,11 +268,12 @@ public static class ProjectAdministration
         Guid projectId,
         [Description("The window to weigh, between 1 and 90 days.")]
         int retentionDays,
+        TheCallingAgent agent,
         CancellationToken cancellationToken = default)
     {
         var proposed = Given.AWindow(retentionDays);
 
-        var outside = await count.ExecuteAsync(projectId, proposed, cancellationToken)
+        var outside = await count.ExecuteAsync(agent.Reach, projectId, proposed, cancellationToken)
             ?? throw Refused.NoSuchProject(projectId);
 
         return new EntriesOutsideWindowAnswer
@@ -281,8 +293,9 @@ public static class ProjectAdministration
     /// there, which is what it is.
     /// </remarks>
     internal static async Task<AdministeredProject> AsItStandsAsync(
-        ReadProject read, Guid projectId, CancellationToken cancellationToken) =>
+        ReadProject read, Guid projectId, TheCallingAgent agent,
+        CancellationToken cancellationToken) =>
         AdministeredProject.Of(
-            await read.ExecuteAsync(projectId, cancellationToken)
+            await read.ExecuteAsync(agent.Reach, projectId, cancellationToken)
             ?? throw Refused.NoSuchProject(projectId));
 }

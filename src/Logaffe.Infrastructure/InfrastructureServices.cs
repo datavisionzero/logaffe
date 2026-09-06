@@ -34,6 +34,7 @@ public static class InfrastructureServices
         services.AddScoped<IStoreFootprint, StoreFootprint>();
         services.AddScoped<ISealedSecrets, SealedSecrets>();
         services.AddScoped<IProjects, Projects>();
+        services.AddScoped<IProjectAccess, ProjectAccesses>();
         services.AddScoped<IGroups, Groups>();
         services.AddScoped<IHosts, Hosts>();
         services.AddScoped<ITokens, Tokens>();

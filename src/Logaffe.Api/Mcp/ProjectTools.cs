@@ -40,9 +40,12 @@ public static class ProjectTools
         one project and is given it by identity.
         """)]
     public static async Task<ProjectsAnswer> ListAsync(
-        ListProjects projects, ListGroups groups, CancellationToken cancellationToken)
+        ListProjects projects,
+        ListGroups groups,
+        TheCallingAgent agent,
+        CancellationToken cancellationToken)
     {
-        var held = await projects.ExecuteAsync(cancellationToken);
+        var held = await projects.ExecuteAsync(agent.Reach, cancellationToken);
 
         // The group rides on the project rather than being a tool of its own:
         // an agent asked about "the production one of shop" resolves it here,

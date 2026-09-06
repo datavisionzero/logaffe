@@ -14,9 +14,13 @@ namespace Logaffe.UnitTests.Application;
 /// </remarks>
 public sealed class GroupActsTests
 {
+    /// <summary>Who is creating, and who reaches what they create (ADR 0055).</summary>
+    private static readonly Guid Creator = Guid.CreateVersion7();
+
     private static readonly DateTimeOffset Now = new(2026, 8, 7, 9, 0, 0, TimeSpan.Zero);
 
     private readonly InMemoryProjects _projects = new();
+    private readonly InMemoryProjectAccess _access = new();
     private readonly InMemoryGroups _groups = new();
     private readonly InMemoryTokens _tokens = new();
     private readonly RecordingReader _entries = new();
@@ -265,7 +269,7 @@ public sealed class GroupActsTests
         await MoveAsync(project!.Id, group!.Id);
 
         var listed = Assert.Single(await new ListProjects(_projects, _tokens, _entries)
-            .ExecuteAsync(TestContext.Current.CancellationToken));
+            .ExecuteAsync(Reach.TheInstallation, TestContext.Current.CancellationToken));
 
         // The identity and not the name: the name is on the group list, which
         // is also where a group holding nothing is found.
@@ -332,15 +336,19 @@ public sealed class GroupActsTests
         (await CreatingAsync(name, groupId)).Project;
 
     private Task<CreationAttempt> CreatingAsync(string name, Guid? groupId = null) =>
-        new CreateProject(_projects, _groups, _clock).ExecuteAsync(
-            name, RetentionWindow.OfDays(7), groupId, TestContext.Current.CancellationToken);
+        new CreateProject(_projects, _groups, _access, _clock).ExecuteAsync(
+            Creator,
+            name,
+            RetentionWindow.OfDays(7),
+            groupId,
+            TestContext.Current.CancellationToken);
 
     private Task<RenameOutcome> RenameAsync(Guid project, string name) =>
-        new RenameProject(_projects).ExecuteAsync(
+        new RenameProject(_projects).ExecuteAsync(Reach.TheInstallation, 
             project, name, TestContext.Current.CancellationToken);
 
     private Task<MoveProjectOutcome> MoveAsync(Guid project, Guid? group) =>
-        new MoveProjectToGroup(_projects, _groups).ExecuteAsync(
+        new MoveProjectToGroup(_projects, _groups).ExecuteAsync(Reach.TheInstallation, 
             project, group, TestContext.Current.CancellationToken);
 
     private ListGroups Listing() => new(_groups);

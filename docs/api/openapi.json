@@ -924,6 +924,116 @@
         }
       }
     },
+    "/projects/{id}/access": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Who reaches this project.",
+        "operationId": "ListProjectAccess",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectAccessResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/projects/{id}/access/{userId}": {
+      "put": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Puts a project within somebody's reach.",
+        "operationId": "GrantProjectAccess",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Takes it back, from that person's next request on.",
+        "operationId": "WithdrawProjectAccess",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/groups": {
       "post": {
         "tags": [
@@ -3798,6 +3908,36 @@
         "properties": {
           "token": {
             "type": "string"
+          }
+        }
+      },
+      "ProjectAccessResponse": {
+        "required": [
+          "userId",
+          "name",
+          "email",
+          "grantedBy",
+          "grantedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "grantedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "grantedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },

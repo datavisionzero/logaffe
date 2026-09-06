@@ -255,6 +255,13 @@ builder.Services.AddScoped<ReadTokenBack>();
 builder.Services.AddSingleton<DummySecret>();
 builder.Services.AddSingleton<DummyPasswordHash>();
 
+// Who is on the other end of a tool call, filled in by the agent's door before
+// any tool runs. Scoped, because it is one call's answer (ADR 0055).
+builder.Services.AddScoped<TheCallingAgent>();
+builder.Services.AddScoped<ResolveReach>();
+builder.Services.AddScoped<AssignProject>();
+builder.Services.AddScoped<ListProjectAccess>();
+
 // Order is start order. This one is first because what it has to say is about
 // where everything after it is written.
 builder.Services.AddHostedService<FileLogService>();
@@ -329,6 +336,7 @@ app.MapHealth();
 app.MapSessions();
 app.MapAccount();
 app.MapProjects();
+app.MapProjectAccess();
 app.MapGroups();
 app.MapEntries();
 app.MapHosts();

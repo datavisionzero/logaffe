@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Logaffe.Api.Queries;
 using Logaffe.Application.Operations;
+using Logaffe.Domain.Projects;
 using Logaffe.Domain.Entries;
 using Logaffe.Domain.Queries;
 using Microsoft.AspNetCore.Authorization;
@@ -97,6 +98,7 @@ public static class EntryTools
         string? exception = null,
         [Description("The cursor a previous search handed back. Pass it on unread.")]
         string? cursor = null,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default)
     {
         var filters = Read(
@@ -120,7 +122,8 @@ public static class EntryTools
         // many entries an agent is handed at once and nothing about which ones.
         while (true)
         {
-            var read = await pages.ExecuteAsync(projectId, filters, position, cancellationToken);
+            var read = await pages.ExecuteAsync(
+                agent.Reach, projectId, filters, position, cancellationToken);
             if (read is null)
             {
                 throw NoSuchProject(projectId);
@@ -164,7 +167,8 @@ public static class EntryTools
         }
 
         var matched = await MatchedAsync(
-            counts, projectId, filters, taken.Count, capped, after, cancellationToken);
+            counts, agent.Reach, projectId, filters, taken.Count, capped, after,
+            cancellationToken);
 
         // No count, no answer. The narrowings are a function of the filters the
         // count ran with, which are these, so this is the same list the use case
@@ -227,13 +231,14 @@ public static class EntryTools
         string? search = null,
         [Description("The same, against the exception text, which is its own filter.")]
         string? exception = null,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default)
     {
         var filters = Read(
             from, until, minimumLevel, instance, loggerName, trace, search, exception);
 
         var read = await count.ExecuteAsync(
-            projectId, filters, groupBy, bucket, cancellationToken);
+            agent.Reach, projectId, filters, groupBy, bucket, cancellationToken);
 
         if (read is null)
         {
@@ -267,9 +272,10 @@ public static class EntryTools
         Guid projectId,
         [Description("The identity a search answered with.")]
         long entryId,
-        CancellationToken cancellationToken)
+        TheCallingAgent agent = null!,
+        CancellationToken cancellationToken = default)
     {
-        var entry = await read.ExecuteAsync(projectId, entryId, cancellationToken);
+        var entry = await read.ExecuteAsync(agent.Reach, projectId, entryId, cancellationToken);
 
         // An entry that aged out between the search and this call looks like
         // this, and so does an identity somebody guessed.
@@ -307,6 +313,7 @@ public static class EntryTools
     /// </remarks>
     private static async Task<long?> MatchedAsync(
         CountEntries count,
+        Reach reach,
         Guid projectId,
         EntryFilters filters,
         int returned,
@@ -322,7 +329,7 @@ public static class EntryTools
         // The bucket is not read for an ungrouped count; it is passed because
         // the use case takes one.
         var read = await count.ExecuteAsync(
-            projectId, filters, Grouping.None, TimeBucket.Hour, cancellationToken);
+            reach, projectId, filters, Grouping.None, TimeBucket.Hour, cancellationToken);
 
         if (read is null)
         {

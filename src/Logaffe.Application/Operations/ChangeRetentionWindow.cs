@@ -32,9 +32,12 @@ public sealed class ChangeRetentionWindow(IProjects projects)
 {
     /// <summary>Whether there was a project to change.</summary>
     public async Task<bool> ExecuteAsync(
-        Guid id, RetentionWindow retention, CancellationToken cancellationToken)
+        Reach reach,
+        Guid id,
+        RetentionWindow retention,
+        CancellationToken cancellationToken)
     {
-        var project = await projects.FindAsync(id, cancellationToken);
+        var project = await projects.FindAsync(reach, id, cancellationToken);
         if (project is null)
         {
             return false;

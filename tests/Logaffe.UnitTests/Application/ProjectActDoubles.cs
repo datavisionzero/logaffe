@@ -36,11 +36,18 @@ internal sealed class InMemoryProjects : IProjects
         return project;
     }
 
-    public Task<IReadOnlyList<Project>> ListAsync(CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<Project>>([.. _projects.OrderBy(p => p.CreatedAt)]);
+    /// <summary>
+    /// Narrowed by the reach, as the real store is: that is the one filter, and
+    /// a double that ignored it would let a test pass over a leak (ADR 0055).
+    /// </summary>
+    public Task<IReadOnlyList<Project>> ListAsync(
+        Reach reach, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Project>>(
+            [.. _projects.Where(p => reach.Includes(p.Id)).OrderBy(p => p.CreatedAt)]);
 
-    public Task<Project?> FindAsync(Guid id, CancellationToken cancellationToken) =>
-        Task.FromResult(_projects.SingleOrDefault(p => p.Id == id));
+    public Task<Project?> FindAsync(Reach reach, Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(
+            _projects.SingleOrDefault(p => p.Id == id && reach.Includes(p.Id)));
 
     /// <summary>
     /// A name is taken where the project would be listed and nowhere else, which
@@ -118,4 +125,47 @@ internal sealed class InMemoryGroups : IGroups
         Writes++;
         return Task.CompletedTask;
     }
+}
+
+/// <summary>
+/// Who reaches which project, in memory. What the acts turn on is that creating
+/// one grants its creator access in the same act (ADR 0055), and that granting
+/// twice is the same state rather than a second row.
+/// </summary>
+internal sealed class InMemoryProjectAccess : IProjectAccess
+{
+    private readonly List<ProjectAccess> _granted = [];
+
+    public IReadOnlyList<ProjectAccess> Granted => _granted;
+
+    public Task<Reach> ReachOfAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult(Reach.Of(
+            _granted.Where(a => a.UserId == userId).Select(a => a.ProjectId)));
+
+    public Task<IReadOnlyList<ProjectAccess>> ListForProjectAsync(
+        Guid projectId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ProjectAccess>>(
+            [.. _granted.Where(a => a.ProjectId == projectId)]);
+
+    public Task<IReadOnlyList<ProjectAccess>> ListForUserAsync(
+        Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ProjectAccess>>(
+            [.. _granted.Where(a => a.UserId == userId)]);
+
+    public Task<bool> GrantAsync(ProjectAccess access, CancellationToken cancellationToken)
+    {
+        if (_granted.Any(a => a.ProjectId == access.ProjectId && a.UserId == access.UserId))
+        {
+            return Task.FromResult(false);
+        }
+
+        _granted.Add(access);
+
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> RevokeAsync(
+        Guid projectId, Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult(
+            _granted.RemoveAll(a => a.ProjectId == projectId && a.UserId == userId) > 0);
 }

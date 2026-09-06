@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
 
@@ -44,9 +45,9 @@ public sealed class PutProjectOnHost(IProjects projects, IHosts hosts)
 {
     /// <param name="hostId">The machine it runs on, or <c>null</c> for none.</param>
     public async Task<PutProjectOnHostOutcome> ExecuteAsync(
-        Guid id, Guid? hostId, CancellationToken cancellationToken)
+        Reach reach, Guid id, Guid? hostId, CancellationToken cancellationToken)
     {
-        var project = await projects.FindAsync(id, cancellationToken);
+        var project = await projects.FindAsync(reach, id, cancellationToken);
         if (project is null)
         {
             return PutProjectOnHostOutcome.NoSuchProject;

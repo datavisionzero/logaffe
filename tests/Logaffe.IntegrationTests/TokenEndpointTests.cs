@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Logaffe.Api.Http;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
@@ -389,12 +390,27 @@ public sealed class TokenEndpointTests(PostgresFixture postgres) : IAsyncLifetim
         _secondFactorSecret = enrolled.SecondFactorSecret;
     }
 
+    /// <summary>
+    /// A project written straight into the store, and put within the signed-in
+    /// administrator's reach in the same write.
+    /// </summary>
+    /// <remarks>
+    /// The assignment is not decoration: a project nobody was assigned does not
+    /// exist for anybody (ADR 0055), and a helper that skipped it would be
+    /// seeding a state the acts cannot produce.
+    /// </remarks>
     private async Task<Guid> ProjectAsync(string name)
     {
         await using var context = ContextFor(_connectionString);
-        var project = Project.Create(name, RetentionWindow.OfDays(7), DateTimeOffset.UtcNow);
+        var now = DateTimeOffset.UtcNow;
+        var project = Project.Create(name, RetentionWindow.OfDays(7), now);
+        var administrator = await context.Identities.OfType<User>()
+            .SingleAsync(TestContext.Current.CancellationToken);
 
         context.Projects.Add(project);
+        context.ProjectAccess.Add(
+            ProjectAccess.Grant(project.Id, administrator.Id, administrator.Id, now));
+
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         return project.Id;

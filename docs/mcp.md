@@ -434,6 +434,35 @@ not a confirmation step. It is that an administering token reads no entry, so th
 sentence asking for the credential never enters its context, and that an ingest
 token is write-only, so nothing is read back out through one.
 
+### What the two kinds reach, once the owner is taken into account
+
+**Every tool that names a project narrows to the projects its owner reaches**
+([ADR 0055](./adr/0055-project-access-is-one-filter.md)). `list_projects`
+answers the ones that person holds; a project out of reach is not in that answer
+and is not found when named by identity, which is the same answer a project that
+was deleted gives. There is no "forbidden" here — a refusal that told the two
+apart would tell an agent, and through it whoever wrote the log line it just
+read, what else the installation holds.
+
+**A project's own settings follow the project.** Renaming it, its retention
+window, its group, its host, its mute and its ingest tokens are reachable by an
+administering token whose owner reaches the project, and by no other.
+
+**What belongs to the installation needs an administrator.** Groups, hosts and
+the sample window are nobody's project, so an administering token reaches them
+only while the person it acts for is an administrator — and it is told so in a
+sentence rather than finding the tool missing. That is a departure from how the
+two token kinds are told apart, and it is deliberate: the tool list is fixed when
+the client connects and a role is not, so a tool that vanished the moment
+somebody lost the role would be a list that lies until the next reconnect.
+
+**Host samples are the one thing that does not narrow.** A sample is what a
+machine said about itself, it belongs to no project, and one host carries several
+projects belonging to several people
+([ADR 0045](./adr/0045-a-sample-is-not-an-entry-and-may-be-read-across-projects.md)).
+What it exposes is a machine name and four numbers, and never anything anybody
+logged.
+
 ### Three things no token reaches
 
 Absent from the interface rather than withheld by a flag, the way this whole

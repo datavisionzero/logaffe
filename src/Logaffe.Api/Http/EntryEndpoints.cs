@@ -209,6 +209,7 @@ public static class EntryEndpoints
                 [AsParameters] EntryFiltersRequest request,
                 [FromQuery] string? cursor,
                 SearchEntries search,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!TryRead(request, out var filters, out var invalid))
@@ -224,7 +225,8 @@ public static class EntryEndpoints
                     return NotACursor();
                 }
 
-                var read = await search.ExecuteAsync(id, filters, after, cancellationToken);
+                var read = await search.ExecuteAsync(
+                    context.Reach(), id, filters, after, cancellationToken);
 
                 if (read is null)
                 {
@@ -249,6 +251,7 @@ public static class EntryEndpoints
                 [AsParameters] EntryFiltersRequest request,
                 [FromQuery] string? since,
                 TailEntries tail,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!TryRead(request, out var filters, out var invalid))
@@ -265,7 +268,8 @@ public static class EntryEndpoints
                     return NotATailCursor();
                 }
 
-                var read = await tail.ExecuteAsync(id, filters, seen, cancellationToken);
+                var read = await tail.ExecuteAsync(
+                    context.Reach(), id, filters, seen, cancellationToken);
 
                 if (read is null)
                 {
@@ -292,6 +296,7 @@ public static class EntryEndpoints
                 [FromQuery] string? groupBy,
                 [FromQuery] string? bucket,
                 CountEntries count,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!TryRead(request, out var filters, out var invalid))
@@ -310,7 +315,7 @@ public static class EntryEndpoints
                 }
 
                 var read = await count.ExecuteAsync(
-                    id, filters, grouping, bucketed, cancellationToken);
+                    context.Reach(), id, filters, grouping, bucketed, cancellationToken);
 
                 if (read is null)
                 {
@@ -334,9 +339,11 @@ public static class EntryEndpoints
                 Guid id,
                 long entryId,
                 ReadEntry read,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                var entry = await read.ExecuteAsync(id, entryId, cancellationToken);
+                var entry = await read.ExecuteAsync(context.Reach(),
+                    id, entryId, cancellationToken);
 
                 // An entry that aged out between the page and the click looks
                 // like this, and so does an identity somebody guessed.

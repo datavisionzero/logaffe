@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
 
@@ -54,7 +55,7 @@ public sealed class SweepExpiredEntries(IProjects projects, IEntries entries, Ti
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var now = clock.GetUtcNow();
-        var live = await projects.ListAsync(cancellationToken);
+        var live = await projects.ListAsync(Reach.TheInstallation, cancellationToken);
 
         foreach (var project in live)
         {
