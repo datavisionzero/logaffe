@@ -29,11 +29,12 @@ function open(routes: Record<string, Answer | Answer[]>) {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("an installation with no second factor", () => {
+describe("an account with no second factor", () => {
   /**
    * The second factor is offered rather than required (ADR 0041), and the
    * interface is the only thing that can keep an omission from passing for a
-   * setting — so this is said on every screen and cannot be dismissed.
+   * setting — so this is said on every screen and cannot be dismissed. It is a
+   * statement about the signed-in account and never about the installation.
    */
   it("says so, and points at the act that ends it", async () => {
     open({ "GET /second-factor": withoutSecondFactor });

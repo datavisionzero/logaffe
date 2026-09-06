@@ -67,7 +67,7 @@ spent.
 ## The second factor is TOTP
 
 The second factor is a time-based one-time code from an authenticator app,
-enrolled from the settings behind the operator's own password, from a QR code and
+enrolled from a user's own settings behind their own password, from a QR code and
 the secret in text for anyone typing it by hand
 ([ADR 0016](./adr/0016-the-second-factor-is-totp.md)).
 
@@ -75,7 +75,7 @@ The secret is **encrypted with the key on the host volume**, like a token, for
 the plain reason that a code cannot be computed without it — so unlike the other
 two credentials it is not hashed, and unlike the other two it is unusable if that
 key is lost
-([ADR 0032](./adr/0032-each-operator-secret-is-stored-for-what-it-is.md)).
+([ADR 0057](./adr/0057-a-users-secrets-are-stored-for-what-they-are-and-the-password-is-argon2id.md)).
 
 **It can be re-enrolled while signed in**, which is what makes replacing a phone
 an ordinary afternoon instead of an incident. Re-enrolling asks for the password
@@ -93,7 +93,26 @@ there stands in for nothing.
 
 The honest cost is stated in the ADR: TOTP is phishable in a way a passkey is
 not. It is chosen because it is the only common second factor that asks nothing
-of the machine in front of the operator.
+of the machine somebody is sitting at.
+
+### It belongs to the user, and nobody else can touch it
+
+**Each user enrols, replaces and removes their own**, behind their own password.
+There is no act anywhere in the product by which one account changes another's
+second factor, password or backup codes — not for an administrator, not over
+MCP, and not from the host. An account somebody else can re-enrol a factor on is
+an account they own.
+
+**An administrator sees who has one and cannot require it.** The user list says
+whether each account has a second factor, because an administrator who cannot see
+that cannot have the conversation, and the state is not a secret from the person
+who invited them. What there is no switch for is *making* it mandatory: a forced
+enrolment is the one most likely to be dispatched with a screenshot of a QR code
+and a sheet of backup codes nobody writes down, which buys the appearance of a
+second factor
+([ADR 0041](./adr/0041-the-second-factor-is-offered-not-required.md)). What the
+product does instead is keep saying so — to the person whose account it is, on
+every screen, until they enrol one.
 
 ## The password
 
@@ -209,8 +228,8 @@ and the sweep is what keeps the list from filling with rows that cannot act.
 installation draws a secret and a fresh sheet of backup codes, shows both, and
 hands back a sealed ticket carrying them
 ([ADR 0036](./adr/0036-an-enrolment-carries-its-own-sealed-ticket.md)); nothing
-is stored until the confirming request, so the authenticator in the operator's
-pocket — if there is one — keeps working until the moment it is replaced. That
+is stored until the confirming request, so the authenticator in their pocket —
+if there is one — keeps working until the moment it is replaced. That
 request asks for the password, a code from the app just enrolled, which is what
 proves the enrolment took, and, when there is already a second factor in place,
 the current code or a backup code, which is the case of the phone that is already
@@ -219,9 +238,9 @@ there before.
 
 **Turning it off** asks for the password and a current code, ends every other
 session for the same reason, and takes the backup codes with it. Every change to
-the second factor ends the other sessions: the point of them all is that the
-operator notices when somebody else is signed in, and this is the moment worth
-noticing.
+the second factor ends that user's other sessions: the point of them all is that
+somebody notices when another person is signed in as them, and this is the moment
+worth noticing.
 
 **A fresh sheet can also be asked for on its own**, which replaces the previous
 set entirely, spent codes and unspent alike. It requires the password, because

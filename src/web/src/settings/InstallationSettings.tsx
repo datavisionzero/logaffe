@@ -64,12 +64,12 @@ export function InstallationSettings() {
           panel: (
             <>
               {/* Each of the acts below asks for the password again, which is
-                  what makes them the operator's rather than those of whoever is
+                  what makes them this person's rather than those of whoever is
                   sitting at an unlocked browser. */}
               <p className="quiet">
-                Each of the three below asks for your password again. There is no reset over
-                the network and no email to send one to: what stands behind all of them is
-                Host Recovery, on the machine this installation runs on.
+                Each of the three below asks for your password again. They are yours alone:
+                nobody else on this installation can enrol your second factor, print your
+                backup codes or change your password, and no administrator can either.
               </p>
 
               <ChangePassword />
