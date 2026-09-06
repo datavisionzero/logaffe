@@ -1,6 +1,7 @@
 using Logaffe.Application.Operations;
 using Logaffe.Application.Ports;
 using Logaffe.Domain.Projects;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
 using Logaffe.Infrastructure.Secrets;
@@ -101,7 +102,11 @@ public sealed class TokenAuthenticationTests(PostgresFixture postgres) : IDispos
     {
         await using var context = ContextFor(connectionString);
         var authenticate = new AuthenticateToken(
-            new Tokens(context), cipher, new DummySecret(cipher), clock);
+            new Tokens(context),
+            new Identities(context),
+            cipher,
+            new DummySecret(cipher),
+            clock);
 
         return await authenticate.AdmittedProjectAsync(
             authorization, TestContext.Current.CancellationToken);

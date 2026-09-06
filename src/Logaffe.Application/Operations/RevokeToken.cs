@@ -60,6 +60,10 @@ public sealed class RevokeToken(ITokens tokens)
             return false;
         }
 
+        // The token and not the agent: an identity is never deleted, and a
+        // record of what this agent did has to keep pointing at something
+        // (ADR 0052). What is left behind is an agent that authenticates
+        // nothing, which is what a revoked credential means.
         await tokens.RemoveAsync(token, cancellationToken);
         return true;
     }

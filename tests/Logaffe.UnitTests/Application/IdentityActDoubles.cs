@@ -34,6 +34,14 @@ internal sealed class InMemoryIdentities : IIdentities
         return user;
     }
 
+    /// <inheritdoc cref="Seed(User)"/>
+    public Agent Seed(Agent agent)
+    {
+        _identities.Add(agent);
+
+        return agent;
+    }
+
     /// <summary>
     /// Puts a user in place with a sheet of backup codes beside them, which is
     /// the state an enrolment leaves behind and the starting point of most of

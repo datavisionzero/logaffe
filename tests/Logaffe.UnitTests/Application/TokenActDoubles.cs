@@ -1,5 +1,6 @@
 using System.Text;
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Tokens;
 
 namespace Logaffe.UnitTests.Application;
@@ -95,8 +96,17 @@ internal sealed class InMemoryTokens : ITokens
     public Task AddAsync(IngestToken token, CancellationToken cancellationToken) =>
         Write(() => _ingestTokens.Add(token));
 
-    public Task AddAsync(AgentToken token, CancellationToken cancellationToken) =>
-        Write(() => _agentTokens.Add(token));
+    /// <summary>The agents written beside their tokens, which some tests read.</summary>
+    public IReadOnlyList<Agent> Agents => _agents;
+
+    private readonly List<Agent> _agents = [];
+
+    public Task AddAsync(Agent agent, AgentToken token, CancellationToken cancellationToken) =>
+        Write(() =>
+        {
+            _agents.Add(agent);
+            _agentTokens.Add(token);
+        });
 
     public Task AddAsync(HostToken token, CancellationToken cancellationToken) =>
         Write(() => _hostTokens.Add(token));

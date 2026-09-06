@@ -1,17 +1,29 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Tokens;
 
 namespace Logaffe.Application.Operations;
 
 /// <summary>
-/// What an admitted agent may ask for: which half of MCP its token earns, and
-/// whether it may make a change after which stored data is gone.
+/// What an admitted agent may ask for: which half of MCP its token earns,
+/// whether it may make a change after which stored data is gone, and who it is
+/// acting for.
 /// </summary>
 /// <remarks>
-/// Both are read off the row and neither is negotiable in the call — there is no
-/// act anywhere that changes either after the token was issued (ADR 0046).
+/// <para>
+/// The first two are read off the token's row and neither is negotiable in the
+/// call — there is no act anywhere that changes either after the token was
+/// issued (ADR 0046).
+/// </para>
+/// <para>
+/// The third is the owner, and it is what everything else about the agent is
+/// resolved through (ADR 0052): the projects it can reach are that user's, and
+/// the installation-wide acts are within reach only while that user is an
+/// administrator. It comes back here because asking for it a second time would
+/// be a second lookup on every call an agent makes.
+/// </para>
 /// </remarks>
-public sealed record AdmittedAgent(AgentTokenKind Kind, bool MayDestroy);
+public sealed record AdmittedAgent(AgentTokenKind Kind, bool MayDestroy, User Owner);
 
 /// <summary>
 /// What a presented token admits: for a delivery of entries, the project it goes
@@ -36,6 +48,7 @@ public sealed record AdmittedAgent(AgentTokenKind Kind, bool MayDestroy);
 /// </remarks>
 public sealed class AuthenticateToken(
     ITokens tokens,
+    IIdentities identities,
     ISecretCipher cipher,
     DummySecret dummy,
     TimeProvider clock)
@@ -124,9 +137,18 @@ public sealed class AuthenticateToken(
     /// silent refusal the two deliveries get.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The kind comes back with it because it is what the adapter above hands
     /// out a tool list from, and asking for it a second time would be a second
     /// lookup on every call an agent makes (ADR 0046).
+    /// </para>
+    /// <para>
+    /// <b>So does the owner, and a token whose owner is not active admits
+    /// nothing.</b> That is the whole of how deactivating somebody silences
+    /// their agents and reactivating them brings back whatever was not revoked
+    /// one at a time: there is no second state to set and nothing to remember to
+    /// undo (ADR 0052).
+    /// </para>
     /// </remarks>
     public async Task<AdmittedAgent?> AdmittedAgentAsync(
         string? authorization, CancellationToken cancellationToken)
@@ -161,6 +183,17 @@ public sealed class AuthenticateToken(
             return null;
         }
 
+        // The agent, and then the person it acts for. An agent whose owner has
+        // been deactivated admits nothing, and neither does one whose identity
+        // is gone — which is Host Recovery a moment ago, since nothing else
+        // removes one. The rows are left where they are: silencing an agent is
+        // the act that deactivated its owner, and this path is a read.
+        var owner = await OwnerAsync(token, cancellationToken);
+        if (owner is null || !owner.IsActive)
+        {
+            return null;
+        }
+
         var now = clock.GetUtcNow();
         if (IsWorthWriting(token.LastUsedAt, now))
         {
@@ -168,7 +201,19 @@ public sealed class AuthenticateToken(
             await tokens.RecordUseAsync(token, cancellationToken);
         }
 
-        return new AdmittedAgent(token.Kind, token.MayDestroy);
+        return new AdmittedAgent(token.Kind, token.MayDestroy, owner);
+    }
+
+    /// <summary>
+    /// The user an agent acts for, through the agent identity its token names.
+    /// </summary>
+    private async Task<User?> OwnerAsync(AgentToken token, CancellationToken cancellationToken)
+    {
+        var agent = await identities.FindAsync(token.IdentityId, cancellationToken) as Agent;
+
+        return agent is null
+            ? null
+            : await identities.FindUserAsync(agent.OwnerId, cancellationToken);
     }
 
     /// <summary>

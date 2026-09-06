@@ -1,6 +1,7 @@
 using System.Text;
 using Logaffe.Application.Operations;
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Tokens;
 
 namespace Logaffe.UnitTests.Application;
@@ -257,10 +258,12 @@ public sealed class AuthenticateTokenTests
         StubTokens? tokens = null,
         StubCipher? cipher = null,
         FixedClock? clock = null,
-        bool mayDestroy = false)
+        bool mayDestroy = false,
+        InMemoryIdentities? identities = null)
     {
         tokens ??= new StubTokens();
         cipher ??= new StubCipher();
+        identities ??= AnOwnerAndTheirAgent();
 
         if (issued.Kind == TokenKind.Ingest)
         {
@@ -270,7 +273,13 @@ public sealed class AuthenticateTokenTests
         else if (AgentTokenKinds.TryFromTokenKind(issued.Kind, out var kind))
         {
             tokens.AgentToken = AgentToken.Issue(
-                "agent", kind, mayDestroy, issued.Identifier, cipher.Encrypt(issued.Secret), Issued);
+                identities.Stored.OfType<Agent>().Single().Id,
+                "agent",
+                kind,
+                mayDestroy,
+                issued.Identifier,
+                cipher.Encrypt(issued.Secret),
+                Issued);
         }
 
         // What the stub cipher was asked before the operation ran is setup, not
@@ -278,7 +287,27 @@ public sealed class AuthenticateTokenTests
         cipher.Forget();
 
         return new AuthenticateToken(
-            tokens, cipher, new DummySecret(cipher), clock ?? new FixedClock(Issued.AddDays(1)));
+            tokens,
+            identities,
+            cipher,
+            new DummySecret(cipher),
+            clock ?? new FixedClock(Issued.AddDays(1)));
+    }
+
+    /// <summary>
+    /// An active user and the agent they own, which is what an agent token is
+    /// resolved through (ADR 0052).
+    /// </summary>
+    private static InMemoryIdentities AnOwnerAndTheirAgent()
+    {
+        var identities = new InMemoryIdentities();
+        var owner = User.Bootstrap("The Administrator", "somebody@example.com", Issued);
+        owner.ActivateWith("$argon2id$v=19$m=19456,t=2,p=1$not-a-real-hash");
+
+        identities.Seed(owner);
+        identities.Seed(Agent.Create("agent", owner.Id, Issued));
+
+        return identities;
     }
 
     private sealed class StubTokens : ITokens
@@ -373,7 +402,8 @@ public sealed class AuthenticateTokenTests
         public Task AddAsync(IngestToken token, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
-        public Task AddAsync(AgentToken token, CancellationToken cancellationToken) =>
+        public Task AddAsync(
+            Agent agent, AgentToken token, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
         public Task AddAsync(HostToken token, CancellationToken cancellationToken) =>

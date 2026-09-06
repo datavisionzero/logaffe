@@ -307,8 +307,13 @@ public static class TokenEndpoints
                     return OnlyAnAdministeringTokenDestroys();
                 }
 
+                // Issued by the person making the request, which is who the
+                // agent will act for. There is no route by which an agent
+                // issues one: this endpoint is behind a session, and the
+                // administering surface over MCP does not carry it (ADR 0046,
+                // ADR 0052).
                 var issued = await issue.ExecuteAsync(
-                    request.Name!, kind, mayDestroy, cancellationToken);
+                    context.CurrentUser(), request.Name!, kind, mayDestroy, cancellationToken);
 
                 return Results.Created(
                     ReadBackOf("agent-tokens", issued.Id),

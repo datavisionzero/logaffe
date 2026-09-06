@@ -67,7 +67,10 @@ public sealed class KeyFitsTests(PostgresFixture postgres) : IDisposable
         var volume = NewVolume();
         var context = await MigratedAsync();
         var cipher = CipherOn(volume);
+        var agent = AnAgentIn(context);
+
         context.AgentTokens.Add(AgentToken.Issue(
+            agent.Id,
             "terminal agent",
             AgentTokenKind.Reading,
             mayDestroy: false,
@@ -139,4 +142,26 @@ public sealed class KeyFitsTests(PostgresFixture postgres) : IDisposable
 
     private static AesGcmSecretCipher CipherOn(string volume) =>
         new(new HostVolumeKey(volume, NullLogger<HostVolumeKey>.Instance));
+
+    /// <summary>
+    /// A user and the agent they own, so that a token has an identity to name
+    /// (ADR 0052). Added to the context and not saved: the caller's own
+    /// SaveChanges writes all of it at once.
+    /// </summary>
+    private static Agent AnAgentIn(LogaffeDbContext context)
+    {
+        var owner = User.Bootstrap(
+            $"owner-{Guid.CreateVersion7():N}",
+            $"{Guid.CreateVersion7():N}@example.com",
+            Now);
+        owner.ActivateWith("$argon2id$v=19$m=19456,t=2,p=1$not-a-real-hash");
+
+        var agent = Agent.Create("terminal agent", owner.Id, Now);
+
+        context.Identities.Add(owner);
+        context.Identities.Add(agent);
+
+        return agent;
+    }
+
 }

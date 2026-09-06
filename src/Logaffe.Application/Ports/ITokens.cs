@@ -1,3 +1,4 @@
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Tokens;
 
 namespace Logaffe.Application.Ports;
@@ -124,7 +125,12 @@ public interface ITokens
     Task AddAsync(IngestToken token, CancellationToken cancellationToken);
 
     /// <inheritdoc cref="AddAsync(IngestToken, CancellationToken)"/>
-    Task AddAsync(AgentToken token, CancellationToken cancellationToken);
+    /// <summary>
+    /// Writes an agent and the token it authenticates with, together. One
+    /// statement, so a token never names an agent that was not created
+    /// (ADR 0052).
+    /// </summary>
+    Task AddAsync(Agent agent, AgentToken token, CancellationToken cancellationToken);
 
     /// <inheritdoc cref="AddAsync(IngestToken, CancellationToken)"/>
     Task AddAsync(HostToken token, CancellationToken cancellationToken);
