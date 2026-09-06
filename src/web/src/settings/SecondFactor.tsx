@@ -4,7 +4,7 @@ import { EnrolSecondFactor } from "../session/EnrolSecondFactor";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Field } from "../components/Field";
-import { About, Area } from "./Area";
+import { About, Area, Said } from "./Area";
 import { Callout } from "../components/Page";
 
 /**
@@ -55,7 +55,7 @@ export function SecondFactor() {
         <b>ends every other session</b>.
       </About>
 
-      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
+      <Said problem={refusal} />
 
       {settled === "enrolled" && (
         <p className="quiet">
@@ -182,7 +182,7 @@ function TurnOff({ onRemoved, onKept }: { onRemoved: () => void; onKept: () => v
           aria-invalid={problems.password !== undefined || undefined}
         />
       </Field>
-      {problems.password !== undefined && <p className="refusal text-sm">{problems.password}</p>}
+      <Said problem={problems.password} />
 
       {usingBackupCode ? (
         <Field label="A backup code off the sheet">
@@ -220,7 +220,7 @@ function TurnOff({ onRemoved, onKept }: { onRemoved: () => void; onKept: () => v
         {usingBackupCode ? "Use the authenticator" : "Use a backup code instead"}
       </Button>
 
-      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
+      <Said problem={refusal} />
 
       <Button type="submit" disabled={removing} className="w-fit">
         Turn it off

@@ -7,7 +7,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Check, Field } from "../components/Field";
 import { Snippet } from "../components/Page";
-import { About, Area, Cell, Head, Listing, RowName } from "./Area";
+import { About, Area, Cell, Head, Listing, RowName, Said } from "./Area";
 
 /** Reading or administering, and never both (ADR 0046). */
 type Kind = "reading" | "administering";
@@ -288,7 +288,12 @@ export function AgentTokens() {
                   <LastUse at={token.lastUsedAt} />
                 </Cell>
                 <Cell>
-                  <Button type="button" variant="link" size="sm" onClick={() => void show(token.id)}>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={() => void show(token.id)}
+                  >
                     Show the configuration
                   </Button>{" "}
                   <Button
@@ -344,7 +349,7 @@ export function AgentTokens() {
         the read that earned it and is shown no finer than that (ADR 0033).
       </p>
 
-      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
+      <Said problem={refusal} />
 
       <form onSubmit={issue} className="grid max-w-md gap-3">
         <Field label="Name for a new token">
@@ -354,7 +359,7 @@ export function AgentTokens() {
             aria-invalid={problem !== undefined || undefined}
           />
         </Field>
-        {problem !== undefined && <p className="refusal text-sm">{problem}</p>}
+        <Said problem={problem} />
 
         <fieldset className="grid gap-2">
           <legend className="pb-1 text-sm font-semibold">What the new token may do</legend>

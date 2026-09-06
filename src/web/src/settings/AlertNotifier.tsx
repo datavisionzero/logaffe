@@ -4,7 +4,7 @@ import type { HeldAlerts, NotifierProof } from "./alerting";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Field } from "../components/Field";
-import { About, Area } from "./Area";
+import { About, Area, Said } from "./Area";
 import { Callout } from "../components/Page";
 
 /** What each way a test send can end says to the person who pressed it. */
@@ -199,7 +199,7 @@ export function AlertNotifier({
             aria-invalid={serverProblem !== undefined || undefined}
           />
         </Field>
-        {serverProblem !== undefined && <p className="refusal text-sm">{serverProblem}</p>}
+        <Said problem={serverProblem} />
 
         <Field label="Topic">
           <Input
@@ -208,7 +208,7 @@ export function AlertNotifier({
             aria-invalid={topicProblem !== undefined || undefined}
           />
         </Field>
-        {topicProblem !== undefined && <p className="refusal text-sm">{topicProblem}</p>}
+        <Said problem={topicProblem} />
 
         <Field label="Access token">
           <Input
@@ -224,17 +224,27 @@ export function AlertNotifier({
         </Field>
 
         {held?.hasAccessToken === true && !shown && (
-          <Button type="button" variant="link" size="sm" disabled={busy} onClick={() => void reveal()}>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            disabled={busy}
+            onClick={() => void reveal()}
+          >
             Show the token
           </Button>
         )}
 
-        <Button type="submit" disabled={busy || server.trim() === "" || topic.trim() === ""} className="w-fit">
+        <Button
+          type="submit"
+          disabled={busy || server.trim() === "" || topic.trim() === ""}
+          className="w-fit"
+        >
           {held === null ? "Set the notifier" : "Save the notifier"}
         </Button>
       </form>
 
-      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
+      <Said problem={refusal} />
       {said !== undefined && <Callout>{said}</Callout>}
 
       {held !== null && (
@@ -269,7 +279,13 @@ export function AlertNotifier({
 
       {held !== null && (
         <p>
-          <Button type="button" variant="link" size="sm" disabled={busy} onClick={() => void clear()}>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            disabled={busy}
+            onClick={() => void clear()}
+          >
             Remove the notifier
           </Button>
         </p>

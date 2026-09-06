@@ -5,7 +5,7 @@ import { useProjects } from "../projects/projects";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Field } from "../components/Field";
-import { About, Area, Cell, Head, Listing, RowName } from "./Area";
+import { About, Area, Cell, Head, Listing, RowName, Said } from "./Area";
 
 /**
  * The headings the projects are listed under.
@@ -234,7 +234,7 @@ export function Groups() {
         settings.
       </p>
 
-      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
+      <Said problem={refusal} />
 
       <form onSubmit={create} className="grid max-w-md gap-3">
         <Field label="Name for a new group">
@@ -244,7 +244,7 @@ export function Groups() {
             aria-invalid={problem !== undefined || undefined}
           />
         </Field>
-        {problem !== undefined && <p className="refusal text-sm">{problem}</p>}
+        <Said problem={problem} />
 
         <Button type="submit" disabled={busy || name.trim() === ""} className="w-fit">
           Make a group

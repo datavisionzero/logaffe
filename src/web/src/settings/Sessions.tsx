@@ -3,7 +3,7 @@ import { api, asInstant } from "../api/client";
 import { formatTimestamp } from "../shared/time";
 import { LastUse } from "./LastUse";
 import { Button } from "../components/ui/button";
-import { About, Area, Cell, Head, Listing, RowName } from "./Area";
+import { About, Area, Cell, Head, Listing, RowName, Said } from "./Area";
 
 interface HeldSession {
   id: string;
@@ -202,10 +202,15 @@ export function Sessions() {
         there would be nothing to recognize it by.
       </p>
 
-      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
+      <Said problem={refusal} />
 
       {others > 0 && (
-        <Button type="button" disabled={busy} onClick={() => void endEveryOther()} className="w-fit">
+        <Button
+          type="button"
+          disabled={busy}
+          onClick={() => void endEveryOther()}
+          className="w-fit"
+        >
           End every other session
         </Button>
       )}

@@ -4,7 +4,7 @@ import { PASSWORD_MINIMUM } from "../session/password";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Field } from "../components/Field";
-import { About, Area } from "./Area";
+import { About, Area, Said } from "./Area";
 
 /**
  * Changing the password, which requires the current one and ends every other
@@ -89,7 +89,7 @@ export function ChangePassword() {
             aria-invalid={problems.current !== undefined || undefined}
           />
         </Field>
-        {problems.current !== undefined && <p className="refusal text-sm">{problems.current}</p>}
+        <Said problem={problems.current} />
 
         <Field label="New password">
           <Input
@@ -100,7 +100,7 @@ export function ChangePassword() {
             aria-invalid={problems.chosen !== undefined || undefined}
           />
         </Field>
-        {problems.chosen !== undefined && <p className="refusal text-sm">{problems.chosen}</p>}
+        <Said problem={problems.chosen} />
 
         <Field label="New password again">
           <Input
@@ -113,7 +113,7 @@ export function ChangePassword() {
         </Field>
         {mismatched && <p className="refusal text-sm">These two are not the same.</p>}
 
-        {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
+        <Said problem={refusal} />
         {changed && (
           <p className="quiet">
             Changed. Every other session has ended; this browser stays signed in.

@@ -5,7 +5,7 @@ import { byName, useHosts } from "../hosts/hosts";
 import { hours, type HeldAlerts } from "./alerting";
 import { Select } from "../components/ui/select";
 import { Check, Field } from "../components/Field";
-import { About, Area } from "./Area";
+import { About, Area, Said } from "./Area";
 import { Callout } from "../components/Page";
 
 /** The value the host select carries for an installation that names none. */
@@ -148,7 +148,7 @@ export function AlertConditions({
         nothing here to guess wrong. All four are off until you switch them on.
       </About>
 
-      {problem !== undefined && <p className="refusal text-sm">{problem}</p>}
+      <Said problem={problem} />
 
       <fieldset className="grid gap-2">
         <legend className="pb-1 text-sm font-semibold">The store is filling up</legend>

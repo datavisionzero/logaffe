@@ -4,7 +4,7 @@ import { BackupCodeSheet } from "../session/Enrolment";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Field } from "../components/Field";
-import { About, Area } from "./Area";
+import { About, Area, Said } from "./Area";
 
 /**
  * A fresh sheet, asked for on its own.
@@ -78,7 +78,7 @@ export function BackupCodes() {
               aria-invalid={problem !== undefined || undefined}
             />
           </Field>
-          {problem !== undefined && <p className="refusal text-sm">{problem}</p>}
+          <Said problem={problem} />
 
           <Button type="submit" disabled={issuing} className="w-fit">
             Issue a fresh sheet

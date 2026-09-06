@@ -65,9 +65,9 @@ export function SampleBand({
 
   if (window.samples.length === 0) {
     return (
-      <div className="band">
+      <div className="rounded-lg border bg-muted px-3 py-2">
         <BandHead window={window} from={from} to={to} />
-        <p className="quiet">
+        <p className="quiet text-sm">
           This host reported nothing over this range. A host with no samples is an
           ordinary state — it is what a machine that is switched off looks like, and what
           a host looks like before its collector is started.
@@ -77,10 +77,10 @@ export function SampleBand({
   }
 
   return (
-    <div className="band">
+    <div className="rounded-lg border bg-muted px-3 py-2">
       <BandHead window={window} from={from} to={to} />
 
-      <div className="band-tracks">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] gap-x-4 gap-y-2">
         <Track
           name="Processor"
           reading={newest === undefined ? "—" : formatShare(newest.cpuAverage, 1)}
@@ -159,9 +159,9 @@ export function SampleBand({
  */
 function BandHead({ window, from, to }: { window: HeldWindow; from: Date; to: Date }) {
   return (
-    <div className="band-head">
-      <b>{window.hostName}</b>
-      <span className="quiet">
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pb-1.5 text-sm">
+      <b className="font-medium">{window.hostName}</b>
+      <span className="quiet font-mono text-xs">
         <time dateTime={from.toISOString()}>{formatTimestamp(from)}</time> to{" "}
         <time dateTime={to.toISOString()}>{formatTimestamp(to)}</time>
       </span>
@@ -213,14 +213,18 @@ function Track({
     ]);
 
   return (
-    <div className="track">
-      <div className="track-name">
+    <div>
+      <div className="flex justify-between gap-2 text-xs text-muted-foreground">
         <span>{name}</span>
-        <span className="track-reading">{reading}</span>
+        <span className="tabular-nums text-foreground">{reading}</span>
       </div>
 
+      {/* Muted on purpose, and never the accent: a band is advisory. There is
+          no threshold in it and no colour that means "too much"
+          (`docs/ui.md`), so it is drawn in the same grey the second sentence of
+          every screen is written in. */}
       <svg
-        className="track-drawing"
+        className="mt-1 block h-9 w-full rounded-md border bg-background"
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
         role="img"
@@ -229,7 +233,7 @@ function Track({
         {runs(points, step).map((run, index) => (
           <g key={index}>
             <polygon
-              className="track-peak"
+              className="fill-muted-foreground/25"
               points={[
                 `${across(run[0]!.at)},100`,
                 ...steps(run, (point) => point.peak),
@@ -237,7 +241,7 @@ function Track({
               ].join(" ")}
             />
             <polyline
-              className="track-average"
+              className="fill-none stroke-muted-foreground [stroke-width:1.5]"
               vectorEffect="non-scaling-stroke"
               points={steps(run, (point) => point.average).join(" ")}
             />

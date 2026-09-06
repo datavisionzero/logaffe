@@ -5,7 +5,7 @@ import { formatTimestamp } from "../shared/time";
 import { LastUse } from "./LastUse";
 import { Button } from "../components/ui/button";
 import { Snippet } from "../components/Page";
-import { About, Area, Cell, Head, Listing, RowName } from "./Area";
+import { About, Area, Cell, Head, Listing, RowName, Said } from "./Area";
 
 /** One of a project's tokens as the list carries it, which is no secret at all. */
 interface HeldToken {
@@ -262,7 +262,7 @@ export function IngestTokens({
         shown no finer than that (ADR 0033).
       </p>
 
-      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
+      <Said problem={refusal} />
 
       {listing.status === "held" && listing.tokens.length < 2 && (
         <Button type="button" className="w-fit" disabled={busy} onClick={() => void issue()}>
