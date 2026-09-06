@@ -1,9 +1,18 @@
+import tailwindcss from "@tailwindcss/vite";
 // From vitest rather than vite, so that the test section below is typed too.
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+
+  // The components copied from planaffe address each other by this alias
+  // (ADR 0051), so that carrying a fix across is a copy and not a rewrite.
+  resolve: {
+    alias: {
+      "@": new URL("./src/", import.meta.url).pathname,
+    },
+  },
 
   // A local `npm run build` lands where the server serves static files from, so
   // that one `dotnet run` gives the whole product. The image build does the same
