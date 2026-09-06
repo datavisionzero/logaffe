@@ -253,7 +253,8 @@ public sealed class ClientDeliveryTests(PostgresFixture postgres) : IAsyncLifeti
             await context.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        var issued = await issue.ExecuteAsync(project.Id, TestContext.Current.CancellationToken);
+        var issued = await issue.ExecuteAsync(Reach.TheInstallation,
+            project.Id, TestContext.Current.CancellationToken);
 
         return (project.Id, issued.Token!.Token);
     }

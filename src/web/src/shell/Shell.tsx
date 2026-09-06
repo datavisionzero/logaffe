@@ -11,6 +11,7 @@ import { InstallationSettings } from "../settings/InstallationSettings";
 import { ProjectSettings } from "../settings/ProjectSettings";
 import { browserTimeZone } from "../shared/time";
 import { AccountMenu } from "./AccountMenu";
+import { useMe } from "../session/me";
 import { AppSidebar } from "./AppSidebar";
 
 /**
@@ -37,6 +38,7 @@ export function Shell({
   onSignedOut: () => void;
 }) {
   const [remaining, setRemaining] = useState(backupCodesRemaining);
+  const me = useMe();
 
   async function signOut() {
     try {
@@ -69,7 +71,7 @@ export function Shell({
               Times in {browserTimeZone()}
             </span>
 
-            <AccountMenu onSignOut={() => void signOut()} />
+            <AccountMenu me={me} onSignOut={() => void signOut()} />
           </header>
 
           <NoSecondFactor />
@@ -129,13 +131,16 @@ function Notice({ children }: { children: ReactNode }) {
 }
 
 /**
- * An installation running behind a password alone says so, for as long as that
- * is true.
+ * An account running behind a password alone says so, for as long as that is
+ * true.
  *
- * The second factor is optional (ADR 0041), and the interface is the only thing
- * that can keep an omission from passing for a setting — so this is **not
- * dismissible**. It is not a warning about something that went wrong; it is the
- * state of the account, and it goes away by enrolling one.
+ * The second factor is each user's own and it is optional (ADR 0041), so this is
+ * a statement about the signed-in account and never about the installation:
+ * somebody else's choice is not this person's business, and nothing here reads
+ * as though it were. The interface is the only thing that can keep an omission
+ * from passing for a setting, so it is **not dismissible** — it is not a warning
+ * about something that went wrong, it is the state of the account, and it goes
+ * away by enrolling one.
  */
 function NoSecondFactor() {
   const [enrolled, setEnrolled] = useState<boolean>();
@@ -167,8 +172,8 @@ function NoSecondFactor() {
 
   return (
     <Notice>
-      This installation has no second factor. Its password is the only thing between the
-      internet and everything it holds.{" "}
+      Your account has no second factor. Your password is the only thing between the
+      internet and everything you can reach here.{" "}
       <Link to="/settings/credentials" className="font-medium underline underline-offset-4">
         Enrol one
       </Link>

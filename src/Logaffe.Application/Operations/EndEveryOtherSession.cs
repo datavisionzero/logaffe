@@ -1,5 +1,5 @@
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.Application.Operations;
 

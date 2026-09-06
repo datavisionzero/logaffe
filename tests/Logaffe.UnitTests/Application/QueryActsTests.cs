@@ -80,7 +80,7 @@ public sealed class QueryActsTests
 
         await Search(project.Id);
         await Count(project.Id);
-        await new ReadEntry(_projects, _reader).ExecuteAsync(
+        await new ReadEntry(_projects, _reader).ExecuteAsync(Reach.TheInstallation, 
             project.Id, 12, TestContext.Current.CancellationToken);
 
         Assert.Equal(project.Id, _reader.Pages.Single().ProjectId);
@@ -99,7 +99,7 @@ public sealed class QueryActsTests
 
         Assert.Null(await Search(gone));
         Assert.Null(await Count(gone));
-        Assert.Null(await new ReadEntry(_projects, _reader).ExecuteAsync(
+        Assert.Null(await new ReadEntry(_projects, _reader).ExecuteAsync(Reach.TheInstallation, 
             gone, 12, TestContext.Current.CancellationToken));
 
         Assert.Empty(_reader.Pages);
@@ -193,7 +193,7 @@ public sealed class QueryActsTests
         var project = Holding();
         _reader.Finding = An.Entry(12);
 
-        var entry = await new ReadEntry(_projects, _reader).ExecuteAsync(
+        var entry = await new ReadEntry(_projects, _reader).ExecuteAsync(Reach.TheInstallation, 
             project.Id, 12, TestContext.Current.CancellationToken);
 
         // Whole. The follow-up after a compact search is the exception and the
@@ -209,13 +209,13 @@ public sealed class QueryActsTests
 
         // An entry that aged out between the page and the click looks like this,
         // and so does an identity somebody guessed.
-        Assert.Null(await new ReadEntry(_projects, _reader).ExecuteAsync(
+        Assert.Null(await new ReadEntry(_projects, _reader).ExecuteAsync(Reach.TheInstallation, 
             project.Id, 4711, TestContext.Current.CancellationToken));
     }
 
     private Task<Read<EntryPage>?> Search(
         Guid projectId, EntryFilters? filters = null, EntryCursor? after = null) =>
-        new SearchEntries(_projects, _reader).ExecuteAsync(
+        new SearchEntries(_projects, _reader).ExecuteAsync(Reach.TheInstallation, 
             projectId,
             filters ?? EntryFilters.None,
             after,
@@ -223,7 +223,7 @@ public sealed class QueryActsTests
 
     private Task<Read<IReadOnlyList<CountedGroup>>?> Count(
         Guid projectId, EntryFilters? filters = null, Grouping grouping = Grouping.None) =>
-        new CountEntries(_projects, _reader).ExecuteAsync(
+        new CountEntries(_projects, _reader).ExecuteAsync(Reach.TheInstallation, 
             projectId,
             filters ?? EntryFilters.None,
             grouping,

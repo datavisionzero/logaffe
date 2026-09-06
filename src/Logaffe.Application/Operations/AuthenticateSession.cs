@@ -1,24 +1,25 @@
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.Application.Operations;
 
 /// <summary>
-/// A session that admitted a request, and whether this use moved its deadline.
+/// A session that admitted a request, whose it is, and whether this use moved
+/// its idle deadline.
 /// </summary>
 /// <param name="DeadlineMoved">
-/// Whether the sliding deadline was actually written forward, which is what the
+/// Whether the idle deadline was actually written forward, which is what the
 /// adapter needs in order to keep the cookie's own expiry in step with the row's
 /// without setting one on every response.
 /// </param>
-public sealed record AdmittedSession(Session Session, bool DeadlineMoved);
+public sealed record AdmittedSession(Session Session, User User, bool DeadlineMoved);
 
 /// <summary>
-/// What a presented session secret admits: the operator, or nothing.
+/// What a presented session secret admits: a user, or nothing.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This is the door every operator surface stands behind, and the counterpart of
+/// This is the door every human surface stands behind, and the counterpart of
 /// <see cref="AuthenticateToken"/> for the credential a person carries. The
 /// shape is deliberately the same — refuse what is not a secret at all before
 /// the database is asked anything, compare in constant time, record the use
@@ -27,19 +28,27 @@ public sealed record AdmittedSession(Session Session, bool DeadlineMoved);
 /// <para>
 /// What differs is the lookup, and it differs for a reason ADR 0031 states from
 /// the other side: a token names its own row because an installation holds
-/// hundreds of them and they sit on the ingest path, while one account holds a
-/// handful of sessions read by one human. So there is no identifier, and the
-/// presented secret is compared against every session in turn.
+/// hundreds of them and they sit on the ingest path, while an installation of
+/// this size holds a handful of sessions read by their owners. So there is no
+/// identifier, and the presented secret is compared against every session in
+/// turn.
+/// </para>
+/// <para>
+/// <b>It resolves the user here rather than leaving that to every caller</b>,
+/// which is what makes a deactivated account stop admitting anything the moment
+/// it is deactivated rather than whenever its sessions were noticed
+/// (ADR 0052).
 /// </para>
 /// </remarks>
-public sealed class AuthenticateSession(ISessions sessions, TimeProvider clock)
+public sealed class AuthenticateSession(
+    ISessions sessions, IIdentities identities, TimeProvider clock)
 {
     /// <summary>
     /// How stale a session's last use may be before another use writes it again.
     /// </summary>
     /// <remarks>
     /// The same five minutes a token gets, for the reason ADR 0033 gives: this
-    /// row exists to be read by one human, occasionally, and the tail of a log
+    /// row exists to be read by a human, occasionally, and the tail of a log
     /// view asking every few seconds must not be an <c>UPDATE</c> every few
     /// seconds. It follows that <see cref="Session.LastSeenFrom"/> is accurate
     /// to within five minutes as well, and is not to be shown as though it were
@@ -82,8 +91,18 @@ public sealed class AuthenticateSession(ISessions sessions, TimeProvider clock)
         // An expired session matches exactly as a live one does — the domain
         // says so on purpose — so refusing it is here. The row is left where it
         // is: removing the ones nobody touched is housekeeping and has its own
-        // sweep, and a cookie the operator abandoned is not an event.
+        // sweep, and a cookie somebody abandoned is not an event.
         if (matched.HasExpiredAt(now))
+        {
+            return null;
+        }
+
+        // A session outliving the account it belongs to is Host Recovery a
+        // moment ago, or a deactivation. Either way the row admits nothing, and
+        // it is left where it is: removing it is the act that deactivated the
+        // user, and this path is a read.
+        var user = await identities.FindUserAsync(matched.UserId, cancellationToken);
+        if (user is null || !user.IsActive)
         {
             return null;
         }
@@ -95,6 +114,6 @@ public sealed class AuthenticateSession(ISessions sessions, TimeProvider clock)
             await sessions.RecordUseAsync(matched, cancellationToken);
         }
 
-        return new AdmittedSession(matched, moved);
+        return new AdmittedSession(matched, user, moved);
     }
 }

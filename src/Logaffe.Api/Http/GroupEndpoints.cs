@@ -53,6 +53,7 @@ public static class GroupEndpoints
         operatorSurface.MapPost(string.Empty, async (
                 GroupRequest request,
                 CreateGroup create,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!IsAName(request.Name))
@@ -74,6 +75,7 @@ public static class GroupEndpoints
 
         operatorSurface.MapGet(string.Empty, async (
                 ListGroups list,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 // A group holding nothing is in this answer rather than left out
@@ -92,6 +94,7 @@ public static class GroupEndpoints
                 Guid id,
                 GroupRequest request,
                 RenameGroup rename,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!IsAName(request.Name))
@@ -119,6 +122,7 @@ public static class GroupEndpoints
         operatorSurface.MapDelete("/{id:guid}", async (
                 Guid id,
                 DeleteGroup delete,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
                 // Nothing is destroyed: the projects that were in it stay, in no
                 // group. That is why this route takes no confirmation of any

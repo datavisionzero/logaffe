@@ -68,15 +68,16 @@ public static class DestructiveTools
         ReadProject read,
         [Description("The project to end, as get_settings gives it.")]
         Guid projectId,
+        TheCallingAgent agent,
         CancellationToken cancellationToken = default)
     {
         // Read before the removal: afterwards nothing can say what the project
         // was called, and an agent reporting back that it deleted `orders` is
         // saying something the operator can check.
-        var project = await read.ExecuteAsync(projectId, cancellationToken)
+        var project = await read.ExecuteAsync(agent.Reach, projectId, cancellationToken)
             ?? throw Refused.NoSuchProject(projectId);
 
-        if (!await delete.ExecuteAsync(projectId, cancellationToken))
+        if (!await delete.ExecuteAsync(agent.Reach, projectId, cancellationToken))
         {
             throw Refused.NoSuchProject(projectId);
         }
@@ -105,9 +106,17 @@ public static class DestructiveTools
         ListHosts hosts,
         [Description("The machine to end, as get_settings gives it.")]
         Guid hostId,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default)
     {
-        var host = await HostAdministration.FoundAsync(hosts, hostId, cancellationToken);
+        // A host is the installation's and not a project's, so ending one is an
+        // administrator's act (ADR 0055).
+        if (!agent.Administers)
+        {
+            throw Refused.NotAnAdministrator("Ending a host");
+        }
+
+        var host = await HostAdministration.FoundAsync(hosts, hostId, agent, cancellationToken);
 
         if (!await delete.ExecuteAsync(hostId, cancellationToken))
         {
@@ -140,10 +149,11 @@ public static class DestructiveTools
         Guid projectId,
         [Description("The new window, between 1 and 90 days, and not above the current one.")]
         int retentionDays,
+        TheCallingAgent agent,
         CancellationToken cancellationToken = default)
     {
         var wanted = Given.AWindow(retentionDays);
-        var project = await read.ExecuteAsync(projectId, cancellationToken)
+        var project = await read.ExecuteAsync(agent.Reach, projectId, cancellationToken)
             ?? throw Refused.NoSuchProject(projectId);
 
         // Equal is neither direction and is a no-op, the same as on the tool
@@ -154,9 +164,10 @@ public static class DestructiveTools
                 project.Retention.Days, wanted.Days, "extend_project_retention");
         }
 
-        await change.ExecuteAsync(projectId, wanted, cancellationToken);
+        await change.ExecuteAsync(agent.Reach, projectId, wanted, cancellationToken);
 
-        return await ProjectAdministration.AsItStandsAsync(read, projectId, cancellationToken);
+        return await ProjectAdministration.AsItStandsAsync(
+            read, projectId, agent, cancellationToken);
     }
 
     [McpServerTool(
@@ -179,8 +190,16 @@ public static class DestructiveTools
         ChangeSampleRetention change,
         [Description("The new window, between 1 and 90 days, and not above the current one.")]
         int retentionDays,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default)
     {
+        // One window for the whole installation rather than one per host
+        // (`docs/metrics.md`), so shortening it is an administrator's act.
+        if (!agent.Administers)
+        {
+            throw Refused.NotAnAdministrator("Shortening the sample window");
+        }
+
         var wanted = Given.AWindow(retentionDays);
         var now = await change.ReadAsync(cancellationToken);
 

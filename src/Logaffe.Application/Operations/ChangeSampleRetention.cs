@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
@@ -22,7 +23,7 @@ namespace Logaffe.Application.Operations;
 /// </para>
 /// </remarks>
 public sealed class ChangeSampleRetention(
-    IInstallation installation, ISamples samples, TimeProvider clock)
+    IInstallation installation, ISamples samples, RecordAChange record, TimeProvider clock)
 {
     /// <summary>The window as it stands.</summary>
     public Task<RetentionWindow> ReadAsync(CancellationToken cancellationToken) =>
@@ -42,6 +43,20 @@ public sealed class ChangeSampleRetention(
         samples.CountReceivedBeforeAsync(
             clock.GetUtcNow() - window.Duration, cancellationToken);
 
-    public Task ExecuteAsync(RetentionWindow window, CancellationToken cancellationToken) =>
-        installation.RecordSampleRetentionAsync(window, cancellationToken);
+    public async Task ExecuteAsync(
+        RetentionWindow window, CancellationToken cancellationToken)
+    {
+        var was = await installation.ReadSampleRetentionAsync(cancellationToken);
+
+        await installation.RecordSampleRetentionAsync(window, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.Installation,
+            subjectId: null,
+            "this installation",
+            Act.Changed,
+            cancellationToken,
+            field: "sample retention",
+            from: $"{was.Days} days",
+            to: $"{window.Days} days");
+    }
 }

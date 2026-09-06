@@ -9,79 +9,122 @@ been made; the behaviour itself lives in the area document under `docs/`, and th
 reasoning behind a contested one lives in `docs/adr/`.
 
 **The entry heading is the canonical name; running prose writes it in ordinary
-case.** `docs/` says "a project", "a log entry", "the operator", and nothing is
-lost by that. Capitals are kept only where they resolve an ambiguity the sentence
-cannot — **Installation** and **Instance** against each other, **Operator** and
-**Agent** as the two consumers against the ordinary words, and a term standing
-beside its own definition.
+case.** `docs/` says "a project", "a log entry", "a user", and nothing is lost by
+that. Capitals are kept only where they resolve an ambiguity the sentence cannot
+— **Installation** and **Instance** against each other, **User** and **Agent** as
+the two consumers against the ordinary words, and a term standing beside its own
+definition.
+
+**"Operator" is not an account.** It survives as the ordinary English word for
+whoever runs an installation — the person who writes the compose file and holds
+the host — and it names no row and no role. The accounts are **User** and
+**Agent**, under **Identity**.
 
 ## Language
 
 **Installation**:
 One deployed logaffe: a container, its database, and the host volume holding what
-is not in the database. It is claimed by exactly one operator, and everything the
-product knows lives inside one of them.
+is not in the database. It holds its own identities and its own projects, and
+everything the product knows lives inside one of them.
 _Avoid_: Instance, deployment, tenant, server, node
 
-**Operator**:
-The single human account of an installation, which can see and do everything.
-There is exactly one, it is established by the claim, and the product has no
-concept of a second person.
-_Avoid_: User, admin, account, owner, tenant
+**Identity**:
+Anything on an installation that can authenticate and can be pointed at: a
+**User** or an **Agent**, never a third thing. It carries a name, it is never
+deleted, and everything that records who did something records one of these.
+_Avoid_: Principal, subject, actor, account holder
+
+**User**:
+A person's account on an installation: an email address, a password, and a state
+— invited, active or deactivated. It may be an **Administrator**, it reaches the
+projects it holds **Project Access** to, and it owns whatever agents it issued a
+token to.
+_Avoid_: Operator, member, person, login, profile
+
+**Administrator**:
+A **User** who runs the installation: invites and deactivates people, grants and
+withdraws the role, and hands out **Project Access**. The role says nothing about
+what the holder may read — an administrator reaches a project's entries only by
+holding access to it, like everyone else. There is always at least one active.
+_Avoid_: Owner, superuser, root, god mode, manager
 
 **Agent**:
-An AI acting on the operator's behalf, reaching the installation over MCP as the
-second first-class consumer beside the operator. It acts on request and never
-watches on its own, and what it can do is what its **Agent Token** is: it reads
-entries or it administers the installation, and no token is both.
+An AI acting on the behalf of the **User** who owns it, reaching the installation
+over MCP as a first-class consumer beside them. It is an **Identity**, it is
+never an **Administrator**, it sees exactly the projects its owner sees, and what
+it can do is what its **Agent Token** is: it reads entries or it administers, and
+no token is both. It acts on request and never watches on its own.
 _Avoid_: Bot, assistant, integration, client, sender
 
-**Claim**:
-The act by which an operator takes an unclaimed installation and establishes
-their account, which is one password and nothing else. An installation is
-unclaimed until it happens, and it happens once.
-_Avoid_: Signup, registration, onboarding, first login, setup
+**Bootstrap**:
+The one start on which an installation holding no **Identity** creates its first
+**Administrator** out of its configuration — a name, an address and a
+**Bootstrap Token**. It happens once; every later start ignores those variables.
+_Avoid_: Claim, signup, registration, onboarding, first login, setup wizard
 
-**Claim Secret**:
-The value that must be presented to claim an installation, either set before its
-first start or drawn by the installation and written where the host can read it.
-It guards the act of claiming, not the account, and it stops working the moment
-the installation is claimed.
-_Avoid_: Setup token, install key, invitation, licence, bootstrap password
+**Bootstrap Token**:
+The value named in the configuration of a **Bootstrap**, exchanged once in a
+browser for a password and a **Session**, and afterwards the first
+administrator's own **Agent Token** for reading. It never travels over the
+network to get where it is used.
+_Avoid_: Claim secret, install key, invitation, licence, bootstrap password
 
-**Claim Window**:
-The limited period after an installation first runs during which a claim may be
-made over the network without a **Claim Secret**. It is the other way of guarding
-a claim, and once it lapses, claiming is only re-enabled from the host the
-installation runs on.
-_Avoid_: Grace period, trial, timeout, expiry
+**Invitation**:
+The act by which an **Administrator** creates a **User** in the invited state and
+sends them a **One-Time Secret**. Setting the first password redeems it and makes
+the user active. An invited user begins with no **Project Access**.
+_Avoid_: Signup, registration, request, application
+
+**One-Time Secret**:
+A single-use value sent to an email address so that its holder may do one thing:
+accept an **Invitation**, recover a password, or confirm a changed address. Only
+its hash is kept, it expires, and issuing a new one of the same purpose spends
+the one before it.
+_Avoid_: Link, token, code, magic link, nonce
+
+**Project Access**:
+The assignment that puts one **Project** within reach of one **User**. A project
+nobody assigned is a project that does not exist for that user, an **Agent**
+inherits its owner's set exactly, and whoever creates a project holds access to
+it from that moment.
+_Avoid_: Permission, role, scope, membership, ACL, grant
 
 **Second Factor**:
-The time-based one-time code from an authenticator app that an operator may give
-alongside their password. It is optional and no part of the claim: a signed-in
-operator enrols it, re-enrols it and can turn it off again.
+The time-based one-time code from an authenticator app that a **User** may give
+alongside their password. It is each user's own and it is optional: they enrol
+it, re-enrol it and can turn it off again, behind their own password.
 _Avoid_: 2FA, MFA, OTP, passkey, authenticator
 
 **Session**:
-One signed-in browser's standing permission to act as the operator. Several exist
+One signed-in browser's standing permission to act as a **User**. Several exist
 at once, each is listed and separately revocable, and each expires on its own
-after a period of disuse.
+after a period of disuse. Changing a password ends the others; deactivating a
+user ends all of them.
 _Avoid_: Login, token, cookie, device, connection
 
 **Backup Code**:
 One of a set of single-use codes shown once when a **Second Factor** is enrolled,
 which stands in for it when it is unavailable. A fresh set can be generated at
-any time and replaces the previous one entirely, and an operator who has enrolled
-no second factor has none.
+any time and replaces the previous one entirely, and a user who has enrolled no
+second factor has none.
 _Avoid_: Recovery code, one-time password, fallback, emergency key
 
 **Host Recovery**:
-The command run inside the running container that returns an installation to
-unclaimed and opens the way in again — a fresh **Claim Secret** or a fresh
-**Claim Window** — keeping its projects, tokens and entries. It is reachable from
-the host and never over the network, and it is the only route back into a claimed
-installation.
+The command run inside the running container that removes every **Identity** on
+an installation — users and agent tokens alike — keeping its projects, groups,
+ingest tokens, settings and entries. The way back in afterwards is a
+**Bootstrap**. It is reachable from the host and never over the network, and it
+is the only route back into an installation nobody can sign in to.
 _Avoid_: Password reset, admin override, rescue mode, break-glass, escape hatch
+
+**Change**:
+One thing somebody did to an **Installation**'s configuration, written down as it
+happened: who did it, when, what they touched and what moved. Every one is an act
+a person or an **Agent** performed deliberately — nothing the installation does
+on its own is one, and no **Log Entry** ever is. The list is an
+**Administrator**'s, it is read-only everywhere, and a row outlives the thing it
+names.
+_Avoid_: Audit log, event log, activity, trail, journal, revision
 
 **Project**:
 The unit of separation: every log entry belongs to exactly one, the operator
@@ -131,27 +174,32 @@ particular client.
 _Avoid_: Example, code sample, quickstart, onboarding, sink configuration
 
 **Agent Token**:
-The secret an agent presents to MCP, issued and named by the operator, readable
-again at any time, recording when it was last used, and revocable on its own.
-Several exist at once, and each is issued as one kind or the other — a **Reading
-Token** or an **Administering Token** — which its prefix carries and which never
-changes for as long as the token exists.
+The secret an agent presents to MCP, issued and named by a **User** and never by
+an agent, readable again at any time, recording when it was last used, and
+revocable on its own. It belongs to the user who issued it and is the whole of
+what makes an **Agent** an **Identity**. Several exist at once, and each is
+issued as one kind or the other — a **Reading Token** or an **Administering
+Token** — which its prefix carries and which never changes for as long as the
+token exists.
 _Avoid_: API key, session, connected agent, read token, credential
 
 **Reading Token**:
-The **Agent Token** issued to read: the query surface the operator has — entries,
-counts and samples across every project — and no setting and no write of any
-kind. It is what an agent is given unless the operator decides otherwise, and it
-is the kind that meets untrusted log content.
+The **Agent Token** issued to read: the query surface its owner has — entries and
+counts across the projects they hold **Project Access** to, and samples across
+every host — and no setting and no write of any kind. It is what an agent is
+given unless its owner decides otherwise, and it is the kind that meets untrusted
+log content.
 _Avoid_: Read scope, viewer, query token, read-only key, permission
 
 **Administering Token**:
-The **Agent Token** issued to administer: the settings an operator works —
-projects, groups, hosts, retention windows, and the issuing and revoking of
-ingest and host tokens — and no **Log Entry**, ever. It issues a write credential
-without ever reading one back, it reaches no **Agent Token**, no operator
-credential and no **Session**, and it makes no **Destructive Change** unless it
-was issued for that as well.
+The **Agent Token** issued to administer: the settings its owner works — the
+projects they hold **Project Access** to, their groups, hosts, retention windows,
+and the issuing and revoking of ingest and host tokens — and no **Log Entry**,
+ever. The installation-wide acts are reachable through it only while its owner is
+an **Administrator**, and the acts on identities never are. It issues a write
+credential without ever reading one back, it reaches no **Agent Token**, no
+credential of a **User** and no **Session**, and it makes no **Destructive
+Change** unless it was issued for that as well.
 _Avoid_: Admin scope, write token, management key, root token, permission
 
 **Destructive Change**:
@@ -176,7 +224,7 @@ The non-secret part a token carries between its prefix and its secret, naming th
 row that holds it so that a presented token is found by one lookup rather than by
 trying every token in turn. It admits nothing on its own, it is not what tells
 the four token kinds apart — the prefix is — and it is not the name an agent
-token carries for the operator's list.
+token carries for its owner's list.
 _Avoid_: Key id, token name, project id, prefix, handle, public key
 
 **Sender**:

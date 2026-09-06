@@ -36,11 +36,11 @@ material value to understanding the decision.
 - [0010 – Search is a substring match, not a full-text query](./0010-search-is-a-substring-match-not-a-full-text-query.md)
 - [0011 – Filters only narrow, and only with AND](./0011-filters-only-narrow-and-only-with-and.md)
 - [0012 – Log content reaches an agent as data, never as prose](./0012-log-content-reaches-an-agent-as-data-never-as-prose.md)
-- [0013 – Host Recovery returns the installation to unclaimed](./0013-host-recovery-returns-the-installation-to-unclaimed.md)
-- [0014 – The claim is atomic and holds nothing](./0014-the-claim-is-atomic-and-holds-nothing.md)
-- [0015 – The operator has no username and no email](./0015-the-operator-has-no-username-and-no-email.md)
+- [0013 – Host Recovery returns the installation to unclaimed](./0013-host-recovery-returns-the-installation-to-unclaimed.md) — superseded by 0058
+- [0014 – The claim is atomic and holds nothing](./0014-the-claim-is-atomic-and-holds-nothing.md) — superseded by 0054
+- [0015 – The operator has no username and no email](./0015-the-operator-has-no-username-and-no-email.md) — superseded by 0052
 - [0016 – The second factor is TOTP](./0016-the-second-factor-is-totp.md)
-- [0017 – A wrong password never locks the account](./0017-a-wrong-password-never-locks-the-account.md)
+- [0017 – A wrong password never locks the account](./0017-a-wrong-password-never-locks-the-account.md) — superseded by 0056
 - [0018 – Projects and tokens are never reachable over MCP](./0018-projects-and-tokens-are-never-reachable-over-mcp.md) — superseded by 0046
 - [0019 – A project is deleted at once and its entries follow](./0019-a-project-is-deleted-at-once-and-its-entries-follow.md)
 - [0020 – Retention has a maximum](./0020-retention-has-a-maximum.md) — the ceiling it set is raised by 0048
@@ -55,23 +55,30 @@ material value to understanding the decision.
 - [0029 – Filter values come from the entries, not from a list](./0029-filter-values-come-from-the-entries-not-from-a-list.md)
 - [0030 – The solution is four layers, not one project](./0030-the-solution-is-four-layers-not-one-project.md)
 - [0031 – A token names its own row](./0031-a-token-names-its-own-row.md)
-- [0032 – Each operator secret is stored for what it is](./0032-each-operator-secret-is-stored-for-what-it-is.md)
+- [0032 – Each operator secret is stored for what it is](./0032-each-operator-secret-is-stored-for-what-it-is.md) — superseded by 0057
 - [0033 – The last use of a token is written coarsely](./0033-the-last-use-of-a-token-is-written-coarsely.md)
-- [0034 – The claim window is a row in the database](./0034-the-claim-window-is-a-row-in-the-database.md)
-- [0035 – The claim hands its enrolment back sealed](./0035-the-claim-hands-its-enrolment-back-sealed.md) — superseded by 0041
-- [0036 – An enrolment carries its own sealed ticket](./0036-an-enrolment-carries-its-own-sealed-ticket.md)
+- [0034 – The claim window is a row in the database](./0034-the-claim-window-is-a-row-in-the-database.md) — superseded by 0054
+- [0035 – The claim hands its enrolment back sealed](./0035-the-claim-hands-its-enrolment-back-sealed.md) — superseded by 0041, then by 0054
+- [0036 – An enrolment carries its own sealed ticket](./0036-an-enrolment-carries-its-own-sealed-ticket.md) — the claim half is superseded by 0054
 - [0037 – The installation dumps its own database](./0037-the-installation-dumps-its-own-database.md)
 - [0038 – Both installations pull on a timer, and the tag is the deliberate act](./0038-both-installations-pull-on-a-timer-and-the-tag-is-the-deliberate-act.md)
 - [0039 – A group has an identity and holds nothing](./0039-a-group-has-an-identity-and-holds-nothing.md)
-- [0040 – The claim is guarded by a secret or by a window, and whoever installs chooses](./0040-the-claim-is-guarded-by-a-secret-or-by-a-window.md)
-- [0041 – The second factor is offered, not required](./0041-the-second-factor-is-offered-not-required.md)
+- [0040 – The claim is guarded by a secret or by a window, and whoever installs chooses](./0040-the-claim-is-guarded-by-a-secret-or-by-a-window.md) — superseded by 0054
+- [0041 – The second factor is offered, not required](./0041-the-second-factor-is-offered-not-required.md) — amended by 0052
 - [0042 – The password carries more, so it gets longer](./0042-the-password-carries-more-so-it-gets-longer.md)
 - [0043 – Metrics come from the host, not from the application](./0043-metrics-come-from-the-host-not-from-the-application.md)
 - [0044 – A sample has a closed schema](./0044-a-sample-has-a-closed-schema.md)
 - [0045 – A sample is not an entry, and may be read across projects](./0045-a-sample-is-not-an-entry-and-may-be-read-across-projects.md)
-- [0046 – Administration is reachable over MCP, on a token that reads no entries](./0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)
+- [0046 – Administration is reachable over MCP, on a token that reads no entries](./0046-administration-is-reachable-on-a-token-that-reads-no-entries.md) — amended by 0052 and 0055
 - [0047 – The volume history is tallied as it arrives, not counted when it is asked](./0047-the-volume-history-is-tallied-as-it-arrives.md)
 - [0048 – Retention's ceiling is a year, and the setting says what it costs](./0048-retentions-ceiling-is-a-year-and-the-setting-says-what-it-costs.md)
-- [0049 – A notification carries numbers and names, never log content](./0049-a-notification-carries-numbers-and-names-never-log-content.md)
+- [0049 – A notification carries numbers and names, never log content](./0049-a-notification-carries-numbers-and-names-never-log-content.md) — one of its reasons is corrected by 0053
 - [0050 – The alert conditions are a closed set](./0050-the-alert-conditions-are-a-closed-set.md)
 - [0051 – The web interface is Tailwind, Base UI, and planaffe's own tokens](./0051-the-web-interface-is-tailwind-base-ui-and-planaffes-own-tokens.md)
+- [0052 – A user and an agent are one identity](./0052-a-user-and-an-agent-are-one-identity.md)
+- [0053 – Transactional email is an optional capability of the installation](./0053-transactional-email-is-an-optional-capability-of-the-installation.md)
+- [0054 – The first administrator comes from the environment, and the claim is gone](./0054-the-first-administrator-comes-from-the-environment.md)
+- [0055 – Project access is one filter, not eight](./0055-project-access-is-one-filter.md)
+- [0056 – Sign-in is throttled per account and per source](./0056-sign-in-is-throttled-per-account-and-per-source.md)
+- [0057 – A user's secrets are stored for what they are, and the password is Argon2id](./0057-a-users-secrets-are-stored-for-what-they-are-and-the-password-is-argon2id.md)
+- [0058 – Host Recovery removes every identity](./0058-host-recovery-removes-every-identity.md)

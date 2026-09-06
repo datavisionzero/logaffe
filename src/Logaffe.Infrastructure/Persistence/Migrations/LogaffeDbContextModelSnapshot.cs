@@ -149,6 +149,77 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                     b.ToTable("log_entry", (string)null);
                 });
 
+            modelBuilder.Entity("Logaffe.Domain.History.Change", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Act")
+                        .HasColumnType("integer")
+                        .HasColumnName("act");
+
+                    b.Property<Guid>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<int>("ActorKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("actor_kind");
+
+                    b.Property<string>("ActorName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("actor_name");
+
+                    b.Property<DateTimeOffset>("At")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("at");
+
+                    b.Property<string>("Field")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("field");
+
+                    b.Property<string>("From")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("moved_from");
+
+                    b.Property<int>("Subject")
+                        .HasColumnType("integer")
+                        .HasColumnName("subject");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("subject_id");
+
+                    b.Property<string>("SubjectName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("subject_name");
+
+                    b.Property<string>("To")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("moved_to");
+
+                    b.HasKey("Id")
+                        .HasName("pk_change");
+
+                    b.HasIndex("ActorId");
+
+                    b.HasIndex("Subject", "SubjectId")
+                        .HasDatabaseName("ix_change_subject");
+
+                    b.ToTable("change", (string)null);
+                });
+
             modelBuilder.Entity("Logaffe.Domain.Hosts.FilesystemReading", b =>
                 {
                     b.Property<Guid>("HostId")
@@ -245,7 +316,7 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                     b.ToTable("host_sample", (string)null);
                 });
 
-            modelBuilder.Entity("Logaffe.Domain.Operators.BackupCode", b =>
+            modelBuilder.Entity("Logaffe.Domain.Identities.BackupCode", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -261,13 +332,13 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("issued_at");
 
-                    b.Property<Guid>("OperatorId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("operator_id");
-
                     b.Property<DateTimeOffset?>("UsedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("used_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
 
                     b.HasKey("Id")
                         .HasName("pk_backup_code");
@@ -276,85 +347,117 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_backup_code_hash");
 
-                    b.HasIndex("OperatorId")
-                        .HasDatabaseName("ix_backup_code_operator");
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_backup_code_user");
 
                     b.ToTable("backup_code", (string)null);
                 });
 
-            modelBuilder.Entity("Logaffe.Domain.Operators.ClaimGuard", b =>
+            modelBuilder.Entity("Logaffe.Domain.Identities.Identity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<byte[]>("DrawnSecretHash")
-                        .HasColumnType("bytea")
-                        .HasColumnName("drawn_secret_hash");
-
-                    b.Property<bool>("OnlyGuard")
+                    b.Property<bool>("Administrator")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("only_guard");
+                        .HasDefaultValue(false)
+                        .HasColumnName("administrator");
 
-                    b.Property<DateTimeOffset>("OpenedAt")
+                    b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasColumnName("opened_at");
+                        .HasColumnName("created_at");
 
-                    b.HasKey("Id")
-                        .HasName("pk_claim_guard");
-
-                    b.HasIndex("OnlyGuard")
-                        .IsUnique()
-                        .HasDatabaseName("ix_claim_guard_only_one");
-
-                    b.ToTable("claim_guard", (string)null);
-                });
-
-            modelBuilder.Entity("Logaffe.Domain.Operators.Operator", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("ClaimedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("claimed_at");
-
-                    b.Property<byte[]>("EncryptedSecondFactorSecret")
-                        .HasColumnType("bytea")
-                        .HasColumnName("second_factor_secret");
-
-                    b.Property<bool>("OnlyOperator")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("only_operator");
-
-                    b.Property<string>("PasswordHash")
+                    b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("character varying(256)")
-                        .HasColumnName("password_hash");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
 
-                    b.Property<DateTimeOffset?>("SecondFactorEnrolledAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("second_factor_enrolled_at");
+                    b.Property<int>("kind")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id")
-                        .HasName("pk_operator");
+                        .HasName("pk_identity");
 
-                    b.HasIndex("OnlyOperator")
-                        .IsUnique()
-                        .HasDatabaseName("ix_operator_only_one");
+                    b.ToTable("identity", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_identity_kind", " \"kind\" in (0, 1) ");
 
-                    b.ToTable("operator", (string)null);
+                            t.HasCheckConstraint("ck_identity_owner", "\"kind\" = 0 and \"owner_id\" is null\nor \"kind\" = 1 and \"owner_id\" is not null and not \"administrator\"");
+
+                            t.HasCheckConstraint("ck_identity_user", "\"kind\" = 0\n    and \"email\" is not null and \"normalized_email\" is not null\n    and \"state\" in (0, 1, 2)\nor \"kind\" = 1\n    and \"email\" is null and \"normalized_email\" is null\n    and \"state\" is null and \"password_hash\" is null\n    and \"second_factor_secret\" is null");
+                        });
+
+                    b.HasDiscriminator<int>("kind");
+
+                    b.UseTphMappingStrategy();
                 });
 
-            modelBuilder.Entity("Logaffe.Domain.Operators.Session", b =>
+            modelBuilder.Entity("Logaffe.Domain.Identities.OneTimeSecret", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("issued_at");
+
+                    b.Property<string>("PendingEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("pending_email");
+
+                    b.Property<string>("PendingNormalizedEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("pending_normalized_email");
+
+                    b.Property<int>("Purpose")
+                        .HasColumnType("integer")
+                        .HasColumnName("purpose");
+
+                    b.Property<byte[]>("SecretHash")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("secret_hash");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_one_time_secret");
+
+                    b.HasIndex("PendingNormalizedEmail")
+                        .HasDatabaseName("ix_one_time_secret_pending")
+                        .HasFilter("\"used_at\" is null and \"pending_normalized_email\" is not null");
+
+                    b.HasIndex("SecretHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_one_time_secret_hash");
+
+                    b.HasIndex("UserId", "Purpose")
+                        .IsUnique()
+                        .HasDatabaseName("ix_one_time_secret_live")
+                        .HasFilter("\"used_at\" is null");
+
+                    b.ToTable("one_time_secret", (string)null);
+                });
+
+            modelBuilder.Entity("Logaffe.Domain.Identities.Session", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -371,10 +474,6 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_used_at");
 
-                    b.Property<Guid>("OperatorId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("operator_id");
-
                     b.Property<byte[]>("SecretHash")
                         .IsRequired()
                         .HasColumnType("bytea")
@@ -384,15 +483,19 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("started_at");
 
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
                     b.HasKey("Id")
                         .HasName("pk_session");
-
-                    b.HasIndex("OperatorId")
-                        .HasDatabaseName("ix_session_operator");
 
                     b.HasIndex("SecretHash")
                         .IsUnique()
                         .HasDatabaseName("ix_session_secret");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_session_user");
 
                     b.ToTable("session", (string)null);
                 });
@@ -474,6 +577,33 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                     b.ToTable("project", (string)null);
                 });
 
+            modelBuilder.Entity("Logaffe.Domain.Projects.ProjectAccess", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("project_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("GrantedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("granted_at");
+
+                    b.Property<Guid>("GrantedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("granted_by");
+
+                    b.HasKey("ProjectId", "UserId")
+                        .HasName("pk_project_access");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_project_access_user");
+
+                    b.ToTable("project_access", (string)null);
+                });
+
             modelBuilder.Entity("Logaffe.Domain.Projects.Tally", b =>
                 {
                     b.Property<Guid>("ProjectId")
@@ -516,6 +646,10 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(12)")
                         .HasColumnName("identifier");
 
+                    b.Property<Guid>("IdentityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("identity_id");
+
                     b.Property<DateTimeOffset>("IssuedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("issued_at");
@@ -544,6 +678,9 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                     b.HasIndex("Identifier")
                         .IsUnique()
                         .HasDatabaseName("ix_agent_token_identifier");
+
+                    b.HasIndex("IdentityId")
+                        .HasDatabaseName("ix_agent_token_identity");
 
                     b.ToTable("agent_token", (string)null);
                 });
@@ -711,6 +848,88 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                     b.ToTable("installation_settings", (string)null);
                 });
 
+            modelBuilder.Entity("Logaffe.Domain.Identities.Agent", b =>
+                {
+                    b.HasBaseType("Logaffe.Domain.Identities.Identity");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.HasIndex("OwnerId")
+                        .HasDatabaseName("ix_identity_owner");
+
+                    b.ToTable(t =>
+                        {
+                            t.HasCheckConstraint("ck_identity_kind", " \"kind\" in (0, 1) ");
+
+                            t.HasCheckConstraint("ck_identity_owner", "\"kind\" = 0 and \"owner_id\" is null\nor \"kind\" = 1 and \"owner_id\" is not null and not \"administrator\"");
+
+                            t.HasCheckConstraint("ck_identity_user", "\"kind\" = 0\n    and \"email\" is not null and \"normalized_email\" is not null\n    and \"state\" in (0, 1, 2)\nor \"kind\" = 1\n    and \"email\" is null and \"normalized_email\" is null\n    and \"state\" is null and \"password_hash\" is null\n    and \"second_factor_secret\" is null");
+                        });
+
+                    b.HasDiscriminator().HasValue(1);
+                });
+
+            modelBuilder.Entity("Logaffe.Domain.Identities.User", b =>
+                {
+                    b.HasBaseType("Logaffe.Domain.Identities.Identity");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("email");
+
+                    b.Property<byte[]>("EncryptedSecondFactorSecret")
+                        .HasColumnType("bytea")
+                        .HasColumnName("second_factor_secret");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("normalized_email");
+
+                    b.Property<string>("PasswordHash")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("password_hash");
+
+                    b.Property<DateTimeOffset?>("SecondFactorEnrolledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("second_factor_enrolled_at");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer")
+                        .HasColumnName("state");
+
+                    b.HasIndex("NormalizedEmail")
+                        .IsUnique()
+                        .HasDatabaseName("ix_identity_normalized_email");
+
+                    b.ToTable(t =>
+                        {
+                            t.HasCheckConstraint("ck_identity_kind", " \"kind\" in (0, 1) ");
+
+                            t.HasCheckConstraint("ck_identity_owner", "\"kind\" = 0 and \"owner_id\" is null\nor \"kind\" = 1 and \"owner_id\" is not null and not \"administrator\"");
+
+                            t.HasCheckConstraint("ck_identity_user", "\"kind\" = 0\n    and \"email\" is not null and \"normalized_email\" is not null\n    and \"state\" in (0, 1, 2)\nor \"kind\" = 1\n    and \"email\" is null and \"normalized_email\" is null\n    and \"state\" is null and \"password_hash\" is null\n    and \"second_factor_secret\" is null");
+                        });
+
+                    b.HasDiscriminator().HasValue(0);
+                });
+
+            modelBuilder.Entity("Logaffe.Domain.History.Change", b =>
+                {
+                    b.HasOne("Logaffe.Domain.Identities.Identity", null)
+                        .WithMany()
+                        .HasForeignKey("ActorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_change_actor");
+                });
+
             modelBuilder.Entity("Logaffe.Domain.Hosts.FilesystemReading", b =>
                 {
                     b.HasOne("Logaffe.Domain.Hosts.Host", null)
@@ -731,24 +950,34 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                         .HasConstraintName("fk_host_sample_host");
                 });
 
-            modelBuilder.Entity("Logaffe.Domain.Operators.BackupCode", b =>
+            modelBuilder.Entity("Logaffe.Domain.Identities.BackupCode", b =>
                 {
-                    b.HasOne("Logaffe.Domain.Operators.Operator", null)
+                    b.HasOne("Logaffe.Domain.Identities.User", null)
                         .WithMany()
-                        .HasForeignKey("OperatorId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_backup_code_operator");
+                        .HasConstraintName("fk_backup_code_user");
                 });
 
-            modelBuilder.Entity("Logaffe.Domain.Operators.Session", b =>
+            modelBuilder.Entity("Logaffe.Domain.Identities.OneTimeSecret", b =>
                 {
-                    b.HasOne("Logaffe.Domain.Operators.Operator", null)
+                    b.HasOne("Logaffe.Domain.Identities.User", null)
                         .WithMany()
-                        .HasForeignKey("OperatorId")
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
-                        .HasConstraintName("fk_session_operator");
+                        .HasConstraintName("fk_one_time_secret_user");
+                });
+
+            modelBuilder.Entity("Logaffe.Domain.Identities.Session", b =>
+                {
+                    b.HasOne("Logaffe.Domain.Identities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_session_user");
                 });
 
             modelBuilder.Entity("Logaffe.Domain.Projects.Project", b =>
@@ -764,6 +993,33 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                         .HasForeignKey("HostId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_project_host");
+                });
+
+            modelBuilder.Entity("Logaffe.Domain.Projects.ProjectAccess", b =>
+                {
+                    b.HasOne("Logaffe.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_project_access_project");
+
+                    b.HasOne("Logaffe.Domain.Identities.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_project_access_user");
+                });
+
+            modelBuilder.Entity("Logaffe.Domain.Tokens.AgentToken", b =>
+                {
+                    b.HasOne("Logaffe.Domain.Identities.Agent", null)
+                        .WithMany()
+                        .HasForeignKey("IdentityId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_agent_token_identity");
                 });
 
             modelBuilder.Entity("Logaffe.Domain.Tokens.HostToken", b =>
@@ -793,6 +1049,16 @@ namespace Logaffe.Infrastructure.Persistence.Migrations
                         .HasForeignKey("HostId")
                         .OnDelete(DeleteBehavior.SetNull)
                         .HasConstraintName("fk_installation_settings_host");
+                });
+
+            modelBuilder.Entity("Logaffe.Domain.Identities.Agent", b =>
+                {
+                    b.HasOne("Logaffe.Domain.Identities.User", null)
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_identity_owner");
                 });
 #pragma warning restore 612, 618
         }

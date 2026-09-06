@@ -1,4 +1,6 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
+using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
 
@@ -40,13 +42,13 @@ public enum PutProjectOnHostOutcome
 /// group.
 /// </para>
 /// </remarks>
-public sealed class PutProjectOnHost(IProjects projects, IHosts hosts)
+public sealed class PutProjectOnHost(IProjects projects, IHosts hosts, RecordAChange record)
 {
     /// <param name="hostId">The machine it runs on, or <c>null</c> for none.</param>
     public async Task<PutProjectOnHostOutcome> ExecuteAsync(
-        Guid id, Guid? hostId, CancellationToken cancellationToken)
+        Reach reach, Guid id, Guid? hostId, CancellationToken cancellationToken)
     {
-        var project = await projects.FindAsync(id, cancellationToken);
+        var project = await projects.FindAsync(reach, id, cancellationToken);
         if (project is null)
         {
             return PutProjectOnHostOutcome.NoSuchProject;
@@ -66,9 +68,27 @@ public sealed class PutProjectOnHost(IProjects projects, IHosts hosts)
             return PutProjectOnHostOutcome.NoSuchHost;
         }
 
+        var was = project.HostId;
+
         project.RunsOn(hostId);
         await projects.RecordAsync(project, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.Project,
+            project.Id,
+            project.Name,
+            Act.Changed,
+            cancellationToken,
+            field: "host",
+            from: await NameOfAsync(was, cancellationToken),
+            to: await NameOfAsync(hostId, cancellationToken));
 
         return PutProjectOnHostOutcome.PutOn;
     }
+
+    /// <inheritdoc cref="MoveProjectToGroup"/>
+    private async Task<string> NameOfAsync(Guid? hostId, CancellationToken cancellationToken) =>
+        hostId is null
+            ? "none"
+            : (await hosts.FindAsync(hostId.Value, cancellationToken))?.Name ?? "none";
+
 }

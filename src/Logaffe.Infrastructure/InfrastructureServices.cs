@@ -1,8 +1,10 @@
 using Logaffe.Application.Ports;
 using Logaffe.Infrastructure.Alerts;
+using Logaffe.Infrastructure.Mail;
 using Logaffe.Infrastructure.Persistence;
 using Logaffe.Infrastructure.Persistence.Log;
 using Logaffe.Infrastructure.Secrets;
+using Logaffe.Infrastructure.Throttling;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,11 +35,14 @@ public static class InfrastructureServices
         services.AddScoped<IStoreFootprint, StoreFootprint>();
         services.AddScoped<ISealedSecrets, SealedSecrets>();
         services.AddScoped<IProjects, Projects>();
+        services.AddScoped<IProjectAccess, ProjectAccesses>();
+        services.AddScoped<IOneTimeSecrets, OneTimeSecrets>();
+        services.AddScoped<IHistory, Histories>();
         services.AddScoped<IGroups, Groups>();
         services.AddScoped<IHosts, Hosts>();
         services.AddScoped<ITokens, Tokens>();
         services.AddScoped<IInstallation, Installation>();
-        services.AddScoped<IOperators, Operators>();
+        services.AddScoped<IIdentities, Identities>();
         services.AddScoped<ISessions, Sessions>();
         services.AddScoped<SchemaMigrator>();
 
@@ -100,16 +105,21 @@ public static class InfrastructureServices
         services.AddSingleton<IHostVolume>(_ => new HostVolume(VolumePath(configuration)));
         services.AddSingleton<ISecretCipher, AesGcmSecretCipher>();
 
-        // Where a drawn claim secret is put for the operator to read. It is on
-        // the same volume and is not part of it in any other sense: it is written
-        // once, read once and removed by the claim (ADR 0040).
-        services.AddSingleton<IClaimSecretHandover>(
-            _ => new ClaimSecretFile(VolumePath(configuration)));
+        // Neither of these holds anything: one writes its parameters into every
+        // hash it produces, the other is arithmetic over a secret the caller
+        // brings.
+        services.AddSingleton<IPasswordHasher, Argon2idPasswordHasher>();
 
-        // Neither of these holds anything: one is PBKDF2 with its parameters
-        // written into every hash it produces, the other is arithmetic over a
-        // secret the caller brings.
-        services.AddSingleton<IPasswordHasher, FrameworkPasswordHasher>();
+        // The two rolling windows in front of the sign-in (ADR 0056). A
+        // singleton because that is what "in the process" means: the counts are
+        // deliberately not product data, and a restart forgetting them is the
+        // safer end of the trade.
+        services.AddSingleton<ISignInThrottle, InProcessSignInThrottle>();
+
+        // The one way anything here reaches an inbox (ADR 0053). A singleton
+        // because it holds a settings record and opens a connection per message:
+        // there is nothing to keep between two of them.
+        services.AddSingleton<IMail, SmtpMail>();
         services.AddSingleton<ISecondFactor, Rfc6238SecondFactor>();
 
         return services;

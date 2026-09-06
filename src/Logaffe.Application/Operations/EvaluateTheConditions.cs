@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Projects;
 using Logaffe.Domain.Alerts;
 
 namespace Logaffe.Application.Operations;
@@ -74,7 +75,7 @@ public sealed class EvaluateTheConditions(
 
         var closedHour = Alerting.ClosedHourAt(clock.GetUtcNow());
 
-        foreach (var project in await projects.ListAsync(cancellationToken))
+        foreach (var project in await projects.ListAsync(Reach.TheInstallation, cancellationToken))
         {
             if (project.Muted)
             {

@@ -1,5 +1,6 @@
 using Logaffe.Application.Operations;
 using Logaffe.Domain.Projects;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -59,6 +60,17 @@ public sealed class SchemaTests(PostgresFixture postgres)
         await context.Database.GetService<IMigrator>().MigrateAsync(
             BeforeTheKind, TestContext.Current.CancellationToken);
 
+        // The operator that installation had, because an agent token was always
+        // issued by one: it is what the token's agent comes to be owned by when
+        // the identities arrive (ADR 0052).
+        await context.Database.ExecuteSqlRawAsync(
+            """
+            INSERT INTO operator (id, password_hash, claimed_at)
+            VALUES ({0}, {1}, {2})
+            """,
+            [Guid.CreateVersion7(), "AQAAAAIAAYagAAAAE-not-a-real-hash", Now],
+            TestContext.Current.CancellationToken);
+
         var minted = TokenText.Mint(TokenKind.Agent);
         await context.Database.ExecuteSqlRawAsync(
             """
@@ -81,6 +93,18 @@ public sealed class SchemaTests(PostgresFixture postgres)
         // that changed.
         Assert.Equal(minted.Identifier, stored.Identifier);
         Assert.Equal(Ciphertext, stored.EncryptedSecret);
+
+        // It has an agent now, named for the token and owned by the account that
+        // used to be the operator — so the agent that holds it does not have to
+        // be reconnected for that either.
+        var agent = Assert.IsType<Agent>(await reader.Identities
+            .SingleAsync(i => i.Id == stored.IdentityId, TestContext.Current.CancellationToken));
+        Assert.Equal("terminal agent", agent.Name);
+
+        var owner = await reader.Identities.OfType<User>()
+            .SingleAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(owner.Id, agent.OwnerId);
+        Assert.True(owner.Administrator);
     }
 
     [Fact]
@@ -283,7 +307,10 @@ public sealed class SchemaTests(PostgresFixture postgres)
         await MigratorFor(context).ApplyAsync(TestContext.Current.CancellationToken);
 
         var minted = TokenText.Mint(TokenKind.Agent);
+        var agent = AnAgentIn(context);
+
         context.AgentTokens.Add(AgentToken.Issue(
+            agent.Id,
             "terminal agent",
             AgentTokenKind.Reading,
             mayDestroy: false,
@@ -313,4 +340,26 @@ public sealed class SchemaTests(PostgresFixture postgres)
 
     private static SchemaMigrator MigratorFor(LogaffeDbContext context) =>
         new(context, NullLogger<SchemaMigrator>.Instance);
+
+    /// <summary>
+    /// A user and the agent they own, so that a token has an identity to name
+    /// (ADR 0052). Added to the context and not saved: the caller's own
+    /// SaveChanges writes all of it at once.
+    /// </summary>
+    private static Agent AnAgentIn(LogaffeDbContext context)
+    {
+        var owner = User.Bootstrap(
+            $"owner-{Guid.CreateVersion7():N}",
+            $"{Guid.CreateVersion7():N}@example.com",
+            Now);
+        owner.ActivateWith("$argon2id$v=19$m=19456,t=2,p=1$not-a-real-hash");
+
+        var agent = Agent.Create("terminal agent", owner.Id, Now);
+
+        context.Identities.Add(owner);
+        context.Identities.Add(agent);
+
+        return agent;
+    }
+
 }

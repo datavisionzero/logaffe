@@ -17,7 +17,8 @@ public sealed class NotifierActsTests
     [Fact]
     public async Task A_server_and_a_topic_are_what_a_notifier_is()
     {
-        await Change().ExecuteAsync("https://ntfy.sh", "logaffe", "", TestContext.Current.CancellationToken);
+        await Change().ExecuteAsync(
+            "https://ntfy.sh", "logaffe", "", TestContext.Current.CancellationToken);
 
         Assert.Equal("https://ntfy.sh/", _installation.Notifier?.Server.ToString());
         Assert.Equal("logaffe", _installation.Notifier?.Topic);
@@ -128,5 +129,5 @@ public sealed class NotifierActsTests
         Assert.Empty(notifier.Sent);
     }
 
-    private ChangeTheNotifier Change() => new(_installation, _cipher);
+    private ChangeTheNotifier Change() => new(_installation, _cipher, Recording.Nobody());
 }

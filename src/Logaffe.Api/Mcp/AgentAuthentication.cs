@@ -28,6 +28,14 @@ namespace Logaffe.Api.Mcp;
 /// a call, because the row was already fetched to verify the secret and asking
 /// twice would be a second lookup on every call an agent makes.
 /// </para>
+/// <para>
+/// <b>It also resolves who the agent acts for, and what that person reaches</b>
+/// (ADR 0052, ADR 0055). MCP is not a lesser surface here — an agent sees
+/// exactly the projects its owner sees, and a project out of reach is absent
+/// rather than refused — so the reach is resolved at this door for the reason it
+/// is resolved at the session's: once per request, so that one call cannot be
+/// answered out of two different answers.
+/// </para>
 /// </remarks>
 public static class AgentAuthentication
 {
@@ -62,6 +70,13 @@ public static class AgentAuthentication
     /// offered the other's list, so the two never meet on one token (ADR 0046).
     /// </summary>
     public const string AdministeringPolicy = "logaffe:agent-administers";
+
+    /// <summary>
+    /// Present, and only present, when the person this agent acts for is an
+    /// administrator. It is what the installation-wide acts ask for, and it is
+    /// read off the owner on every call rather than off the token.
+    /// </summary>
+    public const string AdministratorClaim = "logaffe:administrator";
 
     /// <summary>
     /// What the four that remove stored data ask for: an administering token
@@ -136,14 +151,38 @@ public sealed class AgentAuthenticationHandler(
             return AuthenticateResult.Fail("The presented token admits nothing.");
         }
 
+        var reach = await Context.RequestServices
+            .GetRequiredService<ResolveReach>()
+            .ExecuteAsync(admitted.Owner, Context.RequestAborted);
+
+        Context.RequestServices.GetRequiredService<TheCallingAgent>()
+            .Admitted(admitted.Owner, reach);
+
+        // The agent and not its owner: a row naming the person and not saying
+        // that an agent was holding the keyboard would be true and misleading at
+        // once (ADR 0052).
+        Context.RequestServices.GetRequiredService<TheActor>().Admitted(admitted.Agent);
+
         var claims = new List<Claim>
         {
             new(AgentAuthentication.KindClaim, admitted.Kind.ToString()),
+            new(ClaimTypes.NameIdentifier, admitted.Owner.Id.ToString()),
         };
 
         if (admitted.MayDestroy)
         {
             claims.Add(new Claim(AgentAuthentication.MayDestroyClaim, bool.TrueString));
+        }
+
+        // The owner's role and not the token's: an agent is never an
+        // administrator, and what makes the installation-wide acts reachable
+        // through it is that the person it acts for is one (ADR 0052). It is a
+        // claim so that the policy below can ask for it the way it asks for the
+        // kind, and it is resolved on every call rather than at the moment the
+        // token was issued — a role taken away takes effect immediately.
+        if (admitted.Owner.Administrator)
+        {
+            claims.Add(new Claim(AgentAuthentication.AdministratorClaim, bool.TrueString));
         }
 
         return AuthenticateResult.Success(new AuthenticationTicket(

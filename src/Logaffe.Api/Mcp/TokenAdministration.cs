@@ -76,9 +76,10 @@ public static class TokenAdministration
         IHttpContextAccessor requests,
         [Description("The project that should be able to receive, as get_settings gives it.")]
         Guid projectId,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default)
     {
-        var attempt = await issue.ExecuteAsync(projectId, cancellationToken);
+        var attempt = await issue.ExecuteAsync(agent.Reach, projectId, cancellationToken);
 
         return attempt.Outcome switch
         {

@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Projects;
 using Logaffe.Domain.Entries;
 using Logaffe.Domain.Queries;
 
@@ -54,6 +55,7 @@ public sealed class SearchEntries(IProjects projects, IEntryReader entries)
     /// from a person says so before it gets here; this is the backstop.
     /// </exception>
     public async Task<Read<EntryPage>?> ExecuteAsync(
+        Reach reach,
         Guid projectId,
         EntryFilters filters,
         EntryCursor? after,
@@ -64,7 +66,7 @@ public sealed class SearchEntries(IProjects projects, IEntryReader entries)
             throw new ArgumentException("A time range ends after it starts.", nameof(filters));
         }
 
-        var project = await projects.FindAsync(projectId, cancellationToken);
+        var project = await projects.FindAsync(reach, projectId, cancellationToken);
         if (project is null)
         {
             return null;

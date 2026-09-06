@@ -25,9 +25,9 @@ export const api = createClient<paths>({
 });
 
 /**
- * The session ended somewhere other than the screen the operator is on: it
- * expired, it was revoked from another browser, or the password changed under
- * it. Every request answers `401` from that moment, and the application has one
+ * The session ended somewhere other than the screen somebody is on: it expired,
+ * it was revoked from another browser, the password changed under it, or the
+ * account was deactivated. Every request answers `401` from that moment, and the application has one
  * place to notice rather than one per call.
  */
 type SignedOutListener = () => void;
@@ -45,14 +45,15 @@ export function whenSignedOut(listener: SignedOutListener): () => void {
 }
 
 /**
- * The two surfaces a stranger can reach answer `401` for a wrong password
- * rather than for a session that ended, and turning that into "you have been
- * signed out" would be answering a question nobody asked.
+ * The two surfaces a stranger can reach answer for themselves — a wrong password
+ * or a token that is not this installation's — rather than for a session that
+ * ended, and turning that into "you have been signed out" would be answering a
+ * question nobody asked.
  */
 function isPublic(url: string): boolean {
   const { pathname } = new URL(url, "http://installation.invalid");
 
-  return pathname === "/sign-in" || pathname.startsWith("/claim");
+  return pathname === "/sign-in" || pathname === "/bootstrap";
 }
 
 api.use({

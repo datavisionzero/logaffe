@@ -11,8 +11,9 @@ This document is the log entry table — what each column is for, which indexes
 exist and why, and what the whole thing costs — and, at the end, the two small
 tables that hold samples ([Metrics](./metrics.md)) and the smaller one that holds
 the tally, which are here because their shape was decided rather than because
-their size demands it. The operator account, the projects, the tokens and the
-settings are ordinary relational rows and need no document of their own.
+their size demands it, and the one that holds the identities. The projects, the
+tokens and the settings are ordinary relational rows and need no document of
+their own.
 
 The numbers quoted below were measured on a containerised Postgres capped at two
 cores and 4 GB, holding ten million entries across twenty projects — the shape of
@@ -446,6 +447,168 @@ a uuid, a timestamp and two bigints, so twenty projects for 400 days is about
 11.84 GiB above that is under a thousandth, which is why it gets a period of its
 own without an argument about what it costs.
 
+## The identity table
+
+Everything that acts on an installation is a row here: a **user** or an **agent**,
+in one table split on a `kind` column
+([ADR 0052](./adr/0052-a-user-and-an-agent-are-one-identity.md)). One table
+because everything that records *who* — a session, a backup code, a project
+assignment, a record of a changed setting — has to point at one place, and
+because a hierarchy in two tables makes every one of those relations exist twice.
+
+```
+identity
+  id                         uuid, primary key
+  kind                       0 user, 1 agent
+  name                       what a list shows
+  administrator              runs the installation; never true for an agent
+  owner_id                   the user an agent belongs to; null on a user
+  created_at
+
+  -- a user's, and null on an agent
+  email                      as it was written
+  normalized_email           unique; what a sign-in looks up
+  state                      0 invited, 1 active, 2 deactivated
+  password_hash              null until the first password is set
+  second_factor_secret       sealed under the key on the host volume
+  second_factor_enrolled_at
+```
+
+**The columns a user has and an agent does not are nullable, and three check
+constraints keep that from meaning nothing.** `ck_identity_kind` holds the
+discriminator to the two values there are; `ck_identity_owner` says an agent has
+an owner and is never an administrator, and a user has no owner;
+`ck_identity_user` says a user carries an address and a state and an agent
+carries neither, nor a password, nor a second factor. They are on the table
+rather than only on the write path because that is the half a query written later
+cannot go around.
+
+**The unique index is over the normalized address**, not the written one. The
+address is trimmed, Unicode-normalized and lowercased before the transaction, so
+this index is the last line rather than the first — what it catches is two
+requests arriving at once, and what it means is that two spellings of one address
+are one account.
+
+**Nothing here is ever deleted, except all of it at once.** A user who should not
+sign in is `deactivated`, so that everything pointing at them keeps pointing at
+something; the one statement that removes a row is Host Recovery, which removes
+every row
+([ADR 0058](./adr/0058-host-recovery-removes-every-identity.md)). The sessions,
+the backup codes and an agent's row follow on the cascade.
+
+**It costs nothing worth measuring.** An installation of the size `VISION.md`
+targets holds a handful of these rows against the 11.84 GiB above, which is why
+this section is about shape and constraints and not about bytes.
+
+### Who reaches which project
+
+```
+project_access
+  project_id   cascades with the project
+  user_id      cascades with the identity
+  granted_by   who handed it out
+  granted_at
+```
+
+**The pair is the key.** One user reaches one project once, and a second grant of
+the same pair is the same state rather than a second row — a synthetic id would
+have bought a second way to say one thing and a unique index to keep it honest.
+The index on `user_id` is the one every request uses: a reach is resolved once
+per request from the identity behind it, and every read narrows to it
+([ADR 0055](./adr/0055-project-access-is-one-filter.md)).
+
+**An agent has no row here.** It reaches exactly what its owner reaches, resolved
+through the owner on every call rather than copied when its token was issued — a
+copy would go stale in the one direction that matters, an assignment taken away.
+
+**`granted_by` and `granted_at` are read by nothing today.** They are here
+because *who gave this person access* is a question a multi-user installation
+gets asked, and the row is the only place the answer could be.
+
+### The sessions and the backup codes hang off it
+
+```
+session                                backup_code
+  id            uuid, primary key        id        uuid, primary key
+  user_id       cascades                 user_id   cascades
+  secret_hash   unique; SHA-256          hash      unique; SHA-256
+  started_at    the absolute deadline    issued_at
+  last_used_at  the idle deadline        used_at   null until spent
+  last_seen_from
+```
+
+Neither table is looked up by its secret: a session secret and a backup code
+carry all of their own entropy and name no row, so the handful an installation
+holds are read and compared in constant time — which is the deliberate opposite
+of a token, and for the reason
+[ADR 0031](./adr/0031-a-token-names-its-own-row.md) gives from the other side.
+
+**Both deadlines on a session are derived rather than stored**, from
+`last_used_at` and `started_at`, so neither can disagree with the date it is
+measured from. A use writes `last_used_at` at most every five minutes
+([ADR 0033](./adr/0033-the-last-use-of-a-token-is-written-coarsely.md)) and never
+touches `started_at`, which is what makes the absolute deadline absolute.
+
+**A backup code is consumed by a timestamp and not by a deletion**, so *how many
+remain* is a filtered count and a spent code stays visibly spent
+([ADR 0057](./adr/0057-a-users-secrets-are-stored-for-what-they-are-and-the-password-is-argon2id.md)).
+The index on `user_id` is the cascade's and every read's: a set belongs to one
+person and is only ever counted for that person.
+
+## The history table
+
+```
+change
+  id            bigint, the database's own, and the order rows are read in
+  actor_id      cascades with the identity
+  actor_kind    user or agent
+  actor_name    as it read when the row was written
+  at
+  subject       project, group, host, token, user, access, installation
+  subject_id    no foreign key
+  subject_name  as it read when the row was written
+  act           created, renamed, changed, removed, issued, revoked, …
+  field         the setting that moved, on `changed` and on nothing else
+  moved_from
+  moved_to
+```
+
+One row is one thing somebody did to this installation's configuration, and
+there is no act anywhere that edits or removes one. It is the smallest table in
+the schema by some distance — an installation writes a handful of these a week
+where the log store takes millions a day — so nothing here is arranged for size.
+
+**The key is the order.** `id` is a `bigint` the database assigns, the rows are
+read newest first, and a page resumes on the id it ended at. Ordering on `at`
+would need a tiebreak, because several changes made in one request share a
+timestamp to the microsecond; ordering on the key needs none, because there are
+no ties. That is also why the cursor is not a timestamp: a client walking back
+through the history is walking the primary key backwards.
+
+**The subject has no foreign key, deliberately.** *Who deleted `orders-api`* is
+the question this table exists to answer, and a key pointing at the project would
+take the answer away with the project. What the row carries instead is the
+identity as it was and the name as it read, which is why `subject_name` is a
+column rather than a join.
+
+**The actor has one, and it cascades.** Host Recovery removes every identity on
+an installation
+([ADR 0058](./adr/0058-host-recovery-removes-every-identity.md)), and a history
+naming people who no longer exist would be a list nobody can read. `actor_name`
+is still stored beside it for the ordinary case: a row says who acted without a
+join, and an agent's row names the agent rather than the person who owns it
+([ADR 0052](./adr/0052-a-user-and-an-agent-are-one-identity.md)).
+
+**The one index beyond the key is `(subject, subject_id)`.** Two questions are
+asked of this table: what happened lately, which is the key walked backwards, and
+everything that was ever done to one thing, which is this.
+
+**Nothing writes here on the way past.** The stores do not record what they were
+told to do; the acts record what they did. A store that wrote a row for every
+change it made would have written one for each of the millions the retention
+sweep deletes, and would then have needed telling which of those were
+configuration.
+
 ## What is deliberately not here
 
 - **No partitioning.** Settled in ADR 0023: per-project retention means a
@@ -466,6 +629,11 @@ own without an argument about what it costs.
   correction, no reprocessing, and no backfill.
 - **No second copy for the agent.** MCP reads the same table through the same
   query surface as the web UI ([Querying](./querying.md)).
+- **No deleted identity, and no `deleted_at` on one.** An account that should not
+  be used is deactivated. Deleting would mean either orphaned history or a
+  cascade that erases the record of what somebody did.
+- **No second table for agents.** Covered above: one hierarchy, one table, one
+  thing for everything to point at.
 - **No index on the tally beyond its key, and no query surface over it.** One
   project over a range of hours is the whole of what is asked, which is the key's
   leading column and then a range on the second — plus the oldest hour one

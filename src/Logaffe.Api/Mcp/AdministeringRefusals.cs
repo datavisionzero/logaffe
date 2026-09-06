@@ -71,6 +71,22 @@ internal static class Refused
     public static McpException HostNameTaken(string name) =>
         new($"name: A host called \"{name}\" already exists.");
 
+    /// <summary>
+    /// An installation-wide act reached by an agent whose owner is not an
+    /// administrator (ADR 0052, ADR 0055).
+    /// </summary>
+    /// <remarks>
+    /// A refusal rather than an absence, which is a departure from how the two
+    /// token kinds are told apart and is deliberate: the tool list is fixed when
+    /// the client connects and the owner's role is not, so a tool that vanished
+    /// the moment somebody lost the role would be a list that lies until the
+    /// next reconnect. What the agent gets instead is a sentence it can report
+    /// back.
+    /// </remarks>
+    public static McpException NotAnAdministrator(string what) =>
+        new($"{what} is an act for an administrator, and the person this token "
+            + "belongs to is not one.");
+
     public static McpException NotAName(int maximum) =>
         new($"name: A name is one to {maximum} characters and not only spaces.");
 

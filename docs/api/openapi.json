@@ -23,77 +23,12 @@
         }
       }
     },
-    "/claim": {
-      "get": {
-        "tags": [
-          "logaffe"
-        ],
-        "summary": "Whether this installation has an operator, and how it can be claimed.",
-        "operationId": "CheckTheClaim",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClaimStateResponse"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too Many Requests"
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "logaffe"
-        ],
-        "summary": "Gives this installation an operator, and signs them in.",
-        "operationId": "Claim",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ClaimRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "204": {
-            "description": "No Content"
-          },
-          "403": {
-            "description": "Forbidden"
-          },
-          "409": {
-            "description": "Conflict"
-          },
-          "429": {
-            "description": "Too Many Requests"
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/sign-in": {
       "post": {
         "tags": [
           "logaffe"
         ],
-        "summary": "Starts a session for the operator.",
+        "summary": "Starts a session for the user behind an address and a password.",
         "operationId": "SignIn",
         "requestBody": {
           "content": {
@@ -125,6 +60,43 @@
         }
       }
     },
+    "/bootstrap": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Exchanges the bootstrap token for the first administrator's password and a session.",
+        "operationId": "ExchangeBootstrapToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BootstrapExchangeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sign-out": {
       "post": {
         "tags": [
@@ -138,6 +110,327 @@
           },
           "401": {
             "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/users": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Invites somebody, who begins with an account and no project access.",
+        "operationId": "InviteUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Everybody on this installation.",
+        "operationId": "ListUsers",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ListedUserResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/invitation": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Sends a fresh invitation, and stops the previous link working.",
+        "operationId": "ReinviteUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/recovery": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Sends a link to that address, if there is an account behind it.",
+        "operationId": "BeginRecovery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/invitation/redemption": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Sets a first password, which is what an invitation is for.",
+        "operationId": "RedeemInvitation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/recovery/redemption": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Sets a new password, and ends every session that account had.",
+        "operationId": "RedeemRecovery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/address/redemption": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Confirms the new address, which is when it starts signing in.",
+        "operationId": "RedeemAddressChange",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/address": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Sends a link to the new address; nothing changes until it is used.",
+        "operationId": "ChangeAddress",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeAddressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Who this request is signed in as.",
+        "operationId": "Me",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/history": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "What was changed on this installation, newest first.",
+        "operationId": "ReadHistory",
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChangeResponse"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -239,7 +532,7 @@
         "tags": [
           "logaffe"
         ],
-        "summary": "The operator's signed-in browsers.",
+        "summary": "The signed-in user's own browsers.",
         "operationId": "ListSessions",
         "responses": {
           "200": {
@@ -383,7 +676,7 @@
         "tags": [
           "logaffe"
         ],
-        "summary": "Whether the operator has a second factor, and since when.",
+        "summary": "Whether the signed-in user has a second factor, and since when.",
         "operationId": "CheckSecondFactor",
         "responses": {
           "200": {
@@ -395,9 +688,6 @@
                 }
               }
             }
-          },
-          "401": {
-            "description": "Unauthorized"
           }
         }
       },
@@ -951,6 +1241,214 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/projects/{id}/access": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Who reaches this project.",
+        "operationId": "ListProjectAccess",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProjectAccessResponse"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/projects/{id}/access/{userId}": {
+      "put": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Puts a project within somebody's reach.",
+        "operationId": "GrantProjectAccess",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Takes it back, from that person's next request on.",
+        "operationId": "WithdrawProjectAccess",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/users/{id}/deactivation": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Closes an account, ends its sessions and silences its agents.",
+        "operationId": "DeactivateUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Opens it again, restoring whatever was not individually revoked.",
+        "operationId": "ReactivateUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/users/{id}/role": {
+      "put": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Gives the administrator role or takes it back.",
+        "operationId": "ChangeUserRole",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
           }
         }
       }
@@ -2518,6 +3016,21 @@
   },
   "components": {
     "schemas": {
+      "Act": {
+        "enum": [
+          "created",
+          "renamed",
+          "changed",
+          "removed",
+          "issued",
+          "revoked",
+          "invited",
+          "deactivated",
+          "reactivated",
+          "granted",
+          "withdrawn"
+        ]
+      },
       "AgentTokenKind": {
         "enum": [
           "reading",
@@ -2622,6 +3135,48 @@
           "mountAbsent"
         ]
       },
+      "BootstrapExchangeRequest": {
+        "required": [
+          "token",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ChangeAddressRequest": {
+        "required": [
+          "password",
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ChangePasswordRequest": {
         "required": [
           "currentPassword",
@@ -2643,51 +3198,78 @@
           }
         }
       },
-      "ClaimRequest": {
+      "ChangeResponse": {
         "required": [
-          "password",
-          "secret"
+          "id",
+          "actorId",
+          "actorKind",
+          "actorName",
+          "at",
+          "subject",
+          "subjectId",
+          "subjectName",
+          "act",
+          "field",
+          "from",
+          "to"
         ],
         "type": "object",
         "properties": {
-          "password": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
-              "null",
+              "integer",
               "string"
-            ]
+            ],
+            "format": "int64"
           },
-          "secret": {
-            "type": [
-              "null",
-              "string"
-            ]
-          }
-        }
-      },
-      "ClaimStateResponse": {
-        "required": [
-          "isClaimed",
-          "canBeClaimed",
-          "needsSecret",
-          "closesAt"
-        ],
-        "type": "object",
-        "properties": {
-          "isClaimed": {
-            "type": "boolean"
+          "actorId": {
+            "type": "string",
+            "format": "uuid"
           },
-          "canBeClaimed": {
-            "type": "boolean"
+          "actorKind": {
+            "$ref": "#/components/schemas/IdentityKind"
           },
-          "needsSecret": {
-            "type": "boolean"
+          "actorName": {
+            "type": "string"
           },
-          "closesAt": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/Subject"
+          },
+          "subjectId": {
             "type": [
               "null",
               "string"
             ],
-            "format": "date-time"
+            "format": "uuid"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "act": {
+            "$ref": "#/components/schemas/Act"
+          },
+          "field": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "to": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },
@@ -3289,6 +3871,12 @@
           }
         }
       },
+      "IdentityKind": {
+        "enum": [
+          "user",
+          "agent"
+        ]
+      },
       "InstallationHostRequest": {
         "required": [
           "hostId",
@@ -3308,6 +3896,31 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "InviteRequest": {
+        "required": [
+          "name",
+          "email",
+          "administrator"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "administrator": {
+            "type": "boolean"
           }
         }
       },
@@ -3793,6 +4406,76 @@
           }
         }
       },
+      "ListedUserResponse": {
+        "required": [
+          "id",
+          "name",
+          "email",
+          "state",
+          "administrator",
+          "hasSecondFactor",
+          "projects",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/UserState"
+          },
+          "administrator": {
+            "type": "boolean"
+          },
+          "hasSecondFactor": {
+            "type": "boolean"
+          },
+          "projects": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MeResponse": {
+        "required": [
+          "id",
+          "name",
+          "email",
+          "administrator"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "administrator": {
+            "type": "boolean"
+          }
+        }
+      },
       "NotifierProof": {
         "enum": [
           "sent",
@@ -3856,6 +4539,36 @@
         "properties": {
           "token": {
             "type": "string"
+          }
+        }
+      },
+      "ProjectAccessResponse": {
+        "required": [
+          "userId",
+          "name",
+          "email",
+          "grantedBy",
+          "grantedAt"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "grantedBy": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "grantedAt": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       },
@@ -4074,6 +4787,41 @@
           }
         }
       },
+      "RecoveryRequest": {
+        "required": [
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RedeemRequest": {
+        "required": [
+          "secret",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "RejectedLineResponse": {
         "required": [
           "line",
@@ -4135,6 +4883,17 @@
               "string"
             ],
             "format": "int32"
+          }
+        }
+      },
+      "RoleRequest": {
+        "required": [
+          "administrator"
+        ],
+        "type": "object",
+        "properties": {
+          "administrator": {
+            "type": "boolean"
           }
         }
       },
@@ -4336,12 +5095,19 @@
       },
       "SignInRequest": {
         "required": [
+          "email",
           "password",
           "secondFactorCode",
           "backupCode"
         ],
         "type": "object",
         "properties": {
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
           "password": {
             "type": [
               "null",
@@ -4440,6 +5206,19 @@
           }
         }
       },
+      "Subject": {
+        "enum": [
+          "project",
+          "group",
+          "host",
+          "ingestToken",
+          "hostToken",
+          "agentToken",
+          "user",
+          "projectAccess",
+          "installation"
+        ]
+      },
       "TailResponse": {
         "required": [
           "entries",
@@ -4525,6 +5304,13 @@
             ]
           }
         }
+      },
+      "UserState": {
+        "enum": [
+          "invited",
+          "active",
+          "deactivated"
+        ]
       }
     }
   },

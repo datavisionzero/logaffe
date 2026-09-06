@@ -1,7 +1,8 @@
 using Logaffe.Domain.Alerts;
 using Logaffe.Domain.Entries;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Hosts;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 using Microsoft.EntityFrameworkCore;
@@ -67,22 +68,33 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
     public DbSet<HostToken> HostTokens => Set<HostToken>();
 
     /// <summary>
-    /// The one account, and a set with no row in it while the installation is
-    /// unclaimed. That there can be no second one is the table's own doing —
-    /// see <c>OperatorConfiguration</c>.
+    /// Everything that acts: the users and the agents, in one table split on a
+    /// discriminator (ADR 0052). It is empty on an installation that has not
+    /// been bootstrapped, which is the one question the bootstrap asks.
     /// </summary>
-    public DbSet<Operator> Operators => Set<Operator>();
+    public DbSet<Identity> Identities => Set<Identity>();
+
+    /// <summary>
+    /// Which user reaches which project — the one filter every read narrows to
+    /// (ADR 0055).
+    /// </summary>
+    public DbSet<ProjectAccess> ProjectAccess => Set<ProjectAccess>();
+
+    /// <summary>
+    /// The links an installation has outstanding: invitations, password
+    /// recoveries and changes of address (ADR 0053).
+    /// </summary>
+    public DbSet<OneTimeSecret> OneTimeSecrets => Set<OneTimeSecret>();
+
+    /// <summary>
+    /// What was changed on this installation and by whom — everything that
+    /// changes configuration, and never an entry.
+    /// </summary>
+    public DbSet<Change> History => Set<Change>();
 
     public DbSet<Session> Sessions => Set<Session>();
 
     public DbSet<BackupCode> BackupCodes => Set<BackupCode>();
-
-    /// <summary>
-    /// The one row an installation holds about itself: when it last became
-    /// claimable. It is written by the start that created the schema and by
-    /// Host Recovery, and by nothing else (ADR 0034).
-    /// </summary>
-    public DbSet<ClaimGuard> ClaimGuards => Set<ClaimGuard>();
 
     /// <summary>
     /// The one row of what the operator has set for the whole installation, and

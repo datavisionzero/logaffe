@@ -194,7 +194,8 @@ public static class TokenEndpoints
                 HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                var attempt = await issue.ExecuteAsync(projectId, cancellationToken);
+                var attempt = await issue.ExecuteAsync(
+                    context.Reach(), projectId, cancellationToken);
 
                 // A third is refused rather than queued or rotating the oldest
                 // out: two is what moving deployments over one at a time needs,
@@ -226,9 +227,10 @@ public static class TokenEndpoints
         endpoints.MapGet("/projects/{projectId:guid}/ingest-tokens", async (
                 Guid projectId,
                 ListIngestTokens list,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                var held = await list.ExecuteAsync(projectId, cancellationToken);
+                var held = await list.ExecuteAsync(context.Reach(), projectId, cancellationToken);
 
                 // A project that is not there is 404 rather than an empty list:
                 // a closed door and a deleted project are two different
@@ -269,6 +271,7 @@ public static class TokenEndpoints
         endpoints.MapDelete("/ingest-tokens/{id:guid}", async (
                 Guid id,
                 RevokeToken revoke,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
                 await revoke.IngestTokenAsync(id, cancellationToken)
                     ? Results.NoContent()
@@ -307,8 +310,13 @@ public static class TokenEndpoints
                     return OnlyAnAdministeringTokenDestroys();
                 }
 
+                // Issued by the person making the request, which is who the
+                // agent will act for. There is no route by which an agent
+                // issues one: this endpoint is behind a session, and the
+                // administering surface over MCP does not carry it (ADR 0046,
+                // ADR 0052).
                 var issued = await issue.ExecuteAsync(
-                    request.Name!, kind, mayDestroy, cancellationToken);
+                    context.CurrentUser(), request.Name!, kind, mayDestroy, cancellationToken);
 
                 return Results.Created(
                     ReadBackOf("agent-tokens", issued.Id),
@@ -328,6 +336,7 @@ public static class TokenEndpoints
 
         endpoints.MapGet("/agent-tokens", async (
                 ListAgentTokens list,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 var held = await list.ExecuteAsync(cancellationToken);
@@ -348,6 +357,7 @@ public static class TokenEndpoints
                 Guid id,
                 RenameAgentTokenRequest request,
                 RenameAgentToken rename,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!IsAName(request.Name))
@@ -389,6 +399,7 @@ public static class TokenEndpoints
         endpoints.MapDelete("/agent-tokens/{id:guid}", async (
                 Guid id,
                 RevokeToken revoke,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
                 await revoke.AgentTokenAsync(id, cancellationToken)
                     ? Results.NoContent()
@@ -435,6 +446,7 @@ public static class TokenEndpoints
         endpoints.MapGet("/hosts/{hostId:guid}/host-tokens", async (
                 Guid hostId,
                 ListHostTokens list,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 var held = await list.ExecuteAsync(hostId, cancellationToken);
@@ -484,6 +496,7 @@ public static class TokenEndpoints
         endpoints.MapDelete("/host-tokens/{id:guid}", async (
                 Guid id,
                 RevokeToken revoke,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
                 // A collector still holding it neither retries nor notices: it
                 // drops each reading and takes the next one a minute later, so a

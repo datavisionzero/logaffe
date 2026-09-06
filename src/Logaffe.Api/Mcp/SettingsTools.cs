@@ -64,11 +64,11 @@ public static class SettingsTools
         ListIngestTokens ingestTokens,
         ListHostTokens hostTokens,
         ChangeSampleRetention samples,
-        CancellationToken cancellationToken)
+        TheCallingAgent agent, CancellationToken cancellationToken)
     {
-        var heldProjects = await projects.ExecuteAsync(cancellationToken);
+        var heldProjects = await projects.ExecuteAsync(agent.Reach, cancellationToken);
         var heldGroups = await groups.ExecuteAsync(cancellationToken);
-        var heldHosts = await hosts.ExecuteAsync(cancellationToken);
+        var heldHosts = await hosts.ExecuteAsync(agent.Reach, cancellationToken);
         var sampleWindow = await samples.ReadAsync(cancellationToken);
 
         // The tokens of every project in one read and the tokens of every host in
@@ -76,7 +76,7 @@ public static class SettingsTools
         // is what lets this be one tool without inventing a query here
         // (ADR 0030). A read per project is what this used to be, and it was the
         // one call on this surface that grew with the installation.
-        var heldIngestTokens = await ingestTokens.ExecuteAsync(cancellationToken);
+        var heldIngestTokens = await ingestTokens.ExecuteAsync(agent.Reach, cancellationToken);
         var heldHostTokens = await hostTokens.ExecuteAsync(cancellationToken);
 
         var settingsProjects = new List<SettingsProject>(heldProjects.Count);

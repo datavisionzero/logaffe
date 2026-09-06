@@ -1,5 +1,12 @@
 # An Enrolment Carries Its Own Sealed Ticket
 
+**Superseded by
+[ADR 0054](./0054-the-first-administrator-comes-from-the-environment.md)** as far
+as the claim is concerned. The sealed ticket survives where it was always needed
+— behind a signed-in user enrolling their own second factor — and the enrolment
+is now each user's own
+([ADR 0052](./0052-a-user-and-an-agent-are-one-identity.md)).
+
 Enrolling a second factor, and replacing one, has a shape that fits in no single
 request: a new secret has to be shown, scanned and confirmed before it goes into
 the row, and nothing may be stored in between — a half-written second factor is

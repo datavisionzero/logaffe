@@ -1,5 +1,14 @@
 # Host Recovery Returns the Installation to Unclaimed
 
+**Superseded by
+[ADR 0058](./0058-host-recovery-removes-every-identity.md).** The core of it is
+kept there — one operation, one state — and everything below about *the*
+operator, the claim secret and the window it arms is gone with the claim
+([ADR 0054](./0054-the-first-administrator-comes-from-the-environment.md)).
+Recovery now removes every identity on the installation, and the way back in is
+the bootstrap from configuration. This document is kept because it is where the
+one-operation argument was made.
+
 The host command does one thing: it puts the installation back into the state it
 was in before anyone claimed it, and opens the way in again. `VISION.md` asks
 the escape hatch to cover two cases — an operator locked out of their own

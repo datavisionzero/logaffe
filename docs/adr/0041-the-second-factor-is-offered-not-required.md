@@ -1,5 +1,15 @@
 # The Second Factor Is Offered, Not Required
 
+**Amended by
+[ADR 0052](./0052-a-user-and-an-agent-are-one-identity.md).** The decision stands
+word for word and its subject changed: the second factor is each *user's* to
+enrol and to remove, rather than the operator's, and the interface says whether
+the signed-in user has one rather than whether the installation does. The claim
+this document talks about is gone
+([ADR 0054](./0054-the-first-administrator-comes-from-the-environment.md)); what
+took its place establishes a password and nothing else, exactly as the claim
+did.
+
 The claim establishes a password and nothing else. The TOTP second factor of
 [ADR 0016](./0016-the-second-factor-is-totp.md) is enrolled afterwards by a
 signed-in operator who decides to, and can be turned off again by the same

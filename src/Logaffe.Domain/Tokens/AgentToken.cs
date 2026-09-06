@@ -1,13 +1,26 @@
 namespace Logaffe.Domain.Tokens;
 
 /// <summary>
-/// The secret an agent presents to MCP, which reads every project or
-/// administers the installation.
+/// The secret an agent presents to MCP, which reads what its owner reads or
+/// administers what its owner administers.
 /// </summary>
 /// <remarks>
 /// Several exist at once and each is revocable on its own. It is the same shape
 /// as an ingest token deliberately: one credential model for a machine, pointing
 /// in several directions (ADR 0021).
+/// <para>
+/// <b>It belongs to an agent, and the agent belongs to a person</b>
+/// (ADR 0052). <see cref="IdentityId"/> is what makes that true, and it is what
+/// an agent's authority is resolved through: it sees the projects its owner
+/// sees, and it reaches the installation-wide acts only while that owner is an
+/// administrator. A token is issued by a person and never by an agent — an agent
+/// that can issue one has escaped the identity it was given.
+/// </para>
+/// <para>
+/// <b>The identity outlives the token.</b> Revoking removes this row and leaves
+/// the agent where it was, so a record of what that agent did keeps pointing at
+/// something.
+/// </para>
 /// <para>
 /// What it may do is <see cref="Kind"/> and <see cref="MayDestroy"/> beside it,
 /// and both are settled here, at the moment it is issued. There is no act that
@@ -27,6 +40,7 @@ public sealed class AgentToken
 
     private AgentToken(
         Guid id,
+        Guid identityId,
         string name,
         AgentTokenKind kind,
         bool mayDestroy,
@@ -35,6 +49,7 @@ public sealed class AgentToken
         DateTimeOffset issuedAt)
     {
         Id = id;
+        IdentityId = identityId;
         Name = name;
         Kind = kind;
         MayDestroy = mayDestroy;
@@ -46,11 +61,19 @@ public sealed class AgentToken
     public Guid Id { get; private init; }
 
     /// <summary>
-    /// What the operator called this token, conventionally the client it was
-    /// issued for, and renameable. It is a label for the operator's list and
-    /// nothing more — it does not identify the token to the server, which is
-    /// what <see cref="Identifier"/> is for, and changing it changes nothing
-    /// else. Two agents may share one.
+    /// The agent this token authenticates as, whose owner decides what it may
+    /// reach (ADR 0052). It is the whole of what makes an agent an identity, and
+    /// it is settled when the token is issued.
+    /// </summary>
+    public Guid IdentityId { get; private init; }
+
+    /// <summary>
+    /// What this token was called, conventionally the client it was issued for,
+    /// and renameable. It is a label for its owner's list and nothing more — it
+    /// does not identify the token to the server, which is what
+    /// <see cref="Identifier"/> is for. The agent identity behind it carries the
+    /// same name, because that is what a record of what the agent did reads as,
+    /// and a rename moves both.
     /// </summary>
     public string Name { get; private set; } = null!;
 
@@ -103,6 +126,7 @@ public sealed class AgentToken
     /// than stored as a flag that means nothing.
     /// </exception>
     public static AgentToken Issue(
+        Guid identityId,
         string name,
         AgentTokenKind kind,
         bool mayDestroy,
@@ -114,6 +138,7 @@ public sealed class AgentToken
                 "Only an administering token can be issued to destroy.", nameof(mayDestroy))
             : new AgentToken(
                 Guid.CreateVersion7(),
+                identityId,
                 Normalize(name),
                 kind,
                 mayDestroy,

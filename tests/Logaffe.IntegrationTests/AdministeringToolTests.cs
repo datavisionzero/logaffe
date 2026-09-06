@@ -5,6 +5,7 @@ using System.Text.Json;
 using Logaffe.Api.Http;
 using Logaffe.Application.Ports;
 using Logaffe.Domain.Hosts;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
@@ -104,7 +105,7 @@ public sealed class AdministeringToolTests(PostgresFixture postgres) : IAsyncLif
         using var client = _installation.CreateClient();
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
 
-        var enrolled = await AClaimedInstallation.ClaimAsync(_installation, _volume);
+        var enrolled = await ABootstrappedInstallation.SignInAsync(_installation);
         _secondFactorSecret = enrolled.SecondFactorSecret;
 
         using var operatorClient = await SignedInAsync();
@@ -713,10 +714,18 @@ public sealed class AdministeringToolTests(PostgresFixture postgres) : IAsyncLif
         var cipher = scope.ServiceProvider.GetRequiredService<ISecretCipher>();
         var now = DateTimeOffset.UtcNow;
 
+        // The administrator every one of these is assigned to. A project nobody
+        // was assigned does not exist for anybody (ADR 0055), so seeding without
+        // this would be seeding a state the acts cannot produce.
+        var administrator = (await scope.ServiceProvider.GetRequiredService<IIdentities>()
+            .ListUsersAsync(TestContext.Current.CancellationToken)).Single();
+
         for (var i = 0; i < projects; i++)
         {
             var project = Project.Create($"project-{i:D3}", RetentionWindow.OfDays(14), now);
             context.Projects.Add(project);
+            context.ProjectAccess.Add(
+                ProjectAccess.Grant(project.Id, administrator.Id, administrator.Id, now));
 
             for (var held = 0; held < IngestToken.MaximumPerProject; held++)
             {
@@ -773,6 +782,7 @@ public sealed class AdministeringToolTests(PostgresFixture postgres) : IAsyncLif
             "/sign-in",
             new
             {
+                email = ABootstrappedInstallation.TheirAddress,
                 password = TheirPassword,
                 secondFactorCode = Authenticator.CodeFor(_secondFactorSecret),
             },

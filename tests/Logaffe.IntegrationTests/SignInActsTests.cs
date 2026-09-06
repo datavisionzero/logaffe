@@ -3,9 +3,10 @@ using System.Security.Cryptography;
 using System.Text;
 using Logaffe.Application.Operations;
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 using Logaffe.Infrastructure.Persistence;
 using Logaffe.Infrastructure.Secrets;
+using Logaffe.Infrastructure.Throttling;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -26,6 +27,8 @@ namespace Logaffe.IntegrationTests;
 public sealed class SignInActsTests(PostgresFixture postgres) : IDisposable
 {
     private const string TheirPassword = "a passphrase they typed";
+
+    private const string TheirAddress = "administrator@example.com";
 
     /// <summary>
     /// RFC 6238's own SHA-1 secret, in the base32 an authenticator app is
@@ -148,13 +151,13 @@ public sealed class SignInActsTests(PostgresFixture postgres) : IDisposable
         var stored = await context.Sessions.SingleAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(later, stored.LastUsedAt);
-        Assert.Equal(later + Session.SlidingLifetime, stored.ExpiresAt);
+        Assert.Equal(later + Session.IdleLifetime, stored.ExpiresAt);
     }
 
     /// <summary>
-    /// An installation in the state a completed claim leaves it in: a real
-    /// PBKDF2 hash, a TOTP secret sealed under the key on the volume, and a set
-    /// of codes on paper.
+    /// An installation in the state a finished exchange and an enrolment leave
+    /// it in: a real hash, a TOTP secret sealed under the key on the volume, and
+    /// a set of codes on paper.
     /// </summary>
     private async Task<Installation> ClaimedInstallationAsync()
     {
@@ -163,16 +166,16 @@ public sealed class SignInActsTests(PostgresFixture postgres) : IDisposable
         await new SchemaMigrator(context, NullLogger<SchemaMigrator>.Instance)
             .ApplyAsync(TestContext.Current.CancellationToken);
 
-        var theOperator = Operator.Claim(
-            new FrameworkPasswordHasher().Hash(Password.Create(TheirPassword)), Claimed);
-        theOperator.EnrolSecondFactor(CipherOn(_volume).Encrypt(SecondFactorSecret), Claimed);
+        var user = User.Bootstrap("The Administrator", TheirAddress, Claimed);
+        user.ActivateWith(
+            new Argon2idPasswordHasher().Hash(Password.Create(TheirPassword)));
+        user.EnrolSecondFactor(CipherOn(_volume).Encrypt(SecondFactorSecret), Claimed);
 
-        var minted = BackupCode.MintSet(theOperator.Id, Claimed);
-        var operators = new Operators(context);
-        Assert.True(await operators.TryClaimAsync(
-            theOperator, TestContext.Current.CancellationToken));
-        await operators.ReplaceBackupCodesAsync(
-            minted.Stored, TestContext.Current.CancellationToken);
+        var minted = BackupCode.MintSet(user.Id, Claimed);
+        var identities = new Identities(context);
+        Assert.True(await identities.TryAddAsync(user, TestContext.Current.CancellationToken));
+        await identities.ReplaceBackupCodesAsync(
+            user.Id, minted.Stored, TestContext.Current.CancellationToken);
 
         return new Installation(connectionString, minted.Shown);
     }
@@ -182,15 +185,27 @@ public sealed class SignInActsTests(PostgresFixture postgres) : IDisposable
     {
         await using var context = ContextFor(installation);
 
-        return await new SignIn(
-                new Operators(context),
+        var hasher = new Argon2idPasswordHasher();
+
+        var attempt = await new SignIn(
+                new Identities(context),
                 new Sessions(context),
-                new FrameworkPasswordHasher(),
+                hasher,
+                new DummyPasswordHash(hasher),
+                new InProcessSignInThrottle(),
                 new Rfc6238SecondFactor(),
                 CipherOn(_volume),
                 At(Claimed))
             .ExecuteAsync(
-                password, code, backupCode, "203.0.113.7", TestContext.Current.CancellationToken);
+                TheirAddress, password, code, backupCode, "203.0.113.7",
+                TestContext.Current.CancellationToken);
+
+        // A fresh throttle per call, so that what this class asserts is the
+        // sign-in rather than the windows in front of it — those have their own
+        // tests.
+        Assert.False(attempt.Throttled);
+
+        return attempt.Session;
     }
 
     private static async Task<AdmittedSession?> AuthenticateAsync(
@@ -198,13 +213,14 @@ public sealed class SignInActsTests(PostgresFixture postgres) : IDisposable
     {
         await using var context = ContextFor(installation);
 
-        return await new AuthenticateSession(new Sessions(context), At(now))
+        return await new AuthenticateSession(
+                new Sessions(context), new Identities(context), At(now))
             .ExecuteAsync(secret, "203.0.113.7", TestContext.Current.CancellationToken);
     }
 
     /// <summary>
     /// The six digits the enrolled secret produces at that moment, which is what
-    /// the authenticator app in the operator's pocket would be showing.
+    /// the authenticator app in their pocket would be showing.
     /// </summary>
     /// <remarks>
     /// RFC 6238 written out here rather than asked of

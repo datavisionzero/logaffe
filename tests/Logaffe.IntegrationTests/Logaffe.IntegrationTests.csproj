@@ -27,6 +27,8 @@
     <PackageReference Include="ModelContextProtocol" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="Testcontainers.PostgreSql" />
+    <!-- Mailpit, which the mail tests send through and read back. -->
+    <PackageReference Include="Testcontainers" />
     <!-- Unused here, and present to raise Testcontainers' own SSH.NET past
          GHSA-q939-rpr3-3284. See Directory.Packages.props. -->
     <PackageReference Include="SSH.NET" />

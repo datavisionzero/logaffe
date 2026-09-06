@@ -1,20 +1,30 @@
 using Logaffe.Application.Operations;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Tokens;
 
 namespace Logaffe.UnitTests.Application;
 
 /// <summary>
-/// What the operator does to the credentials their agents act with: issue one
-/// under a name and a kind, rename it, read it back, retire it, and look at the
-/// list that says which one has gone quiet and what each of them may do.
+/// What somebody does to the credentials their agents act with: issue one under
+/// a name and a kind, rename it, read it back, retire it, and look at the list
+/// that says which one has gone quiet and what each of them may do.
 /// </summary>
 public sealed class AgentTokenActsTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 7, 9, 0, 0, TimeSpan.Zero);
 
     private readonly InMemoryTokens _tokens = new();
+    private readonly InMemoryIdentities _identities = new();
     private readonly ReversingCipher _cipher = new();
     private readonly StoppedClock _clock = new(Now);
+    private readonly User _owner;
+
+    public AgentTokenActsTests()
+    {
+        _owner = User.Bootstrap("The Administrator", "somebody@example.com", Now);
+        _owner.ActivateWith("$argon2id$v=19$m=19456,t=2,p=1$not-a-real-hash");
+        _identities.Seed(_owner);
+    }
 
     [Fact]
     public async Task An_issued_token_is_an_agent_token_under_the_name_it_was_given()
@@ -59,6 +69,7 @@ public sealed class AgentTokenActsTests
     public async Task A_name_that_is_not_a_name_is_refused()
     {
         await Assert.ThrowsAsync<ArgumentException>(() => Issuing().ExecuteAsync(
+            _owner,
             "   ",
             AgentTokenKind.Reading,
             mayDestroy: false,
@@ -73,6 +84,7 @@ public sealed class AgentTokenActsTests
         // Refused rather than stored as a flag that means nothing: a reading
         // token makes no change of any kind.
         await Assert.ThrowsAsync<ArgumentException>(() => Issuing().ExecuteAsync(
+            _owner,
             "terminal agent",
             AgentTokenKind.Reading,
             mayDestroy: true,
@@ -216,15 +228,16 @@ public sealed class AgentTokenActsTests
         string name,
         AgentTokenKind kind = AgentTokenKind.Reading,
         bool mayDestroy = false) =>
-        Issuing().ExecuteAsync(name, kind, mayDestroy, TestContext.Current.CancellationToken);
+        Issuing().ExecuteAsync(
+            _owner, name, kind, mayDestroy, TestContext.Current.CancellationToken);
 
-    private IssueAgentToken Issuing() => new(_tokens, _cipher, _clock);
+    private IssueAgentToken Issuing() => new(_tokens, _cipher, Recording.Nobody(), _clock);
 
     private ListAgentTokens Listing() => new(_tokens);
 
     private ReadTokenBack ReadingBack() => new(_tokens, _cipher);
 
-    private RenameAgentToken Renaming() => new(_tokens);
+    private RenameAgentToken Renaming() => new(_tokens, _identities, Recording.Nobody());
 
-    private RevokeToken Revoking() => new(_tokens);
+    private RevokeToken Revoking() => new(_tokens, Recording.Nobody());
 }

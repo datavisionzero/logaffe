@@ -1,169 +1,225 @@
-# Setup and the Claim
+# Setup and the First Administrator
 
-An installation starts life belonging to nobody, and the **claim** is the act
-that gives it an operator. This is the only surface in the product a stranger can
-act on, and everything below is written from that angle.
+An installation creates its **first administrator** on the one start where it
+holds no identity, out of configuration whoever installs it wrote before that
+start. There is no claim, no claim secret, no claim window and no first-run
+screen: the whole of what used to be the only surface a stranger could act on is
+gone ([ADR 0054](./adr/0054-the-first-administrator-comes-from-the-environment.md)).
 
 Two things are settled in `VISION.md` and are the premises here rather than
-decisions of this document. **Whoever installs decides how the claim is
-guarded** — by a secret, which is the default, or by an open window. And **there
-is always a way back in from the host**, which is what makes the rest affordable.
+decisions of this document. **Whoever installs names the first administrator**,
+before the first start, because they are the one holding the compose file. And
+**there is always a way back in from the host**, which is what makes the rest
+affordable.
 
-## An unclaimed installation
-
-An unclaimed installation exposes the claim and nothing else. There is no
-ingestion, because ingestion needs a token and a token needs a project and a
-project needs an operator; no samples, for the same reason one step over — a
-host is something an operator creates ([Metrics](./metrics.md)); there is no
-MCP; there is nothing to read and nothing to configure. The whole reachable
-surface is one flow.
-
-## The claim secret
+## The three keys
 
 ```yaml
-Logaffe__Claim__Mode: secret     # the default
-Logaffe__Claim__Secret: ""       # empty: the installation draws one
+Logaffe__Bootstrap__Administrator: "Alex"                   # the name they are shown under
+Logaffe__Bootstrap__Email: "alex@example.com"               # the address they sign in with
+Logaffe__Bootstrap__Token: "…at least 32 characters…"       # exchanged once, in a browser
 ```
 
-In this mode the installation is **not claimable by anyone who cannot present the
-secret**, and there is no deadline of any kind. A door that is locked does not
-need a clock: an installation that is brought up and forgotten is not an open
-door, and the operator can claim it a week later from wherever they are
-([ADR 0040](./adr/0040-the-claim-is-guarded-by-a-secret-or-by-a-window.md)).
+All three or none. An installation given all three and holding no identity
+creates that administrator on that start and says so in its log.
 
-**Either the installation draws the secret or the operator sets it.** A drawn one
-is thirty-two symbols of the same transcription-safe alphabet a token is written
-in — no `l`, no `o`, no `0`, no `1` — because this is a value that gets read off
-a terminal and typed into a browser on another machine more often than a token
-ever is. It lands in two places on the start that draws it:
+**A token rather than a password**, and that is the whole design. A password in a
+compose file is a password in a shell history, in a git repository and in
+`docker inspect` for as long as the container runs — and unlike a token it is the
+credential a human reuses somewhere else. So the configuration names a value
+nobody has to remember, the browser exchanges it once for a password, and the
+password never travels through a file. Draw it rather than think of it:
 
 ```
-/var/lib/logaffe/claim-secret.txt      on the host volume, readable by its owner alone
+openssl rand -base64 32
 ```
 
-and once in the container log, which is where somebody watching a first start is
-already looking. Every later start while the installation is still unclaimed
-names the file without repeating the secret, because an operator who restarted a
-container has not lost anything.
+**The exchange is reached from the sign-in screen**, by the one link on it that
+is not a sign-in. Nothing announces that an installation is waiting to be set up:
+whether anybody has ever signed in here is not something a stranger learns by
+loading the page, and the person who has the token does not need to be told.
 
-A secret set as configuration is **not stored at all** — it is compared against
-what configuration says, so changing it is editing the compose file and there is
-no second copy to disagree with. It has to be at least sixteen characters or the
-installation refuses to start, which is the one rule this value has: it is
-pasted, not recited, and anything shorter is somebody typing a word.
+**It happens once.** What makes it single-use is not a flag somebody has to
+remember to set: the bootstrap writes the administrator *invited* and without a
+password, and the exchange is the act that gives them one — so the moment it
+succeeds there is no passwordless administrator left to exchange against, and a
+second attempt is refused against an installation that already has its person.
 
-**The secret guards the act of claiming and nothing else.** It is not a factor
-alongside the password, it grants nothing on its own, and it stops working the
-moment the installation is claimed — at which point the file is removed, because
-what is left otherwise is a credential for a door that no longer opens. Losing it
-before that is what Host Recovery is for.
+**From the second start the three keys are ignored**, whatever they say. Changing
+the token in the compose file changes nothing, and an installation that already
+has an administrator cannot be bootstrapped again by editing a file. The way back
+into one nobody can sign into is Host Recovery, below.
 
-**This is the mode an unattended installation uses.** Whoever performs it — a
-person, a script, an agent — writes the compose file, brings the installation up,
-reads the secret and hands it over. The person who claims never has to be the
-person who installed, and never has to be at a browser within minutes of the
-container coming up.
+## What happens on a start that was told nothing
 
-## The claim window
+**It starts anyway, and says so.** An installation with no identity and no
+configuration naming one writes a line naming the three keys and goes on serving:
+ingestion needs no identity, and an installation receiving logs while somebody is
+still writing its compose file is doing something useful. Nothing can sign in
+until the keys are set and it is started again.
+
+**A value it will not accept stops the start**, the way a failed migration does —
+a token shorter than 32 characters, or an address that is not one. Nothing was
+written, and starting anyway would be an installation nobody can sign into
+carrying a variable that looks as though they could.
+
+## Upgrading an installation that had an operator
+
+An installation from before this version had one **operator**: a password, an
+optional second factor, and no address of any kind
+([ADR 0015](./adr/0015-the-operator-has-no-username-and-no-email.md)). The schema
+migration carries that account over to be the first administrator, keeping its id,
+its password, its second factor, its backup codes and its sessions. **Nobody is
+signed out and nobody resets anything.**
+
+The one thing it cannot bring is the address, because it never had one. So
+`Logaffe__Bootstrap__Email` is what supplies it, on the first start after the
+upgrade, and that start **refuses to run without it**. The alternative was a
+placeholder address in the database that somebody signs in with once and never
+changes, and this is the version that does not leave one behind.
+`Logaffe__Bootstrap__Administrator` is taken as their name if it is set, and the
+token is not read at all — that account already has a password.
+
+## The password is at least sixteen characters
+
+([ADR 0042](./adr/0042-the-password-carries-more-so-it-gets-longer.md)) — which
+is what it is worth on an account where it may be the only credential. It is
+hashed with Argon2id
+([ADR 0057](./adr/0057-a-users-secrets-are-stored-for-what-they-are-and-the-password-is-argon2id.md)),
+and an installation carried over from an older version rewrites each hash at the
+new algorithm on that account's next successful sign-in.
+
+**The second factor is not part of the exchange**
+([ADR 0041](./adr/0041-the-second-factor-is-offered-not-required.md)). Requiring
+it there would make the first act of a new installation depend on the person
+having an authenticator to hand at that minute. Every user enrols one afterwards,
+from their own settings, whenever they decide to, and the interface says the
+second factor is off for as long as it is. How that works is
+[Signing in and sessions](./sign-in.md).
+
+## Everybody after the first arrives by invitation
+
+An administrator invites an address, the person sets their own password from a
+one-time link, and they begin with an account and **no project access** until
+somebody gives them some
+([ADR 0055](./adr/0055-project-access-is-one-filter.md)). Recovering a forgotten
+password and changing an address work the same way. All three need mail, which is
+the one external dependency this product takes and is optional
+([ADR 0053](./adr/0053-transactional-email-is-an-optional-capability-of-the-installation.md)):
+an installation with no SMTP configured is healthy and complete in every other
+respect, and only those three acts refuse, saying why.
+
+### What a link is, and what it is not
+
+**Only its hash is kept.** The value in the link exists for the length of one
+request, the way a session secret and a backup code do — a store that could
+reproduce it would be a store that could take somebody's account without their
+password.
+
+**One live link per purpose per person.** Asking again issues a fresh one and
+stops the previous one working in the same transaction, so somebody whose first
+message went to spam holds two links and the newer one is the one that works.
+Two live links would be two chances for the older one to be found in a mailbox
+later.
+
+**It works once.** Redeeming spends it before anything about the account is
+touched, so two requests carrying one link cannot both win.
+
+**An invitation lasts seven days; a recovery and a change of address last an
+hour.** The first has to survive a weekend and a spam folder; the other two are
+answers to something somebody is doing right now.
+
+**Every way of a link not opening anything is one answer.** Used already,
+expired, replaced, for the wrong act, or never a link at all: the installation
+does not tell them apart, because the person holding a value it does not
+recognize has no business learning which.
+
+### The three, one at a time
+
+**An invitation** creates the account in the invited state — an address and no
+password — and the link sets the first one. Re-inviting sends a fresh link and
+stops the old one. An account that has already arrived cannot be re-invited: that
+would be a second way to set a password without being asked for the current one.
+
+**A recovery** never says whether an address exists. An address nobody holds, one
+belonging to somebody who was invited and never arrived, and one whose account
+has been deactivated all get the same sentence — *if there is an account at that
+address, a link is on its way* — because saying otherwise turns a public form
+into a way of asking who is here. Redeeming it **ends every session that account
+had**, everywhere: whoever is redeeming it is not signed in, so a session that
+survived would be the one this exists to end.
+
+**A change of address** asks for the password, sends the link to the **new**
+address — what it proves is that somebody reads mail there — and changes nothing
+until it is redeemed. Until then the old address is still the one that signs in,
+so a change that is never confirmed costs nothing. The new address is reserved
+while the change is live, against the people who hold one and against other
+outstanding changes: two people moving to one address would otherwise both be
+told yes.
+
+## Transactional mail
+
+Three acts send a message and nothing else does: an **invitation**, a **password
+recovery** and the confirmation of a **changed address**
+([ADR 0053](./adr/0053-transactional-email-is-an-optional-capability-of-the-installation.md)).
+An alert does not come through here — that is ntfy's, because the point of an
+alert is a push that reaches a phone ([Alerts](./alerts.md)).
 
 ```yaml
-Logaffe__Claim__Mode: window
+Logaffe__PublicUrl: "https://logs.example.com"     # what every link is built from
+Logaffe__Smtp__Host: "smtp.example.com"
+Logaffe__Smtp__Port: "587"                         # the default
+Logaffe__Smtp__Security: "starttls"                # the default; `tls` is port 465
+Logaffe__Smtp__Username: ""                        # with the password, or neither
+Logaffe__Smtp__Password: ""
+Logaffe__Smtp__From: "logaffe@example.com"
+Logaffe__Smtp__FromName: "logaffe"                 # the default
 ```
 
-In this mode there is no secret and **anyone who can reach the installation may
-claim it**, for a window that opens when the installation **first runs**, lasts
-**30 minutes**, and that **a restart does not extend**. The deadline belongs to
-the installation rather than to the process, so nobody gains anything by forcing
-a restart.
+**It is optional, and an installation without it is healthy.** It starts, it
+signs people in, it ingests, it serves the API and MCP, and it runs its alerts.
+Only the three acts above refuse, and they say that no mail is configured rather
+than failing obscurely. That is what makes it optional in fact and not just in
+name, and it is only affordable because the first administrator does not arrive
+by mail.
 
-Claiming is open here, and the cost of that is a race the operator can lose: an
-installation that is reachable before its operator gets to it can be claimed by
-whoever finds it first. The damage is bounded — an empty installation, no data to
-take, and the host command below takes it back — but it is a real window, and
-thirty minutes is what keeps it narrow.
+**It is configuration and not a second service.** There is no queue, no retry
+engine and no third production container. A delivery failure is returned to
+whoever asked for the message and written to logaffe's own log
+([ADR 0002](./adr/0002-logaffe-logs-to-files-not-into-itself.md)); retrying
+issues a fresh secret rather than resending the old one.
 
-Thirty minutes is deliberately short, and it is short because the way back is
-cheap. The alternative reading — make the window generous so nobody is locked
-out — buys convenience with exactly the exposure this product refuses elsewhere.
-It would also be aimed at the wrong threat: a fresh installation is not found by
-somebody scanning the whole internet on the off chance, it is found because a new
-hostname with a fresh certificate appears in the public **Certificate
-Transparency** logs within seconds of being issued, and those are watched. An
-installation reachable under its own name is discoverable almost immediately, so
-the window has to be measured against a person walking back to their desk, not
-against a scanner's patience.
+**Every link is built from `Logaffe__PublicUrl` and never from the `Host`
+header.** A link assembled from an inbound header is a link an attacker chooses,
+on a surface that is deliberately reachable by anyone. It is the same setting the
+alerts already use, so the two cannot disagree, and an installation that has not
+named an origin cannot configure mail at all.
 
-When the window lapses, claiming over the network is over. The installation says
-so plainly and names the host command that re-opens it, because an operator
-meeting this screen is already having a bad minute and does not need to search
-for the answer. The container log says the same thing on every start.
+**It is read at startup and a value it will not accept stops the start.** A
+half-set configuration — a username without a password, a host without an origin,
+a port that is not one — is the case worth catching: it looks configured in a
+file and sends nothing, and nobody finds out until somebody is waiting for an
+invitation. Two values are refused outside development for the same reason:
+`Security: none`, which sends credentials in the clear, and a `PublicUrl` that is
+not `https`.
 
-**This mode exists for the installation that cannot read a file or a container
-log** — a one-click host, a hosting panel, somebody else's Docker. It is the
-older of the two rather than the better one, and it is chosen deliberately.
+**Mailpit is the development answer** and belongs nowhere else. It is in
+`deploy/docker-compose.dev.yml`, its web interface is at
+<http://localhost:8025>, and `appsettings.Development.json` already points at it.
+The integration tests read the delivered message through its API.
 
-The instant the window hangs off lives **in the database**, which makes the first
-run the run that created the schema
-([ADR 0034](./adr/0034-the-claim-window-is-a-row-in-the-database.md)), and so does
-the hash of a drawn secret. One consequence is worth knowing in advance: an
-installation restored from a backup taken *before* it was claimed comes back with
-that old window, which has long since lapsed, and is opened again with the host
-command below. In secret mode the same restore behaves better — the hash travels
-in the database and the secret on the volume, so a backup holding both halves
-comes back claimable with the secret it always had.
+## After the exchange
 
-## The claim is one act
+What follows it is a **guide, not a stage**: it offers the second factor, then
+the first project with a copy-paste delivery pointed at this installation and the
+ingest token already in it. It can be skipped, it holds no state, and nothing is
+half-configured if it is abandoned — the account was complete the moment the
+exchange finished.
 
-The claim establishes a **password** and nothing else. It is a single request:
-the installation is unclaimed until it succeeds, a claim that is abandoned holds
-nothing, and there is no reservation, no lock and no half-claimed state to clean
-up ([ADR 0014](./adr/0014-the-claim-is-atomic-and-holds-nothing.md)). In window
-mode, two people racing both get to fill the screen in, and whoever sends it
-first has the installation while the other is refused against an installation
-that is no longer unclaimed.
-
-**The second factor is not part of it**
-([ADR 0041](./adr/0041-the-second-factor-is-offered-not-required.md)). It used to
-be — a TOTP enrolment and a sheet of backup codes, shown and confirmed before the
-claim completed — and requiring it there meant the first act of a new
-installation depended on the claimant having an authenticator to hand at that
-minute. An operator enrols one afterwards, from the settings, whenever they
-decide to, and the installation says the second factor is off for as long as it
-is. How that works is [Signing in and sessions](./sign-in.md).
-
-The password is at least sixteen characters
-([ADR 0042](./adr/0042-the-password-carries-more-so-it-gets-longer.md)), which is
-what it is worth on an installation where it may be the only credential.
-
-## The operator has no name and no address
-
-Sign-in is a password, and a second factor if one is enrolled. There is **no
-username**, because an installation has exactly one account and a name that
-identifies which of one is decoration. There is **no email address**, because the
-product sends no mail at all — no verification, no notification, no password
-reset — and storing an address that is never written to would be inviting the
-feature that reads it
-([ADR 0015](./adr/0015-the-operator-has-no-username-and-no-email.md)). The
-notifier an operator may configure for alerts is not a way round this: it is a
-topic on a push service, it belongs to the installation rather than to the
-account, and nothing about the account is ever sent to it.
-
-Consequently there is **no password reset over the network**. Forgetting the
-password has the same answer as losing the second factor and the backup codes
-with it: the host.
-
-## After the claim
-
-What follows the claim is a **guide, not a stage**: it offers the second factor,
-then the first project with a copy-paste delivery pointed at this installation
-and the ingest token already in it. It can be skipped, it holds no state, and
-nothing is half-configured if it is abandoned — the installation is fully claimed
-the moment the claim completed.
-
-The second factor comes first in it because that is the one thing on the list the
-operator cannot be reminded of by anything else later except the banner, and
-because it costs a phone that is already in their hand. Skipping it is a
-decision, not an oversight, and the interface keeps saying so.
+The second factor comes first in it because that is the one thing on the list
+nothing else reminds anybody of later except the banner, and because it costs a
+phone that is already in their hand. Skipping it is a decision, not an oversight,
+and the interface keeps saying so.
 
 The rest exists because `VISION.md` makes ingestion friction the adoption
 barrier, and the shortest path from a running installation to a log arriving is a
@@ -198,7 +254,7 @@ arrives with the package it needs.** The .NET packages are not published yet
 can install is worse than one that is honestly the plain path.
 
 **The guide does not offer a host**, and that is a decision rather than an
-omission. Its whole job is the shortest path from a claimed installation to a log
+omission. Its whole job is the shortest path from a running installation to a log
 arriving, which is the barrier `VISION.md` names; a step that asks the operator to
 name a machine and go paste a second command on it lengthens exactly the flow that
 exists to be short, in service of a screen that has nothing to draw until logs are
@@ -214,26 +270,31 @@ anything is reached on a Docker host:
 docker compose exec logaffe logaffe recover
 ```
 
-**It says what it does and waits to be told to do it.** Somebody reading the
-command name will expect the smaller thing — a password reset — so it prints
-what it removes and asks for the word `recover` before touching anything. A
-caller with no terminal passes `--yes`.
+**It says what it does and waits to be told to do it, and it now does more than
+its name suggests.** Somebody reading the command name will expect the smaller
+thing — a password reset — and this removes not one account but **every identity
+on the installation**: every user, and every agent token
+([ADR 0058](./adr/0058-host-recovery-removes-every-identity.md)). It prints what
+it removes and asks for the word `recover` before touching anything. A caller
+with no terminal passes `--yes`.
 
-It **returns the installation to unclaimed** and opens the way in again
-([ADR 0013](./adr/0013-host-recovery-returns-the-installation-to-unclaimed.md)),
-in whichever form that installation is configured for: it draws and prints a
-fresh claim secret, or it arms a fresh window. The secret is drawn rather than
-reused, because this is exactly the moment at which the installation's notion of
-who may claim it changes. That single operation covers every case `VISION.md`
-asks it to — an operator who forgot their password, one who lost their second
-factor and their backup codes with it, and an installation whose door closed
-before anyone came through it.
+There is deliberately no version that picks an account. A command on the host
+that can pick one is a command that can pick any one, and this path is
+unauthenticated by construction — its only guard is that whoever runs it has the
+machine.
 
-**Projects, hosts, ingest tokens, host tokens, log entries and samples are
-untouched.** Recovery replaces who the installation belongs to, not what it
+**The way back in afterwards is the bootstrap**: set the three keys and start the
+installation again. That makes recovery simpler than it used to be, because there
+is no secret to draw, no file to write and no window to arm and expire. The one
+operation covers every case `VISION.md` asks it to — somebody who forgot their
+password, somebody who lost their second factor and their backup codes with it,
+and an installation whose administrators are all gone.
+
+**Projects, groups, hosts, ingest tokens, host tokens, settings, log entries and
+samples are untouched.** Recovery removes the installation's people, not what it
 holds, and neither an application shipping logs through it nor a collector
-reporting to it notices. Existing sessions end, since the account they belong to
-no longer exists.
+reporting to it notices. Sessions, backup codes and project assignments go with
+the accounts they belong to.
 
 A host token survives for the reason an ingest token does: it writes and reads
 nothing ([Metrics](./metrics.md#the-host-token)), so it is not a credential that
@@ -260,31 +321,42 @@ one place a record of it can survive the reset it performs.
 
 ## Abuse protection on this surface
 
-The claim and the sign-in are public, pre-authentication and reachable by anyone,
-so they carry the rate limits `VISION.md` requires of every exposed endpoint. A
-presented claim secret is compared in constant time and behind those limits, like
-any other credential on a public surface. Failed sign-ins are throttled by their
-source and **never lock the account**, because with one account a lockout is a
-weapon pointed at its owner
-([ADR 0017](./adr/0017-a-wrong-password-never-locks-the-account.md)) — and that
-holds all the more on an installation whose operator enrolled no second factor,
-where the throttle is the whole of what stands in front of a guess.
+The bootstrap exchange and the sign-in are public, pre-authentication and
+reachable by anyone, so they carry the rate limits `VISION.md` requires of every
+exposed endpoint. A presented bootstrap token is compared in constant time and
+behind those limits, like any other credential on a public surface.
+
+Failed sign-ins are throttled **per account and per source** — five attempts in a
+rolling fifteen minutes against one address, twenty from one source
+([ADR 0056](./adr/0056-sign-in-is-throttled-per-account-and-per-source.md)). It is
+a throttle that drains on its own and never a lockout somebody has to lift: with
+several accounts the argument that a per-account limit is a weapon pointed at its
+owner no longer holds, and what replaces it is a clock rather than a refusal to
+count. An address nobody holds, a wrong password and a deactivated account are one
+refusal, in one wording and one time class.
 
 ## What is deliberately not here
 
-- **No setup secret that has to be fetched from somewhere.** The claim secret is
-  produced by the installation being installed, or set by the person installing
-  it; window mode needs none at all. Neither involves an account anywhere, a
-  licence, or a service to ask.
-- **No email, anywhere.** No verification, no reset link, no notification that a
-  claim happened. There is nothing to notify: the account that would be told is
-  the one being created. The installation can be given somewhere to send an alert
-  ([Alerts](./alerts.md)), and that changes nothing here — it is not mail, it is
-  never about the account, and nothing that happens to the claim, the password or
-  the second factor produces one.
-- **No second account, no invitation, no delegation.** Settled in `VISION.md`:
-  one operator, no user model.
-- **No account recovery over the network**, by any mechanism, for any reason.
-- **No re-claim while claimed.** An installation with an operator is not
-  claimable, and the only route back to unclaimed is the host. Neither claim
-  setting does anything on an installation that already has an operator.
+- **No setup secret that has to be fetched from somewhere.** The bootstrap token
+  is set by whoever installs, in the file they are already editing. It involves
+  no account anywhere, no licence, and no service to ask.
+- **No first-run screen, and no endpoint that says whether one would be
+  needed.** The bootstrap is a start, not a flow, and an installation does not
+  report how far along its setup is.
+- **No second bootstrap.** An installation that holds any identity ignores the
+  three keys, and the only route back to none is the host.
+- **No self-registration.** Nobody creates their own account: an administrator
+  invites an address, and that is the only way a second person exists
+  ([ADR 0052](./adr/0052-a-user-and-an-agent-are-one-identity.md)).
+- **No account recovery over the network without mail.** Password recovery is a
+  one-time link to an address, so an installation with no SMTP configured has the
+  host and nothing else — which is what it always had.
+- **No mail queue, no retry engine and no outbox.** A delivery failure is
+  returned to whoever asked for the message. Three kinds of message that a human
+  is waiting on do not earn a background worker
+  ([ADR 0053](./adr/0053-transactional-email-is-an-optional-capability-of-the-installation.md)).
+- **No mail that is not an identity transaction.** No alert, no digest, no
+  report, no notification that somebody signed in. What travels outward on its
+  own is a notification to ntfy, and it carries numbers and names
+  ([ADR 0049](./adr/0049-a-notification-carries-numbers-and-names-never-log-content.md)).
+- **No Mailpit in production**, and no third production container of any kind.

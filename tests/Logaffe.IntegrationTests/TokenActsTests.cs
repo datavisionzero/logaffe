@@ -2,6 +2,7 @@ using System.Text;
 using Logaffe.Application.Operations;
 using Logaffe.Application.Ports;
 using Logaffe.Domain.Projects;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
 using Logaffe.Infrastructure.Secrets;
@@ -65,7 +66,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
 
         await using (var context = ContextFor(installation))
         {
-            Assert.True(await new RevokeToken(new Tokens(context))
+            Assert.True(await new RevokeToken(new Tokens(context), Recording.Nobody())
                 .IngestTokenAsync(issued.Id, TestContext.Current.CancellationToken));
         }
 
@@ -83,7 +84,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
 
         await using (var context = ContextFor(installation))
         {
-            await new RevokeToken(new Tokens(context))
+            await new RevokeToken(new Tokens(context), Recording.Nobody())
                 .IngestTokenAsync(issued!.Id, TestContext.Current.CancellationToken);
         }
 
@@ -114,7 +115,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
 
         await using var reader = ContextFor(installation);
         var listed = await new ListIngestTokens(new Projects(reader), new Tokens(reader))
-            .ExecuteAsync(project, TestContext.Current.CancellationToken);
+            .ExecuteAsync(Reach.TheInstallation, project, TestContext.Current.CancellationToken);
 
         Assert.Equal([first!.Id, second.Id], listed!.Select(token => token.Id));
         Assert.Equal(
@@ -126,11 +127,14 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
     {
         var cipher = CipherOn(_volume);
         var installation = await InstallationAsync();
+        var owner = await AnOwnerIn(installation);
 
         IssuedToken issued;
         await using (var context = ContextFor(installation))
         {
-            issued = await new IssueAgentToken(new Tokens(context), cipher, At(Now)).ExecuteAsync(
+            issued = await new IssueAgentToken(
+                new Tokens(context), cipher, Recording.Nobody(), At(Now)).ExecuteAsync(
+                owner,
                 "claude-code",
                 AgentTokenKind.Reading,
                 mayDestroy: false,
@@ -139,8 +143,17 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
 
         await using (var context = ContextFor(installation))
         {
-            Assert.True(await new RenameAgentToken(new Tokens(context))
+            Assert.True(await new RenameAgentToken(
+                new Tokens(context), new Identities(context), Recording.Nobody())
                 .ExecuteAsync(issued.Id, "laptop", TestContext.Current.CancellationToken));
+
+            // The agent's own name moves with the label, because that is what a
+            // record of what it did reads as (ADR 0052).
+            var agent = Assert.IsType<Agent>(await new Identities(context).FindAsync(
+                (await new Tokens(context).FindAgentTokenAsync(
+                    issued.Id, TestContext.Current.CancellationToken))!.IdentityId,
+                TestContext.Current.CancellationToken));
+            Assert.Equal("laptop", agent.Name);
         }
 
         await using (var context = ContextFor(installation))
@@ -160,7 +173,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
 
         await using (var context = ContextFor(installation))
         {
-            Assert.True(await new RevokeToken(new Tokens(context))
+            Assert.True(await new RevokeToken(new Tokens(context), Recording.Nobody())
                 .AgentTokenAsync(issued.Id, TestContext.Current.CancellationToken));
         }
 
@@ -179,8 +192,9 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
 
         await using (var context = ContextFor(installation))
         {
-            Assert.True(await new DeleteProject(new Projects(context))
-                .ExecuteAsync(project, TestContext.Current.CancellationToken));
+            Assert.True(await new DeleteProject(new Projects(context), Recording.Nobody())
+                .ExecuteAsync(
+                    Reach.TheInstallation, project, TestContext.Current.CancellationToken));
         }
 
         // The project, its tokens and its visibility go at once (ADR 0019), and
@@ -224,9 +238,10 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
     {
         await using var context = ContextFor(connectionString);
         var issue = new IssueIngestToken(
-            new Projects(context), new Tokens(context), cipher, At(now));
+            new Projects(context), new Tokens(context), cipher, Recording.Nobody(), At(now));
 
-        return (await issue.ExecuteAsync(project, TestContext.Current.CancellationToken)).Token;
+        return (await issue.ExecuteAsync(
+            Reach.TheInstallation, project, TestContext.Current.CancellationToken)).Token;
     }
 
     private async Task<Guid?> DeliverAsync(
@@ -234,7 +249,11 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
     {
         await using var context = ContextFor(connectionString);
         var authenticate = new AuthenticateToken(
-            new Tokens(context), cipher, new DummySecret(cipher), At(Now));
+            new Tokens(context),
+            new Identities(context),
+            cipher,
+            new DummySecret(cipher),
+            At(Now));
 
         return await authenticate.AdmittedProjectAsync(
             $"Bearer {presented.Text}", TestContext.Current.CancellationToken);
@@ -252,4 +271,19 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
     {
         public override DateTimeOffset GetUtcNow() => now;
     }
+    /// <summary>
+    /// An active user for an agent token to belong to (ADR 0052).
+    /// </summary>
+    private static async Task<User> AnOwnerIn(string connectionString)
+    {
+        await using var context = ContextFor(connectionString);
+
+        var owner = User.Bootstrap("The Administrator", "somebody@example.com", Now);
+        owner.ActivateWith("$argon2id$v=19$m=19456,t=2,p=1$not-a-real-hash");
+
+        await new Identities(context).TryAddAsync(owner, TestContext.Current.CancellationToken);
+
+        return owner;
+    }
+
 }

@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Projects;
 using Logaffe.Domain.Queries;
 
 namespace Logaffe.Application.Operations;
@@ -40,6 +41,7 @@ public sealed class CountEntries(IProjects projects, IEntryReader entries)
     /// The range asks for a period that does not exist.
     /// </exception>
     public async Task<Read<IReadOnlyList<CountedGroup>>?> ExecuteAsync(
+        Reach reach,
         Guid projectId,
         EntryFilters filters,
         Grouping grouping,
@@ -51,7 +53,7 @@ public sealed class CountEntries(IProjects projects, IEntryReader entries)
             throw new ArgumentException("A time range ends after it starts.", nameof(filters));
         }
 
-        var project = await projects.FindAsync(projectId, cancellationToken);
+        var project = await projects.FindAsync(reach, projectId, cancellationToken);
         if (project is null)
         {
             return null;

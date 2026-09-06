@@ -20,6 +20,22 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
   </ItemGroup>
 
+  <ItemGroup Label="Mail">
+    <!-- Transactional mail, which is the one external dependency this product
+         takes (ADR 0053). .NET's own SmtpClient is obsolete and does not speak
+         STARTTLS the way a modern provider expects; MailKit is what planaffe
+         sends with, at the same version. -->
+    <PackageVersion Include="MailKit" Version="4.17.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="Security">
+    <!-- Argon2id, which .NET 10 does not carry in any of its libraries
+         (ADR 0057). It is the same package at the same version planaffe and
+         vaultaffe take, which is half of why taking it here stopped being a
+         first. -->
+    <PackageVersion Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
+  </ItemGroup>
+
   <ItemGroup Label="Api">
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="10.0.10" />
     <!-- Pinned above what Microsoft.AspNetCore.OpenApi asks for: its 2.0.0 is
@@ -79,6 +95,10 @@
     <!-- … and the binder itself. -->
     <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
+    <!-- Mailpit, for the tests that read a delivered message back (ADR 0053).
+         The base package rather than a module: there is no Testcontainers.Mailpit,
+         and what this needs is a container with two ports. -->
+    <PackageVersion Include="Testcontainers" Version="4.13.0" />
 
     <!-- Nothing here calls SSH.NET. It arrives under Testcontainers, and
          GHSA-q939-rpr3-3284 made 2025.1.0 — the version Testcontainers 4.13.0

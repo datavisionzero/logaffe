@@ -1,5 +1,9 @@
 # The Claim Window Is a Row in the Database
 
+**Superseded by
+[ADR 0054](./0054-the-first-administrator-comes-from-the-environment.md).** There
+is no claim window, because there is no claim.
+
 The window is one of the two ways a claim is guarded and no longer the only one
 ([ADR 0040](./0040-the-claim-is-guarded-by-a-secret-or-by-a-window.md)). Where it
 lives is decided here, and the hash of a drawn claim secret lives in the same

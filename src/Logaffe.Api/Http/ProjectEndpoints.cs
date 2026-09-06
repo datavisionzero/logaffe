@@ -159,6 +159,7 @@ public static class ProjectEndpoints
         operatorSurface.MapPost(string.Empty, async (
                 CreateProjectRequest request,
                 CreateProject create,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!IsAName(request.Name))
@@ -171,8 +172,15 @@ public static class ProjectEndpoints
                     return NotAWindow();
                 }
 
+                // Created by the person making the request, who reaches it from
+                // that moment (ADR 0055) — the alternative is a project its
+                // creator cannot open.
                 var created = await create.ExecuteAsync(
-                    request.Name!, retention, request.GroupId, cancellationToken);
+                    context.CurrentUser().Id,
+                    request.Name!,
+                    retention,
+                    request.GroupId,
+                    cancellationToken);
 
                 // Two projects called `api` is a trap for the operator reaching
                 // for one of them at three in the morning. The name is theirs to
@@ -197,9 +205,10 @@ public static class ProjectEndpoints
 
         operatorSurface.MapGet(string.Empty, async (
                 ListProjects list,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                var held = await list.ExecuteAsync(cancellationToken);
+                var held = await list.ExecuteAsync(context.Reach(), cancellationToken);
 
                 // No count of entries beside a project. That is a query over the
                 // largest table in the database for a number nobody asked for,
@@ -225,9 +234,10 @@ public static class ProjectEndpoints
         operatorSurface.MapGet("/{id:guid}", async (
                 Guid id,
                 ReadProject read,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                var project = await read.ExecuteAsync(id, cancellationToken);
+                var project = await read.ExecuteAsync(context.Reach(), id, cancellationToken);
 
                 return project is null ? Results.NotFound() : Results.Ok(Shown(project));
             })
@@ -240,6 +250,7 @@ public static class ProjectEndpoints
                 Guid id,
                 RenameProjectRequest request,
                 RenameProject rename,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!IsAName(request.Name))
@@ -250,7 +261,8 @@ public static class ProjectEndpoints
                 // A rename moves nothing: entries, tokens and queries are
                 // attached to the identity, so no sender notices and nothing has
                 // to be redeployed.
-                return await rename.ExecuteAsync(id, request.Name!, cancellationToken) switch
+                return await rename.ExecuteAsync(
+                    context.Reach(), id, request.Name!, cancellationToken) switch
                 {
                     RenameOutcome.Renamed => Results.NoContent(),
                     RenameOutcome.NameTaken => Results.Conflict(),
@@ -268,13 +280,15 @@ public static class ProjectEndpoints
                 Guid id,
                 ProjectGroupRequest request,
                 MoveProjectToGroup move,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
                 // A move changes the heading the project is listed under and
                 // nothing else: entries, tokens and queries are attached to the
                 // identity, so no sender notices. A name already taken where it
                 // is going is refused rather than resolved — renaming a project
                 // the operator did not ask to rename is not this route's to do.
-                await move.ExecuteAsync(id, request.GroupId, cancellationToken) switch
+                await move.ExecuteAsync(
+                    context.Reach(), id, request.GroupId, cancellationToken) switch
                 {
                     MoveProjectOutcome.Moved => Results.NoContent(),
                     MoveProjectOutcome.NameTaken => Results.Conflict(),
@@ -290,6 +304,7 @@ public static class ProjectEndpoints
                 Guid id,
                 ProjectHostRequest request,
                 PutProjectOnHost put,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
                 // It moves nothing: entries, tokens and queries are attached to
                 // the identity, so no sender notices and nothing is redeployed.
@@ -301,7 +316,8 @@ public static class ProjectEndpoints
                 // group — two projects called `api` may perfectly well run on one
                 // machine, because the host is not where they are listed and not
                 // a scope they are found in (`docs/metrics.md`).
-                await put.ExecuteAsync(id, request.HostId, cancellationToken) switch
+                await put.ExecuteAsync(
+                    context.Reach(), id, request.HostId, cancellationToken) switch
                 {
                     PutProjectOnHostOutcome.PutOn => Results.NoContent(),
                     _ => Results.NotFound(),
@@ -315,6 +331,7 @@ public static class ProjectEndpoints
                 Guid id,
                 ProjectMuteRequest request,
                 MuteAProject mute,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
                 // It changes what is evaluated and nothing else. What a muted
                 // project receives, keeps and answers is exactly what it was:
@@ -325,7 +342,8 @@ public static class ProjectEndpoints
                 // switch and the mute are the whole of what is adjustable about
                 // alerting (ADR 0050), and a mute per condition would be the
                 // beginning of what that decision refuses.
-                await mute.ExecuteAsync(id, request.Muted, cancellationToken) switch
+                await mute.ExecuteAsync(
+                    context.Reach(), id, request.Muted, cancellationToken) switch
                 {
                     MuteAProjectOutcome.Muted => Results.NoContent(),
                     _ => Results.NotFound(),
@@ -339,6 +357,7 @@ public static class ProjectEndpoints
                 Guid id,
                 int retentionDays,
                 CountEntriesOutsideWindow count,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 // Refused where every other window is. There is no answering
@@ -349,7 +368,8 @@ public static class ProjectEndpoints
                     return NotAWindow();
                 }
 
-                var outside = await count.ExecuteAsync(id, proposed, cancellationToken);
+                var outside = await count.ExecuteAsync(
+                    context.Reach(), id, proposed, cancellationToken);
 
                 return outside is null
                     ? Results.NotFound()
@@ -365,6 +385,7 @@ public static class ProjectEndpoints
                 Guid id,
                 int retentionDays,
                 ReadTheFootprint footprint,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 // Refused where every other window is, for the reason the count
@@ -379,7 +400,8 @@ public static class ProjectEndpoints
                 // call for the size of the store, a handful of tally rows, and
                 // the newest report of one host. Nothing here grows with the
                 // entries (ADR 0048).
-                var cost = await footprint.OfProjectAsync(id, proposed, cancellationToken);
+                var cost = await footprint.OfProjectAsync(
+                    context.Reach(), id, proposed, cancellationToken);
 
                 return cost is null
                     ? Results.NotFound()
@@ -395,6 +417,7 @@ public static class ProjectEndpoints
                 Guid id,
                 RetentionWindowRequest request,
                 ChangeRetentionWindow change,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!RetentionWindow.TryOfDays(request.RetentionDays, out var retention))
@@ -407,7 +430,7 @@ public static class ProjectEndpoints
                 // its own rather than a flag on this one: the warning is a
                 // screen in front of this act, and this stays a write with no
                 // reading behaviour in it.
-                return await change.ExecuteAsync(id, retention, cancellationToken)
+                return await change.ExecuteAsync(context.Reach(), id, retention, cancellationToken)
                     ? Results.NoContent()
                     : Results.NotFound();
             })
@@ -420,12 +443,13 @@ public static class ProjectEndpoints
         operatorSurface.MapDelete("/{id:guid}", async (
                 Guid id,
                 DeleteProject delete,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
                 // Immediate and irreversible: the project, its tokens and its
                 // visibility go at once, and its entries follow in the
                 // background (ADR 0019). A project already gone is 404, which is
                 // a second click or another tab and not a failure.
-                await delete.ExecuteAsync(id, cancellationToken)
+                await delete.ExecuteAsync(context.Reach(), id, cancellationToken)
                     ? Results.NoContent()
                     : Results.NotFound())
             .WithName("DeleteProject")

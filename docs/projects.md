@@ -25,9 +25,10 @@ attached to — never the name.
 
 Projects are **created explicitly by the operator**. There is no implicit
 creation on first delivery, so a token that names nothing admits nothing, and an
-installation's project list is exactly what the operator put there. The first
-project usually comes from the first-run guide after the claim
-([Setup](./setup.md)).
+installation's project list is exactly what somebody put there. The first
+project usually comes from the first-run guide that follows the bootstrap
+exchange ([Setup](./setup.md)). Whoever creates one holds access to it from that
+moment ([ADR 0055](./adr/0055-project-access-is-one-filter.md)).
 
 There is no cap on how many an installation holds. `VISION.md` expects on the
 order of 10 to 30, and that is a statement about the shape of the product rather
@@ -259,14 +260,54 @@ removed afterwards, in the background
 Senders holding its token get `401` from their next delivery and carry on writing
 locally, exactly as they would through a botched rotation.
 
-## Projects belong to the operator alone
+## Who reaches a project
+
+**A project is assigned to people, and a project nobody assigned you does not
+exist for you** ([ADR 0055](./adr/0055-project-access-is-one-filter.md)). It is
+absent from your list rather than present and refused, and asking for it by
+identity answers the way asking for a project that was never created answers — a
+refusal that told the two apart would be a probe for what else the installation
+holds.
+
+**Whoever creates one reaches it**, from the same act. The alternative is a
+project its creator cannot open.
+
+**A new account reaches nothing.** An invitation grants an account, not a view.
+The two directions are deliberately asymmetric: an upgrade must lose nobody — the
+migration that introduced this assigned every project to every user that existed
+— and a new account must gain nothing by default.
+
+**An administrator hands the assignments out and does not thereby hold them.**
+The role is about running the installation, not about looking into it: an
+administrator who wants to read a project assigns it to themselves, which is an
+act that leaves a record, rather than holding a capability that is invisible
+because it was never used. What the role does see is the list of project
+*names*, because that is what handing out an assignment needs.
+
+**An agent reaches exactly what its owner reaches**
+([ADR 0052](./adr/0052-a-user-and-an-agent-are-one-identity.md)), resolved on
+every call rather than copied when its token was issued — so an assignment taken
+away is taken away from the agent in the same moment.
+
+**A name is taken across the installation**, whoever can see it. A project you
+cannot open still holds its name, and creating a second one under it is refused
+with a sentence rather than by the unique index.
+
+## Administering a project
 
 Creating, renaming, deleting a project, issuing, rotating or revoking a token,
-and everything there is to do to a group, are **operator acts**. An agent reaches
-them only on a token the operator issued for exactly that, and such a token reads
-no entry at all — it is a different credential from the one their reading agent
-holds, not the same one with more turned on
+and everything there is to do to a group, are **acts behind a session or an
+administering agent token**. An agent reaches them only on a token issued for
+exactly that, and such a token reads no entry at all — it is a different
+credential from the one a reading agent holds, not the same one with more turned
+on
 ([ADR 0046](./adr/0046-administration-is-reachable-on-a-token-that-reads-no-entries.md)).
+
+**Everything on that surface narrows to the caller's projects as well.**
+Renaming, retention, muting and the ingest tokens are a project's own settings,
+so they are reachable by whoever reaches the project. What is *not* a project's —
+groups, hosts and the installation's sample window — is an administrator's, and
+an agent reaches those only while the person it acts for is one.
 
 **The agent that reads entries reaches none of it.** It cannot bring a project
 into existence, end one, mint a credential, or move a project from one group to
@@ -281,12 +322,27 @@ administering token makes neither unless it was issued to
 not: it stops a sender delivering, and nothing that is already stored is gone.
 
 **An agent token is never issued over MCP**, on any token — an agent that could
-mint one would hand itself what the operator withheld — and neither are the
-operator's own credentials or their sessions.
+mint one would hand itself what its owner withheld — and neither are anybody's
+credentials or their sessions.
+
+**Every one of these acts is written down.** *Who deleted `orders-api`* and *who
+rotated that ingest token* are the two questions a shared installation actually
+gets asked — the first destroys entries, the second brings a sender silently to a
+halt — and both are answered on the installation's own history screen, whichever
+door the act came through ([The Web UI](./ui.md#history)). What is recorded is
+the act and not the data: nothing about a log entry ever appears there, because
+an entry is written once and never altered.
 
 ## What is deliberately not here
 
 - **No implicit project creation.** Settled in `VISION.md`.
+- **No permission on a project beyond reaching it.** An assignment is a yes or a
+  no: there is no read-only assignment, no per-project role, and no permission on
+  an individual entry. Somebody who reaches a project works its settings
+  ([ADR 0055](./adr/0055-project-access-is-one-filter.md)).
+- **No group assigned to anybody.** A group is a name and holds nothing, so it
+  holds no access either: what is assigned is a project, and a group somebody
+  sees is one their projects are listed under.
 - **No per-sender tokens.** Covered above.
 - **No ingest token that reads.** An ingest token writes to its project and does
   nothing else. Reading is a person with a session or an agent with an agent

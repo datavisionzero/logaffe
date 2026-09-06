@@ -1,5 +1,13 @@
 # Each Operator Secret Is Stored for What It Is
 
+**Superseded by
+[ADR 0057](./0057-a-users-secrets-are-stored-for-what-they-are-and-the-password-is-argon2id.md).**
+Both halves fall: its subject was *the operator*, who no longer exists
+([ADR 0052](./0052-a-user-and-an-agent-are-one-identity.md)), and its choice of
+PBKDF2 over Argon2id is reversed. The reasoning below for storing three secrets
+three ways is carried over unchanged; the reasoning for the hasher is answered
+where it was made, which is here.
+
 The operator carries three secrets and each is stored differently. The
 **password** is hashed slowly, with ASP.NET Core's `PasswordHasher<T>` —
 PBKDF2-HMAC-SHA512 — and rehashed at the current cost whenever a sign-in

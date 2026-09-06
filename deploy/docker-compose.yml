@@ -2,7 +2,9 @@
 # `docker compose up`: migrations apply themselves on startup, and there is no
 # separate step and no sequence to follow between versions.
 #
-# Set POSTGRES_PASSWORD in a .env file beside this one before the first start.
+# Set POSTGRES_PASSWORD and the three LOGAFFE_BOOTSTRAP_* values in a .env file
+# beside this one before the first start. The first start is the only one that
+# reads them.
 
 name: logaffe
 
@@ -16,16 +18,18 @@ services:
     environment:
       ConnectionStrings__Postgres: >-
         Host=db;Port=5432;Database=logaffe;Username=logaffe;Password=${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
-      # How the claim is guarded until somebody makes it (docs/setup.md).
-      # `secret` is the default: nobody can claim the installation without the
-      # claim secret, and there is no deadline. Leave LOGAFFE_CLAIM_SECRET unset
-      # and the installation draws one on its first start, writes it to
-      # /var/lib/logaffe/claim-secret.txt on the volume and logs it once.
-      # `window` is the other way: no secret, and anyone who reaches the
-      # installation may claim it for 30 minutes after its first run. It is for
-      # the host where reading that file or that log is not on offer.
-      Logaffe__Claim__Mode: "${LOGAFFE_CLAIM_MODE:-secret}"
-      Logaffe__Claim__Secret: "${LOGAFFE_CLAIM_SECRET:-}"
+      # The first administrator, created on the one start where this
+      # installation holds no identity (docs/setup.md). The token is exchanged
+      # once in the browser for a password — a password here would be a password
+      # in your shell history and in `docker inspect` — and it has to be at
+      # least 32 characters, so draw it rather than think of it:
+      #
+      #   openssl rand -base64 32
+      #
+      # From the second start these three are ignored, whatever they say.
+      Logaffe__Bootstrap__Administrator: "${LOGAFFE_BOOTSTRAP_ADMIN:-}"
+      Logaffe__Bootstrap__Email: "${LOGAFFE_BOOTSTRAP_EMAIL:-}"
+      Logaffe__Bootstrap__Token: "${LOGAFFE_BOOTSTRAP_TOKEN:-}"
       # An installation reached through a reverse proxy names it here, as
       # addresses or CIDR ranges, so that the address a request is throttled by
       # and listed under is the caller's rather than the proxy's. Unset means
@@ -33,13 +37,30 @@ services:
       # an installation reached directly: the header is written by whoever sent
       # the request.
       Logaffe__TrustedProxies: "${LOGAFFE_TRUSTED_PROXIES:-}"
-      # The address this installation is reached at, used for one thing only:
-      # the link an alert carries (docs/alerts.md). Everywhere else the address
-      # comes free from the forwarded headers, because everywhere else there is
-      # a request to read them from — an alert is composed on the hour with
-      # nobody on the other end. Unset means an alert goes without a link
-      # rather than with a wrong one.
+      # The address this installation is reached at. It is used for the two
+      # things composed with nobody on the other end of a request: the link an
+      # alert carries (docs/alerts.md) and every link in a message this
+      # installation sends (docs/setup.md). Never taken from an incoming Host
+      # header — that is a link an attacker would choose. Unset means an alert
+      # goes without a link rather than with a wrong one, and mail cannot be
+      # configured at all.
       Logaffe__PublicUrl: "${LOGAFFE_PUBLIC_URL:-}"
+      # Transactional mail: invitations, password recovery and address changes,
+      # and nothing else (docs/setup.md). It is optional — an installation
+      # without it is healthy, and only those three acts refuse — and it is
+      # configuration rather than a second container: there is no queue and
+      # nothing retries.
+      #
+      # `starttls` is the default and is what port 587 means; `tls` is port 465.
+      # Leave the username and password unset for a relay that takes mail from
+      # its own network without authenticating.
+      Logaffe__Smtp__Host: "${LOGAFFE_SMTP_HOST:-}"
+      Logaffe__Smtp__Port: "${LOGAFFE_SMTP_PORT:-}"
+      Logaffe__Smtp__Security: "${LOGAFFE_SMTP_SECURITY:-}"
+      Logaffe__Smtp__Username: "${LOGAFFE_SMTP_USERNAME:-}"
+      Logaffe__Smtp__Password: "${LOGAFFE_SMTP_PASSWORD:-}"
+      Logaffe__Smtp__From: "${LOGAFFE_SMTP_FROM:-}"
+      Logaffe__Smtp__FromName: "${LOGAFFE_SMTP_FROM_NAME:-}"
     volumes:
       # Both stores are needed, and a database alone is not a backup: the key
       # that makes stored tokens readable lives here.

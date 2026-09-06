@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 
 namespace Logaffe.Application.Operations;
 
@@ -20,7 +21,7 @@ namespace Logaffe.Application.Operations;
 /// reading, and the screen says it before asking.
 /// </para>
 /// </remarks>
-public sealed class DeleteGroup(IGroups groups)
+public sealed class DeleteGroup(IGroups groups, RecordAChange record)
 {
     /// <summary>
     /// Whether there was a group to remove. <c>false</c> is one already gone — a
@@ -34,7 +35,12 @@ public sealed class DeleteGroup(IGroups groups)
             return false;
         }
 
+        var name = group.Name;
+
         await groups.RemoveAsync(group, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.Group, group.Id, name, Act.Removed, cancellationToken);
+
         return true;
     }
 }

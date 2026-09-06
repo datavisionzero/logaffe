@@ -110,5 +110,11 @@ public sealed class AgentTokenTests
         bool mayDestroy = false,
         TokenIdentifier? identifier = null) =>
         AgentToken.Issue(
-            name, kind, mayDestroy, identifier ?? TokenIdentifier.Mint(), Ciphertext, Now);
+            Guid.CreateVersion7(),
+            name,
+            kind,
+            mayDestroy,
+            identifier ?? TokenIdentifier.Mint(),
+            Ciphertext,
+            Now);
 }

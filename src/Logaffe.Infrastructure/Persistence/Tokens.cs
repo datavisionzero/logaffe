@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Tokens;
 using Microsoft.EntityFrameworkCore;
 
@@ -118,9 +119,14 @@ public sealed class Tokens(LogaffeDbContext context) : ITokens
         await context.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task AddAsync(AgentToken token, CancellationToken cancellationToken)
+    public async Task AddAsync(
+        Agent agent, AgentToken token, CancellationToken cancellationToken)
     {
+        // One SaveChanges, which is one transaction: a token never names an
+        // agent that was not written (ADR 0052).
+        context.Identities.Add(agent);
         context.AgentTokens.Add(token);
+
         await context.SaveChangesAsync(cancellationToken);
     }
 

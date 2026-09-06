@@ -1,4 +1,4 @@
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.UnitTests.Domain;
 

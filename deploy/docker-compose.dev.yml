@@ -1,5 +1,5 @@
-# Postgres for working on logaffe, and nothing else. The two toolchains run side
-# by side in development — `dotnet run` in src/Logaffe.Api and `npm run dev` in
+# Postgres and Mailpit for working on logaffe. The two toolchains run side by
+# side in development — `dotnet run` in src/Logaffe.Api and `npm run dev` in
 # src/web — so this file brings up only what neither of them can be.
 #
 #   docker compose -f deploy/docker-compose.dev.yml up -d
@@ -43,6 +43,28 @@ services:
       - track_io_timing=on
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U logaffe -d logaffe"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  # Somewhere for the three transactional messages to go while working on them,
+  # and what the integration tests read the delivered message out of
+  # (ADR 0053). It belongs here and never in the production topology: there is
+  # no third production container, and this one takes mail in the clear.
+  #
+  # The web interface is at http://localhost:8025; appsettings.Development.json
+  # points the installation at 1025.
+  mail:
+    image: axllent/mailpit:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+    environment:
+      MP_MAX_MESSAGES: 500
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
       interval: 3s
       timeout: 3s
       retries: 20

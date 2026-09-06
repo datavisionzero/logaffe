@@ -42,8 +42,14 @@ public static class GroupAdministration
         CreateGroup create,
         [Description("What to call it. Group names are unique across the installation.")]
         string name,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default)
     {
+        if (!agent.Administers)
+        {
+            throw Refused.NotAnAdministrator("Managing groups");
+        }
+
         var wanted = Given.AName(name, Group.NameMaxLength);
 
         return await create.ExecuteAsync(wanted, cancellationToken) is { } group
@@ -70,8 +76,14 @@ public static class GroupAdministration
         Guid groupId,
         [Description("What it should be called instead.")]
         string name,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default)
     {
+        if (!agent.Administers)
+        {
+            throw Refused.NotAnAdministrator("Managing groups");
+        }
+
         var wanted = Given.AName(name, Group.NameMaxLength);
 
         return await rename.ExecuteAsync(groupId, wanted, cancellationToken) switch
@@ -102,8 +114,14 @@ public static class GroupAdministration
         ListGroups groups,
         [Description("The group to remove, as get_settings gives it.")]
         Guid groupId,
+        TheCallingAgent agent = null!,
         CancellationToken cancellationToken = default)
     {
+        if (!agent.Administers)
+        {
+            throw Refused.NotAnAdministrator("Managing groups");
+        }
+
         // Read before the removal, because afterwards nothing can say what the
         // group was called — and because it is the same read that decides
         // whether there was one to remove at all.

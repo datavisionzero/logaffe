@@ -15,6 +15,7 @@ namespace Logaffe.Application.Operations;
 public sealed class ReadProject(IProjects projects)
 {
     /// <summary>The project, or <c>null</c> when there is no such project.</summary>
-    public Task<Project?> ExecuteAsync(Guid id, CancellationToken cancellationToken) =>
-        projects.FindAsync(id, cancellationToken);
+    public Task<Project?> ExecuteAsync(
+        Reach reach, Guid id, CancellationToken cancellationToken) =>
+        projects.FindAsync(reach, id, cancellationToken);
 }

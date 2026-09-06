@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 
 namespace Logaffe.Application.Operations;
@@ -44,9 +45,9 @@ public sealed class ListIngestTokens(IProjects projects, ITokens tokens)
     /// the settings of something deleted.
     /// </remarks>
     public async Task<IReadOnlyList<ListedIngestToken>?> ExecuteAsync(
-        Guid projectId, CancellationToken cancellationToken)
+        Reach reach, Guid projectId, CancellationToken cancellationToken)
     {
-        if (await projects.FindAsync(projectId, cancellationToken) is null)
+        if (await projects.FindAsync(reach, projectId, cancellationToken) is null)
         {
             return null;
         }
@@ -74,13 +75,19 @@ public sealed class ListIngestTokens(IProjects projects, ITokens tokens)
     /// </para>
     /// </remarks>
     public async Task<IReadOnlyDictionary<Guid, IReadOnlyList<ListedIngestToken>>> ExecuteAsync(
-        CancellationToken cancellationToken)
+        Reach reach, CancellationToken cancellationToken)
     {
         var held = await tokens.ListIngestTokensAsync(cancellationToken);
 
-        return held.ToDictionary(
-            project => project.Key,
-            IReadOnlyList<ListedIngestToken> (project) => [.. project.Value.Select(Listed)]);
+        // Narrowed here rather than in the store, because the store is keyed by
+        // the project and the reach is the set of keys that may appear: a token
+        // of a project out of reach is a token of a project that does not exist
+        // (ADR 0055).
+        return held
+            .Where(project => reach.Includes(project.Key))
+            .ToDictionary(
+                project => project.Key,
+                IReadOnlyList<ListedIngestToken> (project) => [.. project.Value.Select(Listed)]);
     }
 
     private static ListedIngestToken Listed(HeldToken token) =>

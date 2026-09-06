@@ -1,5 +1,5 @@
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.Application.Operations;
 
@@ -61,7 +61,7 @@ public enum TurningOffOutcome
 /// </para>
 /// </remarks>
 public sealed class TurnOffTheSecondFactor(
-    IOperators operators,
+    IIdentities identities,
     ISessions sessions,
     IPasswordHasher hasher,
     ISecondFactor secondFactor,
@@ -72,19 +72,19 @@ public sealed class TurnOffTheSecondFactor(
     /// The session making the request, which is the one that survives.
     /// </param>
     public async Task<TurningOffOutcome> ExecuteAsync(
+        User user,
         string? password,
         string? secondFactorCode,
         string? backupCode,
         Session keeping,
         CancellationToken cancellationToken)
     {
-        var theOperator = await operators.FindAsync(cancellationToken);
-        if (theOperator is null || !Password.TryRead(password, out var presented))
+        if (!Password.TryRead(password, out var presented))
         {
             return TurningOffOutcome.PasswordRefused;
         }
 
-        if (!theOperator.HasSecondFactor)
+        if (!user.HasSecondFactor)
         {
             return TurningOffOutcome.NoSecondFactor;
         }
@@ -92,20 +92,24 @@ public sealed class TurnOffTheSecondFactor(
         var now = clock.GetUtcNow();
 
         if (!await ProvesTheSecondFactorAsync(
-            theOperator, secondFactorCode, backupCode, now, cancellationToken))
+            user, secondFactorCode, backupCode, now, cancellationToken))
         {
             return TurningOffOutcome.SecondFactorRefused;
         }
 
-        if (hasher.Verify(theOperator.PasswordHash, presented) is PasswordCheck.Wrong)
+        // An account with no password at all is one that was invited and never
+        // arrived. It cannot be behind this session, so this is a guard rather
+        // than a case, and it refuses the way a wrong password refuses.
+        if (user.PasswordHash is null
+            || hasher.Verify(user.PasswordHash, presented) is PasswordCheck.Wrong)
         {
             return TurningOffOutcome.PasswordRefused;
         }
 
-        theOperator.RemoveSecondFactor();
-        await operators.RecordAsync(theOperator, cancellationToken);
+        user.RemoveSecondFactor();
+        await identities.RecordAsync(user, cancellationToken);
 
-        await operators.ReplaceBackupCodesAsync([], cancellationToken);
+        await identities.ReplaceBackupCodesAsync(user.Id, [], cancellationToken);
         await sessions.RemoveEveryOtherAsync(keeping, cancellationToken);
 
         return TurningOffOutcome.TurnedOff;
@@ -113,7 +117,7 @@ public sealed class TurnOffTheSecondFactor(
 
     /// <inheritdoc cref="EnrolTheSecondFactor"/>
     private async Task<bool> ProvesTheSecondFactorAsync(
-        Operator theOperator,
+        User user,
         string? secondFactorCode,
         string? backupCode,
         DateTimeOffset now,
@@ -122,7 +126,7 @@ public sealed class TurnOffTheSecondFactor(
         if (secondFactorCode is not null)
         {
             return secondFactor.Verifies(
-                cipher.Decrypt(theOperator.EncryptedSecondFactorSecret!),
+                cipher.Decrypt(user.EncryptedSecondFactorSecret!),
                 secondFactorCode,
                 now);
         }
@@ -132,7 +136,7 @@ public sealed class TurnOffTheSecondFactor(
             return false;
         }
 
-        var codes = await operators.ListBackupCodesAsync(cancellationToken);
+        var codes = await identities.ListBackupCodesAsync(user.Id, cancellationToken);
 
         BackupCode? matched = null;
         foreach (var code in codes)

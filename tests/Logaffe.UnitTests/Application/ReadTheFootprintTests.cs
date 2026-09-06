@@ -289,7 +289,7 @@ public sealed class ReadTheFootprintTests
             TestContext.Current.CancellationToken);
 
     private async Task<Footprint?> OfProject(Guid id, int days) =>
-        await Act().OfProjectAsync(
+        await Act().OfProjectAsync(Reach.TheInstallation, 
             id, RetentionWindow.OfDays(days), TestContext.Current.CancellationToken);
 
     private ReadTheFootprint Act() => new(

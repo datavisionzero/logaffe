@@ -330,6 +330,7 @@ public sealed class GroupEndpointTests(PostgresFixture postgres) : IAsyncLifetim
             "/sign-in",
             new
             {
+                email = ABootstrappedInstallation.TheirAddress,
                 password = TheirPassword,
                 secondFactorCode = Authenticator.CodeFor(_secondFactorSecret),
             },
@@ -349,7 +350,7 @@ public sealed class GroupEndpointTests(PostgresFixture postgres) : IAsyncLifetim
     /// </summary>
     private async Task ClaimAsync()
     {
-        var enrolled = await AClaimedInstallation.ClaimAsync(_installation, _volume);
+        var enrolled = await ABootstrappedInstallation.SignInAsync(_installation);
 
         _secondFactorSecret = enrolled.SecondFactorSecret;
     }

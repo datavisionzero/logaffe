@@ -194,9 +194,10 @@ public static class AlertEndpoints
         operatorSurface.MapGet(string.Empty, async (
                 ReadTheAlertSettings read,
                 ReadTheNotifier notifier,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                var settings = await read.ExecuteAsync(cancellationToken);
+                var settings = await read.ExecuteAsync(context.Reach(), cancellationToken);
                 var where = await notifier.ExecuteAsync(cancellationToken);
 
                 return Results.Ok(Shown(settings, where));
@@ -208,6 +209,7 @@ public static class AlertEndpoints
         operatorSurface.MapPut("/switches", async (
                 AlertSwitchesRequest request,
                 ChangeTheAlertSwitches switches,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 // Switching one on while there is no notifier is allowed. It is a
@@ -232,6 +234,7 @@ public static class AlertEndpoints
         operatorSurface.MapPut("/host", async (
                 InstallationHostRequest request,
                 NameTheInstallationHost name,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
                 // The pair goes together: a mount without a machine is a string,
                 // and a machine without a mount does not say which of its
@@ -260,6 +263,7 @@ public static class AlertEndpoints
         notifier.MapPut(string.Empty, async (
                 NotifierRequest request,
                 ChangeTheNotifier change,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 // The two halves are refused separately, because a screen
@@ -286,6 +290,7 @@ public static class AlertEndpoints
 
         notifier.MapDelete(string.Empty, async (
                 ChangeTheNotifier change,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 // The switches are left where they are. An operator who clears a
@@ -302,6 +307,7 @@ public static class AlertEndpoints
 
         notifier.MapGet("/token", async (
                 ReadTheNotifier read,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 // The read-back ADR 0022 exists for, and it is a route of its own
@@ -320,6 +326,7 @@ public static class AlertEndpoints
 
         notifier.MapPost("/test", async (
                 SendATestNotification send,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 // Nothing about it is stored. What a notifier did five minutes

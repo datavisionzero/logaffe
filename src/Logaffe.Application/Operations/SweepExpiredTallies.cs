@@ -45,7 +45,7 @@ public sealed class SweepExpiredTallies(IProjects projects, ITallies tallies, Ti
 
         await tallies.RemoveHoursBeforeAsync(before, cancellationToken);
 
-        var live = await projects.ListAsync(cancellationToken);
+        var live = await projects.ListAsync(Reach.TheInstallation, cancellationToken);
         var known = live.Select(project => project.Id).ToHashSet();
 
         foreach (var projectId in await tallies.ProjectsWithTalliesAsync(cancellationToken))

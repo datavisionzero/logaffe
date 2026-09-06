@@ -14,25 +14,55 @@ an agent calls a handful of times to answer a question.
 
 ## The agent token
 
-An agent authenticates with an **agent token**, issued by the operator and put
-into the client's configuration by hand.
+An agent authenticates with an **agent token**, issued by a person and put into
+the client's configuration by hand.
 
-It is the same shape as an ingest token, and deliberately so: issued by the
-operator, **readable again whenever it is wanted**
+It is the same shape as an ingest token, and deliberately so: **readable again
+whenever it is wanted**
 ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)),
 **named** so that a list of them is readable, recording **when it was last
 used**, and **revocable individually and immediately**. The product has one model
 for a machine credential, pointing in four directions — an ingest token writes to
 one project, a host token writes to one host
-([Metrics](./metrics.md#the-host-token)), and an agent token either reads every
-project or administers the installation
-([ADR 0021](./adr/0021-an-agent-token-is-a-copied-secret.md)).
+([Metrics](./metrics.md#the-host-token)), and an agent token either reads or
+administers ([ADR 0021](./adr/0021-an-agent-token-is-a-copied-secret.md)).
 
-The name is the operator's own, and naming a token after the client it was issued
-for is what makes the list readable. It is a label for the list and nothing
-more — it does not identify the token to the server and changing it changes
-nothing else. The installation never learns what a client calls itself: a token
-is issued before any client has connected with it, and nothing about a call is
+### It belongs to somebody
+
+**Issuing a token creates an agent, and the agent belongs to the person who
+issued it** ([ADR 0052](./adr/0052-a-user-and-an-agent-are-one-identity.md)). An
+agent is an identity in the same table a user is, which is what lets a record of
+a change point at one — and what makes an agent's authority exactly its owner's
+and never more.
+
+- **It sees what its owner sees.** The projects within reach are the ones that
+  user holds access to, and a project they were not given does not exist for the
+  agent either ([ADR 0055](./adr/0055-project-access-is-one-filter.md)).
+- **It administers only while its owner does.** The installation-wide acts are
+  reachable through an administering token for as long as the person who issued
+  it is an administrator, and not a moment longer.
+- **It is never an administrator itself**, which the table holds as a constraint
+  rather than as a habit.
+- **Deactivating somebody silences their agents**, and reactivating them brings
+  back whatever was not revoked one at a time. There is no second state to set:
+  the owner's is read on every call.
+
+**A person issues a token and an agent never does.** That exclusion was already
+here — an agent that can issue an agent token grants itself the kind and the flag
+its owner withheld — and it now has a second reason: an agent issuing one would
+be an identity escaping the one it was given.
+
+**Revoking a token leaves the agent.** The credential is gone immediately and the
+identity is not, because a record of what that agent did has to keep pointing at
+something. What is left behind is an agent that authenticates nothing, which is
+what a revoked credential means.
+
+The name is the issuer's own, and naming a token after the client it was issued
+for is what makes the list readable. It is a label — it does not identify the
+token to the server and changing it changes nothing else — and the agent behind
+it carries the same one, because that is what a record of what the agent did
+reads as. The installation never learns what a client calls itself: a token is
+issued before any client has connected with it, and nothing about a call is
 remembered afterwards.
 
 ### One kind or the other
@@ -140,7 +170,7 @@ ends when [Host Recovery](./setup.md#host-recovery) hands the installation to a
 new operator, which is the one act that removes every agent token at once — a
 credential that reads every project, or administers the installation, must not
 outlive the operator who issued it
-([ADR 0013](./adr/0013-host-recovery-returns-the-installation-to-unclaimed.md)).
+([ADR 0058](./adr/0058-host-recovery-removes-every-identity.md)).
 A password change does **not** end it: an operator who has to
 reconnect every agent whenever they change their password is an operator who
 changes their password less often.
@@ -309,6 +339,14 @@ the acts the settings screens carry, named as the product already names them
 ([Projects and tokens](./projects.md), [Metrics](./metrics.md)) rather than in a
 vocabulary invented for this door.
 
+**Every one of them is written down, under the agent's own name.** An act that
+changes this installation's configuration is recorded whichever door it came
+through, and the record says an agent did it rather than naming the person whose
+authority it borrowed ([`CONTEXT.md`](../CONTEXT.md), Change). What an
+administrator reads afterwards is *the deployment agent deleted project
+orders-api*, which is the sentence that makes handing a credential to a model a
+thing anybody can review.
+
 **`get_settings`** — the whole surface in one answer: the groups, the projects
 with the group each sits in, the host each sits on and its retention window, the
 hosts, the installation's window for samples, and for each project and host how
@@ -404,7 +442,36 @@ not a confirmation step. It is that an administering token reads no entry, so th
 sentence asking for the credential never enters its context, and that an ingest
 token is write-only, so nothing is read back out through one.
 
-### Three things no token reaches
+### What the two kinds reach, once the owner is taken into account
+
+**Every tool that names a project narrows to the projects its owner reaches**
+([ADR 0055](./adr/0055-project-access-is-one-filter.md)). `list_projects`
+answers the ones that person holds; a project out of reach is not in that answer
+and is not found when named by identity, which is the same answer a project that
+was deleted gives. There is no "forbidden" here — a refusal that told the two
+apart would tell an agent, and through it whoever wrote the log line it just
+read, what else the installation holds.
+
+**A project's own settings follow the project.** Renaming it, its retention
+window, its group, its host, its mute and its ingest tokens are reachable by an
+administering token whose owner reaches the project, and by no other.
+
+**What belongs to the installation needs an administrator.** Groups, hosts and
+the sample window are nobody's project, so an administering token reaches them
+only while the person it acts for is an administrator — and it is told so in a
+sentence rather than finding the tool missing. That is a departure from how the
+two token kinds are told apart, and it is deliberate: the tool list is fixed when
+the client connects and a role is not, so a tool that vanished the moment
+somebody lost the role would be a list that lies until the next reconnect.
+
+**Host samples are the one thing that does not narrow.** A sample is what a
+machine said about itself, it belongs to no project, and one host carries several
+projects belonging to several people
+([ADR 0045](./adr/0045-a-sample-is-not-an-entry-and-may-be-read-across-projects.md)).
+What it exposes is a machine name and four numbers, and never anything anybody
+logged.
+
+### Four things no token reaches
 
 Absent from the interface rather than withheld by a flag, the way this whole
 surface was absent before.
@@ -416,6 +483,10 @@ surface was absent before.
   that can re-enrol a second factor owns the account.
 - **Sessions.** Ending one denies the operator their own access, and listing them
   is a record of where the operator has been.
+- **The history.** An agent writes to it with everything it does and reads none
+  of it. A credential handed to a model is not a credential for finding out what
+  the people on an installation have been doing, and the one surface that answers
+  that question stays behind a person's own sign-in.
 
 ## What the agent cannot do
 

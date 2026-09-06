@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Alerts;
 using Logaffe.Domain.Hosts;
 
@@ -23,7 +24,7 @@ namespace Logaffe.Application.Operations;
 /// installation's own log, and the screen carrying the switch says so.
 /// </para>
 /// </remarks>
-public sealed class ChangeTheAlertSwitches(IInstallation installation)
+public sealed class ChangeTheAlertSwitches(IInstallation installation, RecordAChange record)
 {
     /// <summary>
     /// The switches as they stand, which is
@@ -32,8 +33,43 @@ public sealed class ChangeTheAlertSwitches(IInstallation installation)
     public Task<AlertSwitches> ReadAsync(CancellationToken cancellationToken) =>
         installation.ReadAlertSwitchesAsync(cancellationToken);
 
-    public Task ExecuteAsync(AlertSwitches switches, CancellationToken cancellationToken) =>
-        installation.RecordAlertSwitchesAsync(switches, cancellationToken);
+    public async Task ExecuteAsync(
+        AlertSwitches switches, CancellationToken cancellationToken)
+    {
+        var were = await installation.ReadAlertSwitchesAsync(cancellationToken);
+
+        await installation.RecordAlertSwitchesAsync(switches, cancellationToken);
+
+        // One row for the set rather than one per condition: they are switched
+        // on one screen and read as one setting, and four rows saying nothing
+        // moved would be four rows nobody wanted.
+        await record.ExecuteAsync(
+            Subject.Installation,
+            subjectId: null,
+            "this installation",
+            Act.Changed,
+            cancellationToken,
+            field: "alert conditions",
+            from: Said(were),
+            to: Said(switches));
+    }
+
+    /// <summary>Which of the four are on, as a reader sees them.</summary>
+    private static string Said(AlertSwitches switches)
+    {
+        string[] on =
+        [
+            .. new (bool On, string Name)[]
+            {
+                (switches.FillingUp, "filling up"),
+                (switches.GoneQuiet, "gone quiet"),
+                (switches.Flooding, "flooding"),
+                (switches.Failing, "failing"),
+            }.Where(condition => condition.On).Select(condition => condition.Name),
+        ];
+
+        return on.Length == 0 ? "none" : string.Join(", ", on);
+    }
 }
 
 /// <summary>How naming the machine this installation sits on ended.</summary>

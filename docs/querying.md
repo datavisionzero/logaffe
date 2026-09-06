@@ -10,6 +10,19 @@ difference is discovered by whoever is debugging at the time.
 A query always runs **inside one project**. Projects are separate in storage, in
 the UI and in agent access, and nothing in the product reads across them.
 
+## Every read narrows to the caller's projects first
+
+Before any of the below: **a query runs inside one project, and only inside a
+project the caller reaches**
+([ADR 0055](./adr/0055-project-access-is-one-filter.md)). It is one filter and
+not one per query — the page, the count, the tail, the filter values, the volume
+figures and the retention screen all resolve a project through the same
+component, so a call site that forgot it is a call site that does not compile.
+
+A project out of reach answers the way a project that does not exist answers,
+here as everywhere: absent from the list, and not found when asked for by
+identity.
+
 ## Filters
 
 A query is a set of filters. There is no query language

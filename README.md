@@ -1,8 +1,8 @@
 # logaffe
 
-A self-hostable, central logging tool for a single operator and their AI agent.
-It collects logs from many applications, keeps them separated by project, and
-makes them accessible through a web UI and through MCP — safe enough to expose
+A self-hostable, central logging tool for a small team and their AI agents. It
+collects logs from many applications, keeps them separated by project, and makes
+them accessible through a web UI and through MCP — safe enough to expose
 directly to the public internet.
 
 See [VISION.md](VISION.md) for what logaffe is and, just as importantly, what it
@@ -10,14 +10,15 @@ deliberately is not.
 
 ## Status
 
-The product is built. An installation ingests CLEF over HTTP,
-stores and queries it, and is claimed by the one operator it belongs to. Behind
-their sign-in are the projects and their ingest tokens, the log view with its
-filters and its live tail, and the settings for the installation and for each
-project. The same reads are offered to an agent as four MCP tools. `logaffe
-backup` writes both halves of an installation into one artifact and `logaffe
-restore` puts them back; `logaffe recover` is the way back in when the sign-in
-is lost. All of it has been exercised end to end against a running installation.
+The product is built. An installation ingests CLEF over HTTP, stores and queries
+it, and creates its first administrator from the environment on its first start.
+Behind a sign-in are the projects that user has access to and their ingest
+tokens, the log view with its filters and its live tail, the settings for the
+installation and for each project, and a record of everything anybody has changed
+about it. The same reads are offered to an agent over MCP. `logaffe backup` writes both halves of an installation into one artifact and
+`logaffe restore` puts them back; `logaffe recover` is the way back in when every
+sign-in is lost. All of it has been exercised end to end against a running
+installation.
 
 **The first stable release is out**, and it is what
 [`deploy/docker-compose.yml`](deploy/docker-compose.yml) pulls:
@@ -43,7 +44,7 @@ See [VISION.md](VISION.md) for where it is going and
 Working on it needs the .NET 10 SDK, Node 24 or newer, and Docker:
 
 ```
-docker compose -f deploy/docker-compose.dev.yml up -d   # Postgres
+docker compose -f deploy/docker-compose.dev.yml up -d   # Postgres and Mailpit
 dotnet run --project src/Logaffe.Api                    # the server
 npm --prefix src/web install && npm --prefix src/web run dev
 ```

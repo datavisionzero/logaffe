@@ -1,5 +1,5 @@
 using Logaffe.Application.Operations;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
@@ -67,7 +67,10 @@ public sealed class KeyFitsTests(PostgresFixture postgres) : IDisposable
         var volume = NewVolume();
         var context = await MigratedAsync();
         var cipher = CipherOn(volume);
+        var agent = AnAgentIn(context);
+
         context.AgentTokens.Add(AgentToken.Issue(
+            agent.Id,
             "terminal agent",
             AgentTokenKind.Reading,
             mayDestroy: false,
@@ -83,21 +86,21 @@ public sealed class KeyFitsTests(PostgresFixture postgres) : IDisposable
     }
 
     [Fact]
-    public async Task An_operator_with_no_tokens_at_all_is_enough_to_check_against()
+    public async Task A_user_with_no_tokens_at_all_is_enough_to_check_against()
     {
         var volume = NewVolume();
         var context = await MigratedAsync();
         var cipher = CipherOn(volume);
-        var theOperator = Operator.Claim("AQAAAAIAAYagAAAAE-not-a-real-hash", Now);
-        theOperator.EnrolSecondFactor(
-            cipher.Encrypt("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"), Now);
-        context.Operators.Add(theOperator);
+        var user = User.Bootstrap("The Administrator", "somebody@example.com", Now);
+        user.ActivateWith("$argon2id$v=19$m=19456,t=2,p=1$not-a-real-hash");
+        user.EnrolSecondFactor(cipher.Encrypt("GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"), Now);
+        context.Identities.Add(user);
         await context.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        // An installation claimed a minute ago holds no project, no token and
-        // one sealed secret — the operator's second factor. It is the case the
+        // An installation bootstrapped a minute ago holds no project, no token
+        // and one sealed secret — that user's second factor. It is the case the
         // token tables miss entirely, and the one where a wrong key costs the
-        // most: without it the operator cannot verify a code at all (ADR 0032).
+        // most: without it nobody can verify a code at all (ADR 0057).
         Assert.Equal(KeyFit.Fits, await CheckWith(context, volume));
         Assert.Equal(KeyFit.DoesNotFit, await CheckWith(context, NewVolume()));
     }
@@ -139,4 +142,26 @@ public sealed class KeyFitsTests(PostgresFixture postgres) : IDisposable
 
     private static AesGcmSecretCipher CipherOn(string volume) =>
         new(new HostVolumeKey(volume, NullLogger<HostVolumeKey>.Instance));
+
+    /// <summary>
+    /// A user and the agent they own, so that a token has an identity to name
+    /// (ADR 0052). Added to the context and not saved: the caller's own
+    /// SaveChanges writes all of it at once.
+    /// </summary>
+    private static Agent AnAgentIn(LogaffeDbContext context)
+    {
+        var owner = User.Bootstrap(
+            $"owner-{Guid.CreateVersion7():N}",
+            $"{Guid.CreateVersion7():N}@example.com",
+            Now);
+        owner.ActivateWith("$argon2id$v=19$m=19456,t=2,p=1$not-a-real-hash");
+
+        var agent = Agent.Create("terminal agent", owner.Id, Now);
+
+        context.Identities.Add(owner);
+        context.Identities.Add(agent);
+
+        return agent;
+    }
+
 }

@@ -1,4 +1,6 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
+using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
 
@@ -40,16 +42,16 @@ public enum MuteAProjectOutcome
 /// simply does not ask about it (<see cref="EvaluateTheConditions"/>).
 /// </para>
 /// </remarks>
-public sealed class MuteAProject(IProjects projects)
+public sealed class MuteAProject(IProjects projects, RecordAChange record)
 {
     /// <param name="muted">
     /// <c>true</c> to stop evaluating this project's conditions, <c>false</c> to
     /// start again — which is the state every project is created in.
     /// </param>
     public async Task<MuteAProjectOutcome> ExecuteAsync(
-        Guid id, bool muted, CancellationToken cancellationToken)
+        Reach reach, Guid id, bool muted, CancellationToken cancellationToken)
     {
-        var project = await projects.FindAsync(id, cancellationToken);
+        var project = await projects.FindAsync(reach, id, cancellationToken);
         if (project is null)
         {
             return MuteAProjectOutcome.NoSuchProject;
@@ -62,6 +64,15 @@ public sealed class MuteAProject(IProjects projects)
 
         project.Mute(muted);
         await projects.RecordAsync(project, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.Project,
+            project.Id,
+            project.Name,
+            Act.Changed,
+            cancellationToken,
+            field: "alerts",
+            from: muted ? "on" : "muted",
+            to: muted ? "muted" : "on");
 
         return MuteAProjectOutcome.Muted;
     }

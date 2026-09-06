@@ -7,12 +7,11 @@ namespace Logaffe.Infrastructure.Persistence;
 /// Takes the sample out of everything the installation holds sealed.
 /// </summary>
 /// <remarks>
-/// The operator's TOTP secret first, because a claimed installation has exactly
-/// one of those and may have no tokens at all — an operator who claimed an
-/// installation and has not made a project yet is the case the token tables miss
-/// entirely, and it is sealed under the same key (ADR 0032). Then the ingest
-/// tokens, then the agent tokens, which is the order in which an installation
-/// that has anything has them.
+/// The users' TOTP secrets first, because an installation may have those and no
+/// tokens at all — somebody who was bootstrapped and has not made a project yet
+/// is the case the token tables miss entirely, and those secrets are sealed
+/// under the same key (ADR 0057). Then the ingest tokens, then the agent tokens,
+/// which is the order in which an installation that has anything has them.
 /// </remarks>
 public sealed class SealedSecrets(LogaffeDbContext context) : ISealedSecrets
 {
@@ -21,22 +20,16 @@ public sealed class SealedSecrets(LogaffeDbContext context) : ISealedSecrets
     {
         var sample = new List<byte[]>(count);
 
-        // Taken as the single row it is rather than as a page of one: an
-        // installation has exactly one operator (ADR 0015), so there is no order
-        // to get right — and a row-limiting operator with nothing to order by is
-        // what had every start writing an EF warning next to the claim-window
-        // line an operator is watching for.
-        if (count > 0)
-        {
-            var secondFactor = await context.Operators
-                .Select(o => o.EncryptedSecondFactorSecret)
-                .SingleOrDefaultAsync(cancellationToken);
-
-            if (secondFactor is not null)
-            {
-                sample.Add(secondFactor);
-            }
-        }
+        // Ordered by id so that the row-limiting operator has something to order
+        // by, which is what every query in this file does and what keeps EF from
+        // warning on a start an operator is reading.
+        sample.AddRange(await context.Identities
+            .OfType<Logaffe.Domain.Identities.User>()
+            .Where(u => u.EncryptedSecondFactorSecret != null)
+            .OrderBy(u => u.Id)
+            .Select(u => u.EncryptedSecondFactorSecret!)
+            .Take(count)
+            .ToListAsync(cancellationToken));
 
         if (sample.Count < count)
         {

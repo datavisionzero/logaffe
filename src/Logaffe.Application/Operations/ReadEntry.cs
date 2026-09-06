@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Projects;
 using Logaffe.Domain.Entries;
 
 namespace Logaffe.Application.Operations;
@@ -36,9 +37,9 @@ public sealed class ReadEntry(IProjects projects, IEntryReader entries)
     /// looks like, and what a project that no longer exists looks like.
     /// </summary>
     public async Task<LogEntry?> ExecuteAsync(
-        Guid projectId, long id, CancellationToken cancellationToken)
+        Reach reach, Guid projectId, long id, CancellationToken cancellationToken)
     {
-        var project = await projects.FindAsync(projectId, cancellationToken);
+        var project = await projects.FindAsync(reach, projectId, cancellationToken);
 
         return project is null
             ? null

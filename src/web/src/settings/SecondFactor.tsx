@@ -111,8 +111,8 @@ export function SecondFactor() {
  * Removing it, which asks for the same credentials enrolling asks for.
  *
  * It says plainly what the account is left with. This is the one act in the
- * product that makes an installation weaker, and it is the operator's to make
- * with their eyes open.
+ * product that makes an account weaker, and it is that account's own to make
+ * with their eyes open (ADR 0041).
  */
 function TurnOff({ onRemoved, onKept }: { onRemoved: () => void; onKept: () => void }) {
   const [password, setPassword] = useState("");

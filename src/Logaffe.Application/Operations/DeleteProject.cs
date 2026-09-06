@@ -1,4 +1,6 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
+using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
 
@@ -38,21 +40,30 @@ namespace Logaffe.Application.Operations;
 /// is gone.
 /// </para>
 /// </remarks>
-public sealed class DeleteProject(IProjects projects)
+public sealed class DeleteProject(IProjects projects, RecordAChange record)
 {
     /// <summary>
     /// Whether there was a project to delete. <c>false</c> is a project already
     /// gone — a second click, or another tab — and not a failure of anything.
     /// </summary>
-    public async Task<bool> ExecuteAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<bool> ExecuteAsync(
+        Reach reach, Guid id, CancellationToken cancellationToken)
     {
-        var project = await projects.FindAsync(id, cancellationToken);
+        var project = await projects.FindAsync(reach, id, cancellationToken);
         if (project is null)
         {
             return false;
         }
 
+        // Read before the removal: *who deleted project X* is one of the two
+        // questions the history exists to answer, and afterwards there is
+        // nothing left to call it.
+        var name = project.Name;
+
         await projects.RemoveAsync(project, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.Project, project.Id, name, Act.Removed, cancellationToken);
+
         return true;
     }
 }

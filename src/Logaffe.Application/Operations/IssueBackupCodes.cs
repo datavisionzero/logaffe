@@ -1,5 +1,5 @@
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.Application.Operations;
 
@@ -54,22 +54,21 @@ public sealed record IssuedSheet(SheetOutcome Outcome, IReadOnlyList<BackupCodeT
 /// </para>
 /// </remarks>
 public sealed class IssueBackupCodes(
-    IOperators operators,
+    IIdentities identities,
     IPasswordHasher hasher,
     TimeProvider clock)
 {
     /// <summary>The ten codes to show, or why there are none.</summary>
     public async Task<IssuedSheet> ExecuteAsync(
-        string? password, CancellationToken cancellationToken)
+        User user, string? password, CancellationToken cancellationToken)
     {
         if (!Password.TryRead(password, out var presented))
         {
             return Refused(SheetOutcome.PasswordRefused);
         }
 
-        var theOperator = await operators.FindAsync(cancellationToken);
-        if (theOperator is null
-            || hasher.Verify(theOperator.PasswordHash, presented) is PasswordCheck.Wrong)
+        if (user.PasswordHash is null
+            || hasher.Verify(user.PasswordHash, presented) is PasswordCheck.Wrong)
         {
             return Refused(SheetOutcome.PasswordRefused);
         }
@@ -77,13 +76,13 @@ public sealed class IssueBackupCodes(
         // Asked after the password rather than before it, so that whether this
         // installation has a second factor is not something an unauthenticated
         // guess can ask about.
-        if (!theOperator.HasSecondFactor)
+        if (!user.HasSecondFactor)
         {
             return Refused(SheetOutcome.NoSecondFactor);
         }
 
-        var minted = BackupCode.MintSet(theOperator.Id, clock.GetUtcNow());
-        await operators.ReplaceBackupCodesAsync(minted.Stored, cancellationToken);
+        var minted = BackupCode.MintSet(user.Id, clock.GetUtcNow());
+        await identities.ReplaceBackupCodesAsync(user.Id, minted.Stored, cancellationToken);
 
         return new IssuedSheet(SheetOutcome.Issued, minted.Shown);
     }

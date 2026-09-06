@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
@@ -34,16 +35,16 @@ public enum RenameOutcome
 /// delivery and is invisible to every sender. What it changes is the word the
 /// operator reads at three in the morning, which is what the name is for.
 /// </remarks>
-public sealed class RenameProject(IProjects projects)
+public sealed class RenameProject(IProjects projects, RecordAChange record)
 {
     /// <exception cref="ArgumentException">
     /// <paramref name="name"/> is not a name — it is blank, or longer than
     /// <see cref="Project.NameMaxLength"/>.
     /// </exception>
     public async Task<RenameOutcome> ExecuteAsync(
-        Guid id, string name, CancellationToken cancellationToken)
+        Reach reach, Guid id, string name, CancellationToken cancellationToken)
     {
-        var project = await projects.FindAsync(id, cancellationToken);
+        var project = await projects.FindAsync(reach, id, cancellationToken);
         if (project is null)
         {
             return RenameOutcome.NoSuchProject;
@@ -60,8 +61,18 @@ public sealed class RenameProject(IProjects projects)
             return RenameOutcome.NameTaken;
         }
 
+        var was = project.Name;
+
         project.Rename(normalized);
         await projects.RecordAsync(project, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.Project,
+            project.Id,
+            project.Name,
+            Act.Renamed,
+            cancellationToken,
+            from: was,
+            to: project.Name);
 
         return RenameOutcome.Renamed;
     }

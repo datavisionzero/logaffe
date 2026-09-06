@@ -1,16 +1,18 @@
 using Logaffe.Api.Hosting;
 using Logaffe.Application.Operations;
+using Logaffe.Domain.Identities;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace Logaffe.Api.Http;
 
 /// <summary>
-/// What the operator gives to get in, which is a password and one second
-/// factor.
+/// What somebody gives to get in: an address, a password and one second factor.
 /// </summary>
 /// <remarks>
-/// There is nothing naming which account is meant: an installation has exactly
-/// one operator, with no username and no email address (ADR 0015).
+/// All of it in one request, including the code. Asking for the password first
+/// and the code on a second screen would read better and is refused for what it
+/// would give away — the installation would be answering <em>that password was
+/// right</em> (<c>docs/sign-in.md</c>).
 /// </remarks>
 /// <param name="SecondFactorCode">
 /// The six digits from the authenticator app. Left out when
@@ -21,7 +23,18 @@ namespace Logaffe.Api.Http;
 /// spacing, grouping and capitals are all forgiven.
 /// </param>
 public sealed record SignInRequest(
-    string? Password, string? SecondFactorCode, string? BackupCode);
+    string? Email, string? Password, string? SecondFactorCode, string? BackupCode);
+
+/// <summary>
+/// The bootstrap token from the configuration, and the password it is exchanged
+/// for.
+/// </summary>
+/// <remarks>
+/// The one act besides the sign-in that needs no session, and it works only
+/// while the first administrator has no password — which is what makes it
+/// single-use without anything being stored (ADR 0054).
+/// </remarks>
+public sealed record BootstrapExchangeRequest(string? Token, string? Password);
 
 /// <summary>
 /// What a sign-in answers, which is not the session.
@@ -37,17 +50,16 @@ public sealed record SignInRequest(
 public sealed record SignInResponse(int? BackupCodesRemaining);
 
 /// <summary>
-/// One of the operator's signed-in browsers, as they see it in the list.
+/// One of a user's signed-in browsers, as they see it in their own list.
 /// </summary>
 /// <remarks>
 /// It carries no secret and nothing that could be presented: a session is
 /// admitted by the value in the cookie, and the row holds only a fast hash of it
-/// (ADR 0032).
+/// (ADR 0057).
 /// </remarks>
 /// <param name="LastSeenFrom">
 /// The address it last acted from, or <c>unknown</c> where there was none to
-/// read. With no email anywhere in the product (ADR 0015) this column is the
-/// only way the operator can ever notice a session that is not theirs.
+/// read. This column is how somebody notices a session that is not theirs.
 /// </param>
 /// <param name="LastUsedAt">
 /// When it last acted, accurate to within five minutes (ADR 0033) and not to be
@@ -57,8 +69,8 @@ public sealed record SignInResponse(int? BackupCodesRemaining);
 /// Whether this is the browser asking. The server says so because nothing else
 /// can: the list carries no secret and the cookie carries nothing but one, so
 /// there is nothing the interface could compare — and without it "end all
-/// others" is a guess and revoking a row signs the operator out of the screen
-/// they are on.
+/// others" is a guess and revoking a row signs somebody out of the screen they
+/// are on.
 /// </param>
 public sealed record ListedSessionResponse(
     Guid Id,
@@ -73,10 +85,11 @@ public sealed record ListedSessionResponse(
 /// </summary>
 /// <remarks>
 /// <b>Ending a session is removing the row, never marking it.</b> The list is
-/// what the operator acts on, and one they ended has to be gone from it rather
-/// than greyed out (<c>docs/sign-in.md</c>). It takes effect on the next
-/// request, because the session authentication reads the row every time and
-/// holds no cache in front of it.
+/// what a person acts on, and one they ended has to be gone from it rather than
+/// greyed out (<c>docs/sign-in.md</c>). It takes effect on the next request,
+/// because the session authentication reads the row every time and holds no
+/// cache in front of it. <b>Nobody sees anybody else's list</b>, not even an
+/// administrator (ADR 0055).
 /// </remarks>
 public static class SessionEndpoints
 {
@@ -88,17 +101,32 @@ public static class SessionEndpoints
                 HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                var signedIn = await signIn.ExecuteAsync(
+                var attempt = await signIn.ExecuteAsync(
+                    request.Email,
                     request.Password,
                     request.SecondFactorCode,
                     request.BackupCode,
                     context.SeenFrom(),
                     cancellationToken);
 
-                // One refusal for every way of not getting in: a wrong password,
-                // a wrong code, a code already spent, and an installation with
-                // no operator at all. The screen says one thing, and which of
-                // them it was is not something this surface hands over.
+                // The one answer that is not the one refusal, because the caller
+                // has to be told something different: come back later. It says
+                // nothing about which of the two windows filled up, and an
+                // address nobody holds fills its own exactly as one somebody
+                // holds does (ADR 0056).
+                if (attempt.Throttled)
+                {
+                    return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+                }
+
+                var signedIn = attempt.Session;
+
+                // One refusal for every way of not getting in: an address
+                // nobody holds, a wrong password, a wrong code, a code already
+                // spent, an account that was invited and never arrived, and one
+                // that has been deactivated. The screen says one thing, and
+                // which of them it was is not something this surface hands over
+                // — in wording or in how long it took (ADR 0056).
                 if (signedIn is null)
                 {
                     return Results.Unauthorized();
@@ -109,19 +137,59 @@ public static class SessionEndpoints
                 return Results.Ok(new SignInResponse(signedIn.BackupCodesRemaining));
             })
             .WithName("SignIn")
-            .WithSummary("Starts a session for the operator.")
+            .WithSummary("Starts a session for the user behind an address and a password.")
             .RequireRateLimiting(PublicRateLimits.SignIn)
             .AllowAnonymous()
             .Produces<SignInResponse>()
             .Produces(StatusCodes.Status401Unauthorized)
             .Produces(StatusCodes.Status429TooManyRequests);
 
+        endpoints.MapPost("/bootstrap", async (
+                BootstrapExchangeRequest request,
+                ExchangeBootstrapToken exchange,
+                HttpContext context,
+                CancellationToken cancellationToken) =>
+            {
+                var exchanged = await exchange.ExecuteAsync(
+                    request.Token, request.Password, context.SeenFrom(), cancellationToken);
+
+                if (exchanged.Outcome is not ExchangeOutcome.Exchanged)
+                {
+                    // Said by field, unlike the sign-in. There is little to
+                    // protect and much to lose by being unhelpful: whoever is
+                    // here is setting up their own installation with the compose
+                    // file open in another window (ADR 0054).
+                    return exchanged.Outcome switch
+                    {
+                        ExchangeOutcome.PasswordNotOne => NotRight("password", APasswordIs),
+                        ExchangeOutcome.TokenRefused => NotRight(
+                            "token",
+                            "That is not the bootstrap token this installation's "
+                            + "configuration names."),
+                        _ => Results.Conflict(),
+                    };
+                }
+
+                SessionCookie.Issue(context.Response, exchanged.Secret!.Text);
+
+                return Results.NoContent();
+            })
+            .WithName("ExchangeBootstrapToken")
+            .WithSummary(
+                "Exchanges the bootstrap token for the first administrator's password and a "
+                + "session.")
+            .RequireRateLimiting(PublicRateLimits.SignIn)
+            .AllowAnonymous()
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status409Conflict)
+            .ProducesValidationProblem();
+
         endpoints.MapPost("/sign-out", async (
                 SignOut signOut,
                 HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                await signOut.ExecuteAsync(context.OperatorSession(), cancellationToken);
+                await signOut.ExecuteAsync(context.CurrentSession(), cancellationToken);
                 SessionCookie.Clear(context.Response);
 
                 return Results.NoContent();
@@ -137,18 +205,29 @@ public static class SessionEndpoints
         return endpoints;
     }
 
+    private static string APasswordIs =>
+        $"A password is at least {Password.MinimumLength} and at most "
+        + $"{Password.MaximumLength} characters.";
+
+    /// <summary>
+    /// Which field the request was refused over, said by name — on the one
+    /// anonymous act where saying so costs nothing.
+    /// </summary>
+    private static IResult NotRight(string field, string message) =>
+        Results.ValidationProblem(new Dictionary<string, string[]> { [field] = [message] });
+
     private static void MapTheList(this IEndpointRouteBuilder endpoints)
     {
-        var operatorSurface = endpoints
+        var account = endpoints
             .MapGroup(string.Empty)
             .RequireAuthorization()
             .RequireRateLimiting(PublicRateLimits.Operator);
 
-        operatorSurface.MapGet("/sessions", async (
+        account.MapGet("/sessions", async (
                 ListSessions list, HttpContext context, CancellationToken cancellationToken) =>
             {
-                var current = context.OperatorSession();
-                var held = await list.ExecuteAsync(cancellationToken);
+                var current = context.CurrentSession();
+                var held = await list.ExecuteAsync(current.UserId, cancellationToken);
 
                 return Results.Ok(held.Select(session => new ListedSessionResponse(
                     session.Id,
@@ -159,18 +238,19 @@ public static class SessionEndpoints
                     session.Id == current.Id)));
             })
             .WithName("ListSessions")
-            .WithSummary("The operator's signed-in browsers.")
+            .WithSummary("The signed-in user's own browsers.")
             .Produces<IEnumerable<ListedSessionResponse>>();
 
-        operatorSurface.MapDelete("/sessions/others", async (
+        account.MapDelete("/sessions/others", async (
                 EndEveryOtherSession endOthers,
                 HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                // Every other, never every one: the browser doing this stays
-                // signed in, or securing the installation would sign the
-                // operator out of the screen they secured it from.
-                await endOthers.ExecuteAsync(context.OperatorSession(), cancellationToken);
+                // Every other of this user's, never every one and never anybody
+                // else's: the browser doing this stays signed in, or securing
+                // the account would sign somebody out of the screen they secured
+                // it from.
+                await endOthers.ExecuteAsync(context.CurrentSession(), cancellationToken);
 
                 return Results.NoContent();
             })
@@ -178,13 +258,18 @@ public static class SessionEndpoints
             .WithSummary("Ends every session but this one.")
             .Produces(StatusCodes.Status204NoContent);
 
-        operatorSurface.MapDelete("/sessions/{id:guid}", async (
+        account.MapDelete("/sessions/{id:guid}", async (
                 Guid id,
                 RevokeSession revoke,
                 HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                if (!await revoke.ExecuteAsync(id, cancellationToken))
+                // Somebody else's session id answers exactly as a session id
+                // that never existed does: the act looks in the caller's own
+                // list, so there is nothing here that says whether the row is
+                // out there under another name.
+                if (!await revoke.ExecuteAsync(
+                    context.CurrentSession().UserId, id, cancellationToken))
                 {
                     // Already gone: a second click, another tab, or a sweep.
                     return Results.NotFound();
@@ -193,7 +278,7 @@ public static class SessionEndpoints
                 // Ending your own from the list is a sign-out by another name,
                 // and the cookie has to go with it — otherwise the browser keeps
                 // presenting a secret whose row is not there any more.
-                if (id == context.OperatorSession().Id)
+                if (id == context.CurrentSession().Id)
                 {
                     SessionCookie.Clear(context.Response);
                 }

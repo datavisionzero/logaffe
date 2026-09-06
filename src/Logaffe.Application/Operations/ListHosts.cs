@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
 
@@ -44,13 +45,13 @@ public sealed class ListHosts(
     IHosts hosts, IProjects projects, ITokens tokens, ISampleReader samples)
 {
     public async Task<IReadOnlyList<ListedHost>> ExecuteAsync(
-        CancellationToken cancellationToken)
+        Reach reach, CancellationToken cancellationToken)
     {
         var held = await hosts.ListAsync(cancellationToken);
         var heldTokens = await tokens.ListHostTokensAsync(cancellationToken);
         var reported = await samples.LastReportedAsync(cancellationToken);
 
-        var on = (await projects.ListAsync(cancellationToken))
+        var on = (await projects.ListAsync(reach, cancellationToken))
             .Where(project => project.HostId is not null)
             .GroupBy(project => project.HostId!.Value)
             .ToDictionary(group => group.Key, group => group.Count());

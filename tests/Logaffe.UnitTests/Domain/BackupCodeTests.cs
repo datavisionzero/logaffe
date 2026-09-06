@@ -1,4 +1,4 @@
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.UnitTests.Domain;
 
@@ -18,7 +18,7 @@ public sealed class BackupCodeTests
         Assert.Equal(BackupCode.SetSize, minted.Shown.Select(c => c.Symbols).Distinct().Count());
         Assert.All(minted.Stored, code =>
         {
-            Assert.Equal(operatorId, code.OperatorId);
+            Assert.Equal(operatorId, code.UserId);
             Assert.Equal(Now, code.IssuedAt);
             Assert.False(code.IsSpent);
             Assert.Equal(BackupCode.HashLength, code.Hash.Length);

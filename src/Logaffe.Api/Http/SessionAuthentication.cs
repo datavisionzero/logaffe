@@ -2,15 +2,16 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Logaffe.Api.Hosting;
 using Logaffe.Application.Operations;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
+using Logaffe.Domain.Projects;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
 namespace Logaffe.Api.Http;
 
 /// <summary>
-/// The operator's door: a cookie holding a session secret, and
-/// <see cref="AuthenticateSession"/> deciding what it admits.
+/// The human door: a cookie holding a session secret, and
+/// <see cref="AuthenticateSession"/> deciding whose it is.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -24,8 +25,8 @@ namespace Logaffe.Api.Http;
 /// <para>
 /// The framework's own cookie authentication was the alternative and buys the
 /// wrong half: it holds the identity inside the cookie so that a request costs
-/// no read, which is exactly what would make ending a session from the operator's
-/// list stop being immediate.
+/// no read, which is exactly what would make ending a session from its owner's
+/// list — or deactivating an account — stop being immediate.
 /// </para>
 /// </remarks>
 public static class SessionAuthentication
@@ -33,7 +34,24 @@ public static class SessionAuthentication
     /// <summary>What the endpoints name when they ask to be behind the door.</summary>
     public const string Scheme = "Session";
 
+    /// <summary>
+    /// The one role there is. It says who runs the installation and nothing
+    /// about what may be read (ADR 0055).
+    /// </summary>
+    public const string Administrator = "administrator";
+
+    /// <summary>
+    /// What the installation-wide acts ask for: inviting somebody, handing out
+    /// a role, assigning a project. <b>Never what a read asks for</b> — a read
+    /// narrows to the caller's reach and the role does not widen it.
+    /// </summary>
+    public const string AdministratorPolicy = "logaffe:administrator";
+
     private const string SessionItemKey = "logaffe.session";
+
+    private const string UserItemKey = "logaffe.user";
+
+    private const string ReachItemKey = "logaffe.reach";
 
     public static IServiceCollection AddLogaffeSessionAuthentication(
         this IServiceCollection services)
@@ -42,7 +60,14 @@ public static class SessionAuthentication
             .AddAuthentication(Scheme)
             .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(Scheme, null);
 
-        return services.AddAuthorization();
+        services
+            .AddAuthorizationBuilder()
+            .AddPolicy(AdministratorPolicy, policy => policy
+                .AddAuthenticationSchemes(Scheme)
+                .RequireAuthenticatedUser()
+                .RequireRole(Administrator));
+
+        return services;
     }
 
     /// <summary>
@@ -54,12 +79,41 @@ public static class SessionAuthentication
     /// behind the scheme, so reaching it without one is a routing mistake rather
     /// than an unauthenticated request.
     /// </exception>
-    public static Session OperatorSession(this HttpContext context) =>
+    public static Session CurrentSession(this HttpContext context) =>
         context.Items[SessionItemKey] as Session
         ?? throw new InvalidOperationException("This request was not admitted by a session.");
 
-    internal static void SetOperatorSession(this HttpContext context, Session session) =>
+    /// <summary>
+    /// Whose request this is. Resolved once by the door rather than by every act
+    /// behind it, which is what makes a deactivated account stop admitting
+    /// anything the moment it is deactivated (ADR 0052).
+    /// </summary>
+    /// <inheritdoc cref="CurrentSession" path="/exception"/>
+    public static User CurrentUser(this HttpContext context) =>
+        context.Items[UserItemKey] as User
+        ?? throw new InvalidOperationException("This request was not admitted by a session.");
+
+    /// <summary>
+    /// The projects this request may see, resolved once by the door rather than
+    /// by every act behind it (ADR 0055).
+    /// </summary>
+    /// <remarks>
+    /// Once per request and not once per read: a reach resolved twice inside one
+    /// request could answer differently in the middle of it, and a screen
+    /// assembled out of two answers is a screen that contradicts itself.
+    /// </remarks>
+    /// <inheritdoc cref="CurrentSession" path="/exception"/>
+    public static Reach Reach(this HttpContext context) =>
+        context.Items[ReachItemKey] as Reach
+        ?? throw new InvalidOperationException("This request was not admitted by a session.");
+
+    internal static void SetCurrentIdentity(
+        this HttpContext context, Session session, User user, Reach reach)
+    {
         context.Items[SessionItemKey] = session;
+        context.Items[UserItemKey] = user;
+        context.Items[ReachItemKey] = reach;
+    }
 }
 
 /// <inheritdoc cref="SessionAuthentication"/>
@@ -85,9 +139,10 @@ public sealed class SessionAuthenticationHandler(
         if (admitted is null)
         {
             // A secret naming no live session: signed out elsewhere, revoked
-            // from the list, or thirty days untouched. The browser is told to
-            // drop it rather than presenting it on every request until it
-            // expires on its own.
+            // from the list, past one of its two deadlines, or belonging to an
+            // account that has been deactivated. The browser is told to drop it
+            // rather than presenting it on every request until it expires on its
+            // own.
             SessionCookie.Clear(Response);
 
             return AuthenticateResult.Fail("The session secret admits nothing.");
@@ -98,17 +153,32 @@ public sealed class SessionAuthenticationHandler(
             SessionCookie.Issue(Response, presented);
         }
 
-        Context.SetOperatorSession(admitted.Session);
+        var reach = await Context.RequestServices
+            .GetRequiredService<ResolveReach>()
+            .ExecuteAsync(admitted.User, Context.RequestAborted);
 
-        // One account, no roles and nothing to distinguish (ADR 0015), so the
-        // principal carries what identifies the row and nothing that looks like
-        // a permission.
+        Context.SetCurrentIdentity(admitted.Session, admitted.User, reach);
+
+        // Who is doing this, for whatever the request goes on to change
+        // (CONTEXT.md, Change).
+        Context.RequestServices.GetRequiredService<TheActor>().Admitted(admitted.User);
+
+        // What identifies the row, and the one role there is. Project access is
+        // deliberately not here: it is a set that every read narrows to and not
+        // a claim on a principal, and a claim would be a copy of it that could
+        // go stale inside one request (ADR 0055).
         var identity = new ClaimsIdentity(
             [
-                new Claim(ClaimTypes.NameIdentifier, admitted.Session.OperatorId.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, admitted.User.Id.ToString()),
                 new Claim(ClaimTypes.Sid, admitted.Session.Id.ToString()),
+                new Claim(ClaimTypes.Name, admitted.User.Name),
             ],
             Scheme.Name);
+
+        if (admitted.User.Administrator)
+        {
+            identity.AddClaim(new Claim(ClaimTypes.Role, SessionAuthentication.Administrator));
+        }
 
         return AuthenticateResult.Success(
             new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name));

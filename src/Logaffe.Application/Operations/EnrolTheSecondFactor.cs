@@ -1,5 +1,5 @@
 using Logaffe.Application.Ports;
-using Logaffe.Domain.Operators;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.Application.Operations;
 
@@ -88,7 +88,7 @@ public enum EnrolmentOutcome
 /// </para>
 /// </remarks>
 public sealed class EnrolTheSecondFactor(
-    IOperators operators,
+    IIdentities identities,
     ISessions sessions,
     IPasswordHasher hasher,
     ISecondFactor secondFactor,
@@ -108,6 +108,7 @@ public sealed class EnrolTheSecondFactor(
     /// The session making the request, which is the one that survives.
     /// </param>
     public async Task<EnrolmentOutcome> ExecuteAsync(
+        User user,
         string? password,
         string? secondFactorCode,
         string? backupCode,
@@ -116,8 +117,7 @@ public sealed class EnrolTheSecondFactor(
         Session keeping,
         CancellationToken cancellationToken)
     {
-        var theOperator = await operators.FindAsync(cancellationToken);
-        if (theOperator is null || !Password.TryRead(password, out var presented))
+        if (!Password.TryRead(password, out var presented))
         {
             return EnrolmentOutcome.PasswordRefused;
         }
@@ -125,13 +125,13 @@ public sealed class EnrolTheSecondFactor(
         var now = clock.GetUtcNow();
 
         if (!EnrolmentTicket.TryOpen(ticket, cipher, out var enrolment)
-            || !enrolment.BelongsTo(theOperator, now))
+            || !enrolment.BelongsTo(user, now))
         {
             return EnrolmentOutcome.EnrolmentNotOurs;
         }
 
         if (!await ProvesTheSecondFactorInUseAsync(
-            theOperator, secondFactorCode, backupCode, now, cancellationToken))
+            user, secondFactorCode, backupCode, now, cancellationToken))
         {
             return EnrolmentOutcome.SecondFactorRefused;
         }
@@ -141,16 +141,20 @@ public sealed class EnrolTheSecondFactor(
             return EnrolmentOutcome.NewSecondFactorRefused;
         }
 
-        if (hasher.Verify(theOperator.PasswordHash, presented) is PasswordCheck.Wrong)
+        // An account with no password at all is one that was invited and never
+        // arrived. It cannot be behind this session, so this is a guard rather
+        // than a case, and it refuses the way a wrong password refuses.
+        if (user.PasswordHash is null
+            || hasher.Verify(user.PasswordHash, presented) is PasswordCheck.Wrong)
         {
             return EnrolmentOutcome.PasswordRefused;
         }
 
-        theOperator.EnrolSecondFactor(cipher.Encrypt(enrolment.SecondFactorSecret), now);
-        await operators.RecordAsync(theOperator, cancellationToken);
+        user.EnrolSecondFactor(cipher.Encrypt(enrolment.SecondFactorSecret), now);
+        await identities.RecordAsync(user, cancellationToken);
 
-        await operators.ReplaceBackupCodesAsync(
-            BackupCode.SetOf(theOperator.Id, enrolment.BackupCodeHashes, now),
+        await identities.ReplaceBackupCodesAsync(user.Id, 
+            BackupCode.SetOf(user.Id, enrolment.BackupCodeHashes, now),
             cancellationToken);
 
         await sessions.RemoveEveryOtherAsync(keeping, cancellationToken);
@@ -170,13 +174,13 @@ public sealed class EnrolTheSecondFactor(
     /// which matches a spent code exactly as it matches a fresh one.
     /// </remarks>
     private async Task<bool> ProvesTheSecondFactorInUseAsync(
-        Operator theOperator,
+        User user,
         string? secondFactorCode,
         string? backupCode,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        if (!theOperator.HasSecondFactor)
+        if (!user.HasSecondFactor)
         {
             return true;
         }
@@ -184,7 +188,7 @@ public sealed class EnrolTheSecondFactor(
         if (secondFactorCode is not null)
         {
             return secondFactor.Verifies(
-                cipher.Decrypt(theOperator.EncryptedSecondFactorSecret!),
+                cipher.Decrypt(user.EncryptedSecondFactorSecret!),
                 secondFactorCode,
                 now);
         }
@@ -194,7 +198,7 @@ public sealed class EnrolTheSecondFactor(
             return false;
         }
 
-        var codes = await operators.ListBackupCodesAsync(cancellationToken);
+        var codes = await identities.ListBackupCodesAsync(user.Id, cancellationToken);
 
         BackupCode? matched = null;
         foreach (var code in codes)

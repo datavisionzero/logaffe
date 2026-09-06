@@ -1,144 +1,113 @@
 import { useEffect, useState } from "react";
-import { api, whenSignedOut } from "./api/client";
-import { Gate, PageTitle } from "./components/Page";
-import { CannotBeClaimed, ClaimScreen } from "./claim/ClaimScreen";
-import { FirstRun } from "./claim/FirstRun";
+import { useLocation, useNavigate } from "react-router";
+import { whenSignedOut } from "./api/client";
+import { RecoveryScreen } from "./session/RecoveryScreen";
+import { RedeemScreen, type Redemption } from "./session/RedeemScreen";
 import { SignInScreen } from "./session/SignInScreen";
+import { BootstrapScreen } from "./setup/BootstrapScreen";
+import { FirstRun } from "./setup/FirstRun";
 import { Shell } from "./shell/Shell";
 
 /**
- * What this installation is, which is what decides the first screen.
+ * Where this browser is, which is what decides the screen.
  *
- * There are only two: an installation nobody owns shows the claim and nothing
- * else, and a claimed one shows the operator's application. Whether the
- * operator is signed in is not asked here — the first request the application
- * makes answers it, and a screen that probed for it beforehand would be the
- * interface asking for something unasked.
+ * There is no state to ask the installation about. An installation with nobody
+ * signed into it does not say so — the claim that used to announce it is gone
+ * (ADR 0054) — so the application starts by showing the application, and the
+ * first request it makes is what answers whether the session is one. A screen
+ * that probed for it beforehand would be the interface asking for something
+ * unasked, and on this product it would also be the one place a stranger could
+ * learn whether anybody has ever signed in here.
  *
- * `guiding` is not a third: it is the claim that just completed, still on
- * screen. Nothing reaches it except finishing a claim in this browser, which is
- * what keeps the first-run guide a guide rather than a stage (`docs/setup.md`) —
- * it holds no state, so it cannot know it was skipped, and an installation
- * reloaded from here is simply a claimed one.
+ * `bootstrapping` and `guiding` are reached deliberately and never by a probe:
+ * the first from a link on the sign-in screen, held by whoever has the bootstrap
+ * token; the second from finishing that exchange. Neither holds anything, which
+ * is what keeps the first-run guide a guide rather than a stage
+ * (`docs/setup.md`) — it cannot know it was skipped, and an installation
+ * reloaded from there is simply one somebody is signed into.
+ *
+ * The three redemptions are decided by the address, because that is what a link
+ * in a message points at (ADR 0053). They are checked before anything else: a
+ * person redeeming an invitation has no account yet, and one recovering a
+ * password cannot sign in, so neither of them can be behind the shell.
  */
-type Reached =
-  | { at: "asking" }
-  | { at: "unreachable" }
-  | {
-      at: "unclaimed";
-      canBeClaimed: boolean;
-      needsSecret: boolean;
-      closesAt: string | null;
-    }
-  | { at: "guiding" }
-  | { at: "claimed" };
+type Where = "in" | "signed-out" | "bootstrapping" | "guiding" | "recovering";
+
+/** The address each of the three links lands on. */
+const REDEMPTIONS: Record<string, Redemption> = {
+  "/invitation": "invitation",
+  "/recovery": "recovery",
+  "/address": "address",
+};
 
 export function App() {
-  const [reached, setReached] = useState<Reached>({ at: "asking" });
-
-  useEffect(() => {
-    let current = true;
-
-    void (async () => {
-      try {
-        const { data } = await api.GET("/claim");
-
-        if (!current) {
-          return;
-        }
-
-        setReached(
-          data === undefined
-            ? { at: "unreachable" }
-            : data.isClaimed
-              ? { at: "claimed" }
-              : {
-                  at: "unclaimed",
-                  canBeClaimed: data.canBeClaimed,
-                  needsSecret: data.needsSecret,
-                  closesAt: data.closesAt,
-                },
-        );
-      } catch {
-        if (current) {
-          setReached({ at: "unreachable" });
-        }
-      }
-    })();
-
-    return () => {
-      current = false;
-    };
-  }, []);
-
-  switch (reached.at) {
-    case "asking":
-      return null;
-
-    case "unreachable":
-      return (
-        <Gate>
-          <PageTitle>logaffe</PageTitle>
-          <p className="refusal">This installation did not answer. Reload to try again.</p>
-        </Gate>
-      );
-
-    case "unclaimed":
-      return reached.canBeClaimed ? (
-        <ClaimScreen
-          needsSecret={reached.needsSecret}
-          closesAt={reached.closesAt}
-          onClaimed={() => setReached({ at: "guiding" })}
-        />
-      ) : (
-        <CannotBeClaimed needsSecret={reached.needsSecret} />
-      );
-
-    case "guiding":
-      return <FirstRun onDone={() => setReached({ at: "claimed" })} />;
-
-    case "claimed":
-      return <Installation />;
-  }
-}
-
-/**
- * A claimed installation, in front of which the sign-in stands whenever the
- * session is not one.
- *
- * The session ends in five ways that are not a sign-out — it expires, it is
- * revoked from another browser, the password changes, the second factor is
- * re-enrolled, or Host Recovery removes the account — and every one of them
- * shows up as the next request being refused. That is the one signal this
- * listens for.
- */
-function Installation() {
-  const [signedOut, setSignedOut] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [where, setWhere] = useState<Where>("in");
   const [backupCodesRemaining, setBackupCodesRemaining] = useState<number | null>(null);
 
   // A fresh shell for each session, so that signing back in re-reads what the
   // installation holds rather than showing what the previous one saw.
   const [session, setSession] = useState(0);
 
-  useEffect(() => whenSignedOut(() => setSignedOut(true)), []);
+  // The session ends in six ways that are not a sign-out — it expires, it hits
+  // its thirty days, it is revoked from another browser, the password changes,
+  // the second factor is re-enrolled, or the account is deactivated — and every
+  // one of them shows up as the next request being refused. That is the one
+  // signal this listens for.
+  useEffect(() => whenSignedOut(() => setWhere("signed-out")), []);
 
-  if (signedOut) {
-    return (
-      <SignInScreen
-        onSignedIn={(remaining) => {
-          setBackupCodesRemaining(remaining);
-          setSession((n) => n + 1);
-          setSignedOut(false);
-        }}
-      />
-    );
+  function begin() {
+    setSession((n) => n + 1);
+    setWhere("in");
   }
 
-  return (
-    <Shell
-      key={session}
-      backupCodesRemaining={backupCodesRemaining}
-      onSignedOut={() => setSignedOut(true)}
-    />
-  );
+  /** Back to the sign-in, with the secret out of the address bar. */
+  function leaveTheLink() {
+    void navigate("/", { replace: true });
+    setWhere("signed-out");
+  }
+
+  const redemption = REDEMPTIONS[location.pathname];
+
+  if (redemption !== undefined) {
+    return <RedeemScreen what={redemption} onDone={leaveTheLink} />;
+  }
+
+  switch (where) {
+    case "signed-out":
+      return (
+        <SignInScreen
+          onSignedIn={(remaining) => {
+            setBackupCodesRemaining(remaining);
+            begin();
+          }}
+          onSettingUp={() => setWhere("bootstrapping")}
+          onRecovering={() => setWhere("recovering")}
+        />
+      );
+
+    case "recovering":
+      return <RecoveryScreen onDone={() => setWhere("signed-out")} />;
+
+    case "bootstrapping":
+      return (
+        <BootstrapScreen
+          onExchanged={() => setWhere("guiding")}
+          onCancel={() => setWhere("signed-out")}
+        />
+      );
+
+    case "guiding":
+      return <FirstRun onDone={begin} />;
+
+    case "in":
+      return (
+        <Shell
+          key={session}
+          backupCodesRemaining={backupCodesRemaining}
+          onSignedOut={() => setWhere("signed-out")}
+        />
+      );
+  }
 }

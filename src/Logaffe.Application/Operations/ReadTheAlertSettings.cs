@@ -94,9 +94,10 @@ public sealed class ReadTheAlertSettings(
     CheckTheStoreIsFillingUp fillingUp,
     TimeProvider clock)
 {
-    public async Task<TheAlertSettings> ExecuteAsync(CancellationToken cancellationToken)
+    public async Task<TheAlertSettings> ExecuteAsync(
+        Reach reach, CancellationToken cancellationToken)
     {
-        var held = await projects.ListAsync(cancellationToken);
+        var held = await projects.ListAsync(reach, cancellationToken);
 
         return new TheAlertSettings(
             await installation.ReadAlertSwitchesAsync(cancellationToken),

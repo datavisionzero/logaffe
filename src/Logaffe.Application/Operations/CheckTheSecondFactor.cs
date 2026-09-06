@@ -1,4 +1,4 @@
-using Logaffe.Application.Ports;
+using Logaffe.Domain.Identities;
 
 namespace Logaffe.Application.Operations;
 
@@ -19,19 +19,9 @@ namespace Logaffe.Application.Operations;
 public sealed record SecondFactorState(bool IsEnrolled, DateTimeOffset? EnrolledAt);
 
 /// <inheritdoc cref="SecondFactorState"/>
-public sealed class CheckTheSecondFactor(IOperators operators)
+public sealed class CheckTheSecondFactor
 {
-    /// <returns>
-    /// The state, or <c>null</c> when there is no account — which behind a
-    /// session means Host Recovery ran a moment ago.
-    /// </returns>
-    public async Task<SecondFactorState?> ExecuteAsync(CancellationToken cancellationToken)
-    {
-        var theOperator = await operators.FindAsync(cancellationToken);
-
-        return theOperator is null
-            ? null
-            : new SecondFactorState(
-                theOperator.HasSecondFactor, theOperator.SecondFactorEnrolledAt);
-    }
+    /// <returns>What the interface has to say about this user's second factor.</returns>
+    public SecondFactorState Execute(User user) =>
+        new(user.HasSecondFactor, user.SecondFactorEnrolledAt);
 }

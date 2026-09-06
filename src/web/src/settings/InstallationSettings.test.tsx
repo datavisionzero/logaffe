@@ -63,6 +63,16 @@ const ENROLMENT: Answer = {
 /** The screen at one of its areas, which is an address like any other. */
 function open(routes: Record<string, Answer | Answer[]> = {}, at = "/settings") {
   const installation = anInstallationAnswering({
+    // Who is reading, which the screen asks before it draws anything: the areas
+    // are not the same for everybody, and one of them is an administrator's.
+    "GET /me": {
+      body: {
+        id: "u1",
+        name: "The Administrator",
+        email: "admin@example.com",
+        administrator: false,
+      },
+    },
     "GET /sessions": { body: [aSession({ id: "s1", isCurrent: true })] },
     "GET /agent-tokens": { body: [] },
     "GET /second-factor": withSecondFactor,
@@ -105,9 +115,11 @@ describe("the areas", () => {
     await screen.findByText("203.0.113.7");
 
     // The stacked screen asked for the sessions and the agent tokens both,
-    // whichever of them the operator had come for. The interface asks for
-    // nothing unasked (`docs/ui.md`), and an area nobody opened is unasked.
-    expect(installation.asked).toEqual(["GET /sessions"]);
+    // whichever of them somebody had come for. The interface asks for nothing
+    // unasked (`docs/ui.md`), and an area nobody opened is unasked. Who is
+    // signed in is the screen's own question: it decides whether the people tab
+    // is offered at all.
+    expect([...installation.asked].sort()).toEqual(["GET /me", "GET /sessions"]);
   });
 
   it("walks from one area to another, and marks the one being read", async () => {

@@ -185,6 +185,7 @@ public static class HostEndpoints
         hosts.MapPost(string.Empty, async (
                 HostRequest request,
                 CreateHost create,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!IsAName(request.Name))
@@ -210,13 +211,14 @@ public static class HostEndpoints
 
         hosts.MapGet(string.Empty, async (
                 ListHosts list,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 // A host that has never reported is in this answer rather than
                 // left out of it: it is something the operator made, and a list
                 // that omitted it would answer where the machine they just added
                 // went.
-                var held = await list.ExecuteAsync(cancellationToken);
+                var held = await list.ExecuteAsync(context.Reach(), cancellationToken);
 
                 return Results.Ok(held.Select(host => new ListedHostResponse(
                     host.Id,
@@ -234,6 +236,7 @@ public static class HostEndpoints
                 Guid id,
                 HostRequest request,
                 RenameHost rename,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!IsAName(request.Name))
@@ -261,6 +264,7 @@ public static class HostEndpoints
         hosts.MapDelete("/{id:guid}", async (
                 Guid id,
                 DeleteHost delete,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
                 // The host and its tokens go at once and its samples follow in
                 // the background, exactly as a deleted project's entries do
@@ -279,6 +283,7 @@ public static class HostEndpoints
                 DateTimeOffset from,
                 DateTimeOffset to,
                 ReadSamples read,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 // The caller names a range and the installation says how it
@@ -312,6 +317,7 @@ public static class HostEndpoints
         hosts.MapGet("/{id:guid}/mounts", async (
                 Guid id,
                 ListTheMountsAHostReports mounts,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 // What the operator picks the installation's own mount out of
@@ -338,6 +344,7 @@ public static class HostEndpoints
 
         samples.MapGet(string.Empty, async (
                 ChangeSampleRetention retention,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 var window = await retention.ReadAsync(cancellationToken);
@@ -351,6 +358,7 @@ public static class HostEndpoints
         samples.MapGet("/outside", async (
                 int retentionDays,
                 ChangeSampleRetention retention,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 // Refused where every other window is. There is no answering
@@ -373,6 +381,7 @@ public static class HostEndpoints
         samples.MapGet("/footprint", async (
                 int retentionDays,
                 ReadTheFootprint footprint,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!RetentionWindow.TryOfDays(retentionDays, out var proposed))
@@ -397,6 +406,7 @@ public static class HostEndpoints
         samples.MapPut(string.Empty, async (
                 SampleRetentionRequest request,
                 ChangeSampleRetention retention,
+                HttpContext context,
                 CancellationToken cancellationToken) =>
             {
                 if (!RetentionWindow.TryOfDays(request.RetentionDays, out var window))

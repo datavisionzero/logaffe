@@ -288,9 +288,14 @@ self-hostable, and it reaches a phone.
 
 A notification that is a name, a few numbers and a URL formats identically
 everywhere, so the case for a second integration is not that the first renders
-poorly. Email in particular stays absent for the reason it was always absent —
-this product has no address to send anything to
-([ADR 0015](./adr/0015-the-operator-has-no-username-and-no-email.md)).
+poorly. **Email in particular stays absent, and the reason it used to be given
+for is no longer true.** This product had no address to send anything to; it has
+one for every user now, and it can send mail
+([ADR 0053](./adr/0053-transactional-email-is-an-optional-capability-of-the-installation.md)).
+What carries the decision is the part that was always the real one: the point of
+an alert is a push that reaches a phone while nobody is looking at a screen, and
+an email is the thing that arrives in the morning. Mail in this product is for
+identity transactions and for nothing else.
 
 The access token is stored the way every other secret in this product is: sealed
 under the key on the host volume

@@ -6,26 +6,34 @@ import { Field } from "../components/Field";
 import { Gate, PageTitle } from "../components/Page";
 
 /**
- * How the operator gets back in, from whatever machine they happen to be at.
+ * How somebody gets back in, from whatever machine they happen to be at.
  *
- * There is nothing to select and nothing naming which account is meant: an
- * installation has exactly one operator, with no username and no email address
- * (ADR 0015), so a password and one second factor is the whole of it. Nothing
- * is bound to this browser, and nothing has to be prepared on a machine being
- * used for the first time.
+ * An address, a password, and the second factor if they enrolled one — all in
+ * one request. Nothing is bound to this browser, and nothing has to be prepared
+ * on a machine being used for the first time.
  *
  * **The code is left empty by an account that has none** (ADR 0041), and the
- * form says so rather than asking in two stages. Asking for the password first
- * and the code afterwards would read better and would tell an attacker when they
- * had found the password, which is the one thing this screen refuses to say:
- * every way of not getting in is one refusal (ADR 0017).
+ * form says so rather than asking in two stages. Asking for the address and
+ * password first and the code afterwards would read better and would tell an
+ * attacker when they had found the password, which is the one thing this screen
+ * refuses to say: every way of not getting in is one refusal, in one wording and
+ * one time class (ADR 0056).
  */
 export function SignInScreen({
   onSignedIn,
+  onSettingUp,
+  onRecovering,
 }: {
   /** How many backup codes are left, when one was spent getting in. */
   onSignedIn: (backupCodesRemaining: number | null) => void;
+
+  /** Somebody with the bootstrap token in hand, setting this installation up. */
+  onSettingUp: () => void;
+
+  /** Somebody who cannot remember their password. */
+  onRecovering: () => void;
 }) {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [secondFactorCode, setSecondFactorCode] = useState("");
   const [backupCode, setBackupCode] = useState("");
@@ -41,6 +49,7 @@ export function SignInScreen({
     try {
       const { data, response } = await api.POST("/sign-in", {
         body: {
+          email,
           password,
           secondFactorCode: usingBackupCode ? null : secondFactorCode,
           backupCode: usingBackupCode ? backupCode : null,
@@ -56,12 +65,13 @@ export function SignInScreen({
         return;
       }
 
-      // One refusal for every way of not getting in — a wrong password, a
-      // wrong code, a code already spent — because which of them it was is not
+      // One refusal for every way of not getting in — an address nobody
+      // holds, a wrong password, a wrong code, a code already spent, an account
+      // that has been deactivated — because which of them it was is not
       // something this surface hands over.
       setRefusal(
         response.status === 429
-          ? "Too many attempts from here. Wait a moment and try again; the account is never locked."
+          ? "Too many attempts. Wait a few minutes and try again; nothing is locked, and the count clears on its own."
           : "That did not sign you in.",
       );
     } catch {
@@ -79,6 +89,16 @@ export function SignInScreen({
       </div>
 
       <form onSubmit={signIn} className="grid max-w-md gap-3">
+        <Field label="Email address">
+          <Input
+            type="email"
+            name="email"
+            autoComplete="username"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </Field>
+
         <Field label="Password">
           <Input
             type="password"
@@ -130,6 +150,19 @@ export function SignInScreen({
           Sign in
         </Button>
 
+        {/* A link to an address rather than an answer here. What this screen
+            must not become is a way of asking who has an account on this
+            installation (ADR 0053). */}
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="w-fit px-0"
+          onClick={onRecovering}
+        >
+          Forgotten your password?
+        </Button>
+
         {/* A backup code stands in for the second factor and is consumed when
             used. It is the ordinary way in when the phone is not to hand, so it
             is one click away rather than something to be found. */}
@@ -144,6 +177,21 @@ export function SignInScreen({
           }}
         >
           {usingBackupCode ? "Use the authenticator app" : "Use a backup code instead"}
+        </Button>
+
+        {/* The way in for whoever is holding the bootstrap token, and the only
+            thing on this screen that is not a sign-in. It is a link rather than
+            something the application decided to show, because an installation
+            does not announce whether anybody has signed into it yet
+            (ADR 0054). */}
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="w-fit px-0"
+          onClick={onSettingUp}
+        >
+          Setting this installation up for the first time?
         </Button>
       </form>
     </Gate>

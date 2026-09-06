@@ -1,3 +1,4 @@
+using Logaffe.Domain.Identities;
 using Logaffe.Domain.Tokens;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -16,6 +17,20 @@ public sealed class AgentTokenConfiguration : IEntityTypeConfiguration<AgentToke
 
         // Deliberately not unique: the name is a label for the operator's list,
         // and two agents that call themselves the same thing is their business.
+        builder.Property(t => t.IdentityId).HasColumnName("identity_id").IsRequired();
+
+        // The agent this token authenticates as. It cascades because Host
+        // Recovery removes every identity and the tokens go with them
+        // (ADR 0058); nothing else deletes one, and revoking a token leaves the
+        // agent where it was.
+        builder.HasOne<Agent>()
+            .WithMany()
+            .HasForeignKey(t => t.IdentityId)
+            .HasConstraintName("fk_agent_token_identity")
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(t => t.IdentityId).HasDatabaseName("ix_agent_token_identity");
+
         builder.Property(t => t.Name)
             .HasColumnName("name")
             .HasMaxLength(AgentToken.NameMaxLength)

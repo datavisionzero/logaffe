@@ -44,7 +44,7 @@ public sealed class HostEndpointTests(PostgresFixture postgres) : IAsyncLifetime
         using var client = _installation.CreateClient();
         Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health")).StatusCode);
 
-        var enrolled = await AClaimedInstallation.ClaimAsync(_installation, _volume);
+        var enrolled = await ABootstrappedInstallation.SignInAsync(_installation);
         _secondFactorSecret = enrolled.SecondFactorSecret;
     }
 
@@ -486,7 +486,8 @@ public sealed class HostEndpointTests(PostgresFixture postgres) : IAsyncLifetime
             "/sign-in",
             new
             {
-                password = AClaimedInstallation.TheirPassword,
+                email = ABootstrappedInstallation.TheirAddress,
+                password = ABootstrappedInstallation.TheirPassword,
                 secondFactorCode = Authenticator.CodeFor(_secondFactorSecret),
             },
             TestContext.Current.CancellationToken);
