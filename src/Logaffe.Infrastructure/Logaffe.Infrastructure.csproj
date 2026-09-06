@@ -21,6 +21,8 @@
     <PackageReference Include="Dapper" />
     <!-- Argon2id, which is what a password is hashed with (ADR 0057). -->
     <PackageReference Include="Konscious.Security.Cryptography.Argon2" />
+    <!-- The SMTP client behind the mail port (ADR 0053). -->
+    <PackageReference Include="MailKit" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <!-- Named as well as arriving under the provider above, because the log
          path writes with Npgsql's binary COPY directly (ADR 0003) rather than

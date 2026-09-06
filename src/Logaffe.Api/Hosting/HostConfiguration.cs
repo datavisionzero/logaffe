@@ -93,4 +93,28 @@ public static class HostConfiguration
             configuration[BootstrapSettings.AdministratorKey],
             configuration[BootstrapSettings.EmailKey],
             configuration[BootstrapSettings.TokenKey]);
+
+    /// <summary>
+    /// The SMTP account this installation sends through, and the address its
+    /// links are built from (ADR 0053).
+    /// </summary>
+    /// <remarks>
+    /// Read at startup rather than at the moment somebody presses invite, so
+    /// that a mail configuration that is wrong is found by whoever brought the
+    /// installation up rather than by the person waiting for a message.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Something is set that this installation will not send with.
+    /// </exception>
+    public static SmtpSettings Smtp(IConfiguration configuration, bool development) =>
+        SmtpSettings.Read(
+            configuration[SmtpSettings.HostKey],
+            configuration[SmtpSettings.PortKey],
+            configuration[SmtpSettings.UsernameKey],
+            configuration[SmtpSettings.PasswordKey],
+            configuration[SmtpSettings.SecurityKey],
+            configuration[SmtpSettings.FromKey],
+            configuration[SmtpSettings.FromNameKey],
+            configuration[SmtpSettings.PublicUrlKey],
+            development);
 }

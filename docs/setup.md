@@ -109,6 +109,57 @@ the one external dependency this product takes and is optional
 an installation with no SMTP configured is healthy and complete in every other
 respect, and only those three acts refuse, saying why.
 
+## Transactional mail
+
+Three acts send a message and nothing else does: an **invitation**, a **password
+recovery** and the confirmation of a **changed address**
+([ADR 0053](./adr/0053-transactional-email-is-an-optional-capability-of-the-installation.md)).
+An alert does not come through here — that is ntfy's, because the point of an
+alert is a push that reaches a phone ([Alerts](./alerts.md)).
+
+```yaml
+Logaffe__PublicUrl: "https://logs.example.com"     # what every link is built from
+Logaffe__Smtp__Host: "smtp.example.com"
+Logaffe__Smtp__Port: "587"                         # the default
+Logaffe__Smtp__Security: "starttls"                # the default; `tls` is port 465
+Logaffe__Smtp__Username: ""                        # with the password, or neither
+Logaffe__Smtp__Password: ""
+Logaffe__Smtp__From: "logaffe@example.com"
+Logaffe__Smtp__FromName: "logaffe"                 # the default
+```
+
+**It is optional, and an installation without it is healthy.** It starts, it
+signs people in, it ingests, it serves the API and MCP, and it runs its alerts.
+Only the three acts above refuse, and they say that no mail is configured rather
+than failing obscurely. That is what makes it optional in fact and not just in
+name, and it is only affordable because the first administrator does not arrive
+by mail.
+
+**It is configuration and not a second service.** There is no queue, no retry
+engine and no third production container. A delivery failure is returned to
+whoever asked for the message and written to logaffe's own log
+([ADR 0002](./adr/0002-logaffe-logs-to-files-not-into-itself.md)); retrying
+issues a fresh secret rather than resending the old one.
+
+**Every link is built from `Logaffe__PublicUrl` and never from the `Host`
+header.** A link assembled from an inbound header is a link an attacker chooses,
+on a surface that is deliberately reachable by anyone. It is the same setting the
+alerts already use, so the two cannot disagree, and an installation that has not
+named an origin cannot configure mail at all.
+
+**It is read at startup and a value it will not accept stops the start.** A
+half-set configuration — a username without a password, a host without an origin,
+a port that is not one — is the case worth catching: it looks configured in a
+file and sends nothing, and nobody finds out until somebody is waiting for an
+invitation. Two values are refused outside development for the same reason:
+`Security: none`, which sends credentials in the clear, and a `PublicUrl` that is
+not `https`.
+
+**Mailpit is the development answer** and belongs nowhere else. It is in
+`deploy/docker-compose.dev.yml`, its web interface is at
+<http://localhost:8025>, and `appsettings.Development.json` already points at it.
+The integration tests read the delivered message through its API.
+
 ## After the exchange
 
 What follows it is a **guide, not a stage**: it offers the second factor, then
@@ -252,3 +303,12 @@ refusal, in one wording and one time class.
 - **No account recovery over the network without mail.** Password recovery is a
   one-time link to an address, so an installation with no SMTP configured has the
   host and nothing else — which is what it always had.
+- **No mail queue, no retry engine and no outbox.** A delivery failure is
+  returned to whoever asked for the message. Three kinds of message that a human
+  is waiting on do not earn a background worker
+  ([ADR 0053](./adr/0053-transactional-email-is-an-optional-capability-of-the-installation.md)).
+- **No mail that is not an identity transaction.** No alert, no digest, no
+  report, no notification that somebody signed in. What travels outward on its
+  own is a notification to ntfy, and it carries numbers and names
+  ([ADR 0049](./adr/0049-a-notification-carries-numbers-and-names-never-log-content.md)).
+- **No Mailpit in production**, and no third production container of any kind.

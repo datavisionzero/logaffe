@@ -37,13 +37,30 @@ services:
       # an installation reached directly: the header is written by whoever sent
       # the request.
       Logaffe__TrustedProxies: "${LOGAFFE_TRUSTED_PROXIES:-}"
-      # The address this installation is reached at, used for one thing only:
-      # the link an alert carries (docs/alerts.md). Everywhere else the address
-      # comes free from the forwarded headers, because everywhere else there is
-      # a request to read them from — an alert is composed on the hour with
-      # nobody on the other end. Unset means an alert goes without a link
-      # rather than with a wrong one.
+      # The address this installation is reached at. It is used for the two
+      # things composed with nobody on the other end of a request: the link an
+      # alert carries (docs/alerts.md) and every link in a message this
+      # installation sends (docs/setup.md). Never taken from an incoming Host
+      # header — that is a link an attacker would choose. Unset means an alert
+      # goes without a link rather than with a wrong one, and mail cannot be
+      # configured at all.
       Logaffe__PublicUrl: "${LOGAFFE_PUBLIC_URL:-}"
+      # Transactional mail: invitations, password recovery and address changes,
+      # and nothing else (docs/setup.md). It is optional — an installation
+      # without it is healthy, and only those three acts refuse — and it is
+      # configuration rather than a second container: there is no queue and
+      # nothing retries.
+      #
+      # `starttls` is the default and is what port 587 means; `tls` is port 465.
+      # Leave the username and password unset for a relay that takes mail from
+      # its own network without authenticating.
+      Logaffe__Smtp__Host: "${LOGAFFE_SMTP_HOST:-}"
+      Logaffe__Smtp__Port: "${LOGAFFE_SMTP_PORT:-}"
+      Logaffe__Smtp__Security: "${LOGAFFE_SMTP_SECURITY:-}"
+      Logaffe__Smtp__Username: "${LOGAFFE_SMTP_USERNAME:-}"
+      Logaffe__Smtp__Password: "${LOGAFFE_SMTP_PASSWORD:-}"
+      Logaffe__Smtp__From: "${LOGAFFE_SMTP_FROM:-}"
+      Logaffe__Smtp__FromName: "${LOGAFFE_SMTP_FROM_NAME:-}"
     volumes:
       # Both stores are needed, and a database alone is not a backup: the key
       # that makes stored tokens readable lives here.

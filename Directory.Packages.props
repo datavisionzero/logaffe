@@ -20,6 +20,14 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.10" />
   </ItemGroup>
 
+  <ItemGroup Label="Mail">
+    <!-- Transactional mail, which is the one external dependency this product
+         takes (ADR 0053). .NET's own SmtpClient is obsolete and does not speak
+         STARTTLS the way a modern provider expects; MailKit is what planaffe
+         sends with, at the same version. -->
+    <PackageVersion Include="MailKit" Version="4.17.0" />
+  </ItemGroup>
+
   <ItemGroup Label="Security">
     <!-- Argon2id, which .NET 10 does not carry in any of its libraries
          (ADR 0057). It is the same package at the same version planaffe and

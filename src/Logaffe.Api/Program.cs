@@ -106,6 +106,13 @@ builder.Services.AddScoped<IngestSample>();
 // here, because it is host-local and never reachable over the network
 // (ADR 0058).
 builder.Services.AddSingleton(HostConfiguration.Bootstrap(builder.Configuration));
+
+// The SMTP account, read at startup so that a wrong one is found by whoever
+// brought the installation up rather than by the person waiting for an
+// invitation (ADR 0053). An installation with none configured is healthy: only
+// the three acts that necessarily send refuse, and they say why.
+builder.Services.AddSingleton(HostConfiguration.Smtp(
+    builder.Configuration, builder.Environment.IsDevelopment()));
 builder.Services.AddScoped<BootstrapTheInstallation>();
 builder.Services.AddScoped<ExchangeBootstrapToken>();
 

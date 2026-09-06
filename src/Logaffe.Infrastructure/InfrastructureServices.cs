@@ -1,5 +1,6 @@
 using Logaffe.Application.Ports;
 using Logaffe.Infrastructure.Alerts;
+using Logaffe.Infrastructure.Mail;
 using Logaffe.Infrastructure.Persistence;
 using Logaffe.Infrastructure.Persistence.Log;
 using Logaffe.Infrastructure.Secrets;
@@ -112,6 +113,11 @@ public static class InfrastructureServices
         // deliberately not product data, and a restart forgetting them is the
         // safer end of the trade.
         services.AddSingleton<ISignInThrottle, InProcessSignInThrottle>();
+
+        // The one way anything here reaches an inbox (ADR 0053). A singleton
+        // because it holds a settings record and opens a connection per message:
+        // there is nothing to keep between two of them.
+        services.AddSingleton<IMail, SmtpMail>();
         services.AddSingleton<ISecondFactor, Rfc6238SecondFactor>();
 
         return services;
