@@ -152,6 +152,28 @@
             }
           }
         }
+      },
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Everybody on this installation.",
+        "operationId": "ListUsers",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ListedUserResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/users/{id}/invitation": {
@@ -347,6 +369,27 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/me": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Who this request is signed in as.",
+        "operationId": "Me",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
                 }
               }
             }
@@ -1270,6 +1313,104 @@
           },
           "404": {
             "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/users/{id}/deactivation": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Closes an account, ends its sessions and silences its agents.",
+        "operationId": "DeactivateUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Opens it again, restoring whatever was not individually revoked.",
+        "operationId": "ReactivateUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          }
+        }
+      }
+    },
+    "/users/{id}/role": {
+      "put": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Gives the administrator role or takes it back.",
+        "operationId": "ChangeUserRole",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "409": {
+            "description": "Conflict"
           }
         }
       }
@@ -4131,6 +4272,76 @@
           }
         }
       },
+      "ListedUserResponse": {
+        "required": [
+          "id",
+          "name",
+          "email",
+          "state",
+          "administrator",
+          "hasSecondFactor",
+          "projects",
+          "createdAt"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/UserState"
+          },
+          "administrator": {
+            "type": "boolean"
+          },
+          "hasSecondFactor": {
+            "type": "boolean"
+          },
+          "projects": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "MeResponse": {
+        "required": [
+          "id",
+          "name",
+          "email",
+          "administrator"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "administrator": {
+            "type": "boolean"
+          }
+        }
+      },
       "NotifierProof": {
         "enum": [
           "sent",
@@ -4541,6 +4752,17 @@
           }
         }
       },
+      "RoleRequest": {
+        "required": [
+          "administrator"
+        ],
+        "type": "object",
+        "properties": {
+          "administrator": {
+            "type": "boolean"
+          }
+        }
+      },
       "SampleBucketResponse": {
         "required": [
           "start",
@@ -4935,6 +5157,13 @@
             ]
           }
         }
+      },
+      "UserState": {
+        "enum": [
+          "invited",
+          "active",
+          "deactivated"
+        ]
       }
     }
   },

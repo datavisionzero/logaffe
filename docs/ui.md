@@ -1,6 +1,6 @@
 # The Web UI
 
-The web UI is the operator's whole entry into the product: a single-page
+The web UI is a person's whole entry into the product: a single-page
 application ([ADR 0001](./adr/0001-the-frontend-is-react-not-blazor.md)) reading
 through the query surface of [Querying](./querying.md) — the same one the agent
 gets, rather than a richer one of its own. This document is what the operator
@@ -321,8 +321,16 @@ column, where they are true of every project at once.
 Both screens are their **areas**, listed beside what is being read and marked
 while it is: a project's are *the project*, *ingest tokens* and *delete this
 project*; the installation's are *signed-in browsers*, *agent tokens*, *your
-credentials*, *groups*, *hosts* and *alerts*. One is on the screen at a time.
-Stacked, the answer to *where is the retention window* was to read the page.
+credentials*, *people*, *groups*, *hosts* and *alerts*. One is on the screen at a
+time. Stacked, the answer to *where is the retention window* was to read the
+page.
+
+**People is offered to an administrator and to nobody else.** That is a courtesy
+rather than a boundary: the installation refuses the acts either way, and a tab
+that does nothing but refuse is a tab nobody should be shown
+([ADR 0055](./adr/0055-project-access-is-one-filter.md)). The screen waits for the
+answer to *who is reading this* only when the address names that area, so every
+other address still draws on the first frame.
 
 **An area is an address**, so a reload comes back to it and the back button walks
 the ones just opened — the same thing the log view does with a filter set. The
@@ -337,8 +345,44 @@ only about the log view.
 
 **Deleting a project is an area rather than the end of one**, because an act that
 destroys data and cannot be undone should be arrived at rather than scrolled
-past. The three credentials stay together on one area, because they are three
-acts on one account rather than three subjects.
+past. The four credentials stay together on one area, because they are four acts
+on one account rather than four subjects.
+
+### People
+
+The list is name, address, state, role, whether a second factor is enrolled, and
+how many projects the person reaches. Beside each of them: invite again, give or
+take the administrator role, set the project assignments, and deactivate or
+reactivate.
+
+**Nothing here deletes, and no button says it does.** An account that should not
+be used is deactivated, so that every project assignment and every record of who
+changed something keeps pointing at somebody
+([ADR 0052](./adr/0052-a-user-and-an-agent-are-one-identity.md)). The screen says
+what deactivating costs: the sessions end and the agents go quiet.
+
+**Nothing here reaches somebody else's credentials.** No screen in this product
+sets another person's password, enrols their second factor, prints their backup
+codes or reads their sessions. What an administrator sees of them is whether a
+second factor is enrolled, because somebody who cannot see that cannot have the
+conversation — and there is no switch that makes one mandatory
+([Signing in](./sign-in.md)).
+
+**The last active administrator cannot be deactivated or lose the role**, and the
+installation is what says so rather than the screen guessing: the count is the
+rule, and it is counted where the rows are.
+
+**The project assignments list every project on the installation**, including the
+ones the administrator doing this cannot open. Handing out access is exactly the
+case where somebody works on a project they do not read, and requiring them to
+assign it to themselves first would make the role self-granting by the back door.
+What they see of such a project is its name.
+
+**The account menu says who is signed in**, by name and address. There is more
+than one person now, and *as whom am I looking at this* has an answer worth
+reading — on an installation somebody administers for other people it is the
+difference between two browser windows. Still no avatar: a picture would be a
+thing to upload.
 
 **The retention field states the cost of the number in it**, live, as three
 figures beside the box: what the installation holds today, what this window
@@ -369,7 +413,7 @@ means to end them ([Signing in](./sign-in.md)), the second factor — enrolled,
 re-enrolled or turned off from here, since this is the only place it is ever done
 ([ADR 0041](./adr/0041-the-second-factor-is-offered-not-required.md)) — a fresh
 set of backup codes, and the **agent tokens** ([MCP](./mcp.md)). **An
-installation with no second factor says so wherever the operator is**, not only
+account with no second factor says so wherever its owner is**, not only
 on this screen: a banner that stays until one is enrolled, because the interface
 is the only thing that can keep an omission from passing for a setting.
 The session list marks the browser being read from, which the server says and
@@ -377,8 +421,9 @@ nothing else could — without it "end all others" is a guess. It shows the last
 use to the minute rather than to the second, because that is how accurately it is
 recorded ([ADR 0033](./adr/0033-the-last-use-of-a-token-is-written-coarsely.md)).
 The agent tokens live here rather than inside a project because an agent token
-reads every project — putting it under one of them would say something untrue
-about what it can do.
+reaches whatever the person who issued it reaches — putting it under one project
+would say something untrue about what it can do
+([ADR 0055](./adr/0055-project-access-is-one-filter.md)).
 
 **Issuing one asks which kind it is**, reading or administering, with reading
 offered: `VISION.md` says agent access is read-only by default, and a default is

@@ -5,7 +5,10 @@ import { BackupCodes } from "./BackupCodes";
 import { ChangePassword } from "./ChangePassword";
 import { Groups } from "./Groups";
 import { Hosts } from "./Hosts";
+import { ChangeAddress } from "./ChangeAddress";
 import { SecondFactor } from "./SecondFactor";
+import { Users } from "./Users";
+import { useMe } from "../session/me";
 import { Sessions } from "./Sessions";
 import { SettingsScreen } from "./SettingsScreen";
 
@@ -44,8 +47,24 @@ import { SettingsScreen } from "./SettingsScreen";
  * was doing — so opening one is a screen rather than a row that unfolds, and it
  * is an address for the reason every area is one.
  */
+const EVERYBODY = ["agents", "credentials", "groups", "hosts", "alerts"];
+
+/**
+ * The settings of the installation itself, as areas.
+ */
 export function InstallationSettings() {
   const { section, hostId } = useParams();
+  const me = useMe();
+
+  // One area is only an administrator's, and who is reading takes a request to
+  // find out. The screen therefore waits for the answer **only when the address
+  // names an area it does not otherwise know** — which is the case that would
+  // otherwise bounce somebody who opened /settings/people directly straight
+  // back to the first area. Every other address draws on the first frame, the
+  // way it always did.
+  if (me === undefined && section !== undefined && !EVERYBODY.includes(section)) {
+    return null;
+  }
 
   return (
     <SettingsScreen
@@ -73,11 +92,18 @@ export function InstallationSettings() {
               </p>
 
               <ChangePassword />
+              <ChangeAddress />
               <SecondFactor />
               <BackupCodes />
             </>
           ),
         },
+        // Offered only to an administrator, which is a courtesy rather than a
+        // boundary: the installation refuses the acts either way, and a tab that
+        // does nothing but refuse is a tab nobody should be shown (ADR 0055).
+        ...(me?.administrator === true
+          ? [{ at: "people", name: "People", panel: <Users me={me.id} /> }]
+          : []),
         { at: "groups", name: "Groups", panel: <Groups /> },
         { at: "hosts", name: "Hosts", panel: <Hosts hostId={hostId} /> },
         { at: "alerts", name: "Alerts", panel: <Alerts /> },

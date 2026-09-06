@@ -278,6 +278,8 @@ builder.Services.AddScoped<ReinviteAUser>();
 builder.Services.AddScoped<BeginRecovery>();
 builder.Services.AddScoped<RedeemALink>();
 builder.Services.AddScoped<ChangeAddress>();
+builder.Services.AddScoped<ListUsers>();
+builder.Services.AddScoped<ChangeAUser>();
 
 // Order is start order. This one is first because what it has to say is about
 // where everything after it is written.
@@ -355,6 +357,7 @@ app.MapAccount();
 app.MapProjects();
 app.MapProjectAccess();
 app.MapInvitations();
+app.MapUsers();
 app.MapGroups();
 app.MapEntries();
 app.MapHosts();

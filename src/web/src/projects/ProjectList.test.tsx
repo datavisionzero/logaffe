@@ -96,10 +96,12 @@ describe("the project list", () => {
 
     // A dashboard is a set of counts nobody asked for over the largest table in
     // the database. The list asks for the projects and the headings they are
-    // listed under, and for nothing else — the third is the shell's, asking
-    // whether this account has a second factor to say so if it has not.
+    // listed under, and for nothing else — the other two are the shell's: who is
+    // signed in, and whether this account has a second factor to say so if it
+    // has not.
     expect([...installation.asked].sort()).toEqual([
       "GET /groups",
+      "GET /me",
       "GET /projects",
       "GET /second-factor",
     ]);

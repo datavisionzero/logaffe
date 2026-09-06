@@ -11,6 +11,7 @@ import { InstallationSettings } from "../settings/InstallationSettings";
 import { ProjectSettings } from "../settings/ProjectSettings";
 import { browserTimeZone } from "../shared/time";
 import { AccountMenu } from "./AccountMenu";
+import { useMe } from "../session/me";
 import { AppSidebar } from "./AppSidebar";
 
 /**
@@ -37,6 +38,7 @@ export function Shell({
   onSignedOut: () => void;
 }) {
   const [remaining, setRemaining] = useState(backupCodesRemaining);
+  const me = useMe();
 
   async function signOut() {
     try {
@@ -69,7 +71,7 @@ export function Shell({
               Times in {browserTimeZone()}
             </span>
 
-            <AccountMenu onSignOut={() => void signOut()} />
+            <AccountMenu me={me} onSignOut={() => void signOut()} />
           </header>
 
           <NoSecondFactor />
