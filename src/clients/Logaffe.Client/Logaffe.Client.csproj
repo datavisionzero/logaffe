@@ -14,4 +14,10 @@
     <PackageTags>logging;logaffe;clef</PackageTags>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- For the clock alone: the report a repeating failure makes only after
+         five minutes is not something a test can wait for. -->
+    <InternalsVisibleTo Include="Logaffe.UnitTests" />
+  </ItemGroup>
+
 </Project>

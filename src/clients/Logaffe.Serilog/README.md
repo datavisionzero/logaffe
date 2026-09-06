@@ -102,6 +102,12 @@ That holds however the sink was configured, including the overloads taking
 `EntryDeliveryOptions`. Set `OnFailure` on those options to send the reports
 somewhere else instead; what you set is kept.
 
+Each one is a single line — the exception's type and message, not its stack
+trace — and a failure that keeps repeating is written once and then at most every
+five minutes, with one closing line when deliveries get through again. An
+`OnFailure` of your own receives the `Exception` itself and may render it however
+it likes.
+
 **Call `Log.CloseAndFlush()` on shutdown**, as with any Serilog sink. Without it
 the application's last entries never leave.
 

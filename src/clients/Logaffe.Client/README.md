@@ -53,6 +53,14 @@ could not be reached, so the report belongs in the local log that already
 exists. Left unset it writes to `Console.Error`; silence is a callback that says
 nothing.
 
+**And a failure is one line.** The built-in report names the exception's type and
+message, not the stack trace: an unreachable installation fails once per batch,
+and the trace is the same paragraph every time. A repeating failure is said once
+and then held back to one line every five minutes, which names how many entries
+have gone undelivered since the last one, and when deliveries get through again
+there is one line for that too, saying what the outage cost. Your own `OnFailure`
+receives the `Exception` object unchanged and may render whatever it likes.
+
 **Disposal flushes, with a deadline.** `Dispose`/`DisposeAsync` spends up to
 `FlushTimeout` delivering what is still queued, and reports how many entries were
 still waiting when the time ran out. What does not go in that time is lost —

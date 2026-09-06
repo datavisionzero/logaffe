@@ -116,9 +116,7 @@ public sealed class LogaffeSink : ILogEventSink, IDisposable
             : new EntryDeliveryOptions(delivery)
             {
                 OnFailure = (message, exception) => SelfLog.WriteLine(
-                    "logaffe: {0}{1}",
-                    message,
-                    exception is null ? string.Empty : $" {exception}"),
+                    "{0}", EntryDelivery.Describe(message, exception)),
             };
 
     /// <summary>

@@ -81,7 +81,9 @@ registers one, the one taking an `HttpClient` included.
 
 **Nothing is guaranteed to arrive.** No durable buffer, no retry outliving the
 process. The application still has its own log, which is where a failed delivery
-is reported through `OnFailure`.
+is reported through `OnFailure` — one line naming the exception's type and
+message, held back to one every five minutes while the same failure repeats, and
+one closing line when deliveries get through again.
 
 ## What logaffe does with what you send
 

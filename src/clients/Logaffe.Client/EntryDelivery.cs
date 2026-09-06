@@ -71,21 +71,47 @@ public sealed class EntryDelivery : IDisposable, IAsyncDisposable
     /// </summary>
     private const int GzipThreshold = 4 * 1024;
 
+    /// <summary>
+    /// How long a delivery that keeps failing the same way stays quiet before it
+    /// says so again.
+    /// </summary>
+    /// <remarks>
+    /// An installation that is unreachable is unreachable for minutes at a time,
+    /// and at the default batch interval the same failure is otherwise a line
+    /// every second — after a night of it, the sender's own log holds nothing
+    /// but this component complaining. Five minutes is a judgement rather than a
+    /// measured figure: few enough lines that an outage does not bury the log,
+    /// often enough that somebody reading during one can see it is still going
+    /// on.
+    /// </remarks>
+    private static readonly TimeSpan RepeatFailureAfter = TimeSpan.FromMinutes(5);
+
     private readonly EntryDeliveryOptions _options;
     private readonly Channel<string> _queued;
     private readonly HttpClient _http;
     private readonly bool _ownsHttp;
     private readonly Uri _ingest;
+    private readonly TimeProvider _time;
     private readonly Task _pump;
 
     private int _dropped;
     private int _disposed;
 
+    // The outage under way, if one is: the cause that is repeating, when this
+    // last said anything about it, and what it has cost since then and
+    // altogether. Only the pump touches them — it is the single reader, and one
+    // delivery's outcome is settled before the next one starts — so they need no
+    // guard of their own.
+    private string? _failing;
+    private DateTimeOffset _said;
+    private int _lostSinceSaid;
+    private int _lostToTheOutage;
+
     /// <summary>
     /// Starts delivering, with an <see cref="HttpClient"/> of its own.
     /// </summary>
     public EntryDelivery(EntryDeliveryOptions options)
-        : this(options, new HttpClient(), ownsHttp: true)
+        : this(options, new HttpClient(), ownsHttp: true, TimeProvider.System)
     {
     }
 
@@ -95,15 +121,26 @@ public sealed class EntryDelivery : IDisposable, IAsyncDisposable
     /// handlers — or a test that substitutes one — supplies it.
     /// </summary>
     public EntryDelivery(EntryDeliveryOptions options, HttpClient http)
-        : this(options, http, ownsHttp: false)
+        : this(options, http, ownsHttp: false, TimeProvider.System)
     {
     }
 
-    private EntryDelivery(EntryDeliveryOptions options, HttpClient http, bool ownsHttp)
+    /// <summary>
+    /// The same again with the clock supplied, which is how a test asks about
+    /// the report that only comes after five minutes.
+    /// </summary>
+    internal EntryDelivery(EntryDeliveryOptions options, HttpClient http, TimeProvider time)
+        : this(options, http, ownsHttp: false, time)
+    {
+    }
+
+    private EntryDelivery(
+        EntryDeliveryOptions options, HttpClient http, bool ownsHttp, TimeProvider time)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _http = http ?? throw new ArgumentNullException(nameof(http));
         _ownsHttp = ownsHttp;
+        _time = time ?? throw new ArgumentNullException(nameof(time));
         _ingest = new Uri(options.Installation, IngestPath);
 
         // DropOldest is what makes Send neither block nor fail: the queue always
@@ -320,11 +357,15 @@ public sealed class EntryDelivery : IDisposable, IAsyncDisposable
                 .SendAsync(request, timeout.Token)
                 .ConfigureAwait(false);
 
+            // Before the receipt is read: the installation answered, which is
+            // the end of an outage whatever the answer turns out to say.
+            ReportRecovered();
+
             await ReadReceiptAsync(response, batch.Count, timeout.Token).ConfigureAwait(false);
         }
         catch (Exception failure)
         {
-            Report($"{batch.Count} entries were not delivered to {_ingest}.", failure);
+            ReportFailed(batch.Count, failure);
         }
         finally
         {
@@ -439,6 +480,89 @@ public sealed class EntryDelivery : IDisposable, IAsyncDisposable
     };
 
     /// <summary>
+    /// Says a delivery failed: the first one at once, and after that at most
+    /// once every <see cref="RepeatFailureAfter"/> for as long as the cause
+    /// holds.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The cause is the exception's type and message, so a host that cannot be
+    /// resolved and a request that ran out of time are two outages rather than
+    /// one, and a second cause arriving during the first is said out loud
+    /// instead of being swallowed by the first one's quiet.
+    /// </para>
+    /// <para>
+    /// What the repetition adds is the count. Every batch that went unreported
+    /// was still a batch that was lost, and an operator reading the second line
+    /// wants to know what the outage has cost since the first.
+    /// </para>
+    /// </remarks>
+    private void ReportFailed(int entries, Exception failure)
+    {
+        var cause = $"{failure.GetType().Name}: {failure.Message}";
+        var now = _time.GetUtcNow();
+
+        if (_failing != cause)
+        {
+            _failing = cause;
+            _said = now;
+            _lostSinceSaid = 0;
+            _lostToTheOutage = entries;
+
+            Report($"{entries} entries were not delivered to {_ingest}.", failure);
+            return;
+        }
+
+        _lostSinceSaid += entries;
+        _lostToTheOutage += entries;
+
+        if (now - _said < RepeatFailureAfter)
+        {
+            return;
+        }
+
+        Report(
+            $"{_lostSinceSaid} further entries were not delivered to {_ingest}, which is "
+            + "still failing the same way.",
+            failure);
+
+        _said = now;
+        _lostSinceSaid = 0;
+    }
+
+    /// <summary>
+    /// Says an outage ended, once, and says what it cost.
+    /// </summary>
+    /// <remarks>
+    /// Whoever saw the first line is owed the last one. Without it the log holds
+    /// the beginning of every outage and the end of none, and a reader arriving
+    /// afterwards cannot tell an installation that came back in a minute from
+    /// one that is still gone. What is counted is what the failed deliveries
+    /// carried; entries the queue shed on top of that are counted separately by
+    /// <see cref="ReportDrops"/>, and adding them here would say the same loss
+    /// twice.
+    /// </remarks>
+    private void ReportRecovered()
+    {
+        if (_failing is null)
+        {
+            return;
+        }
+
+        var lost = _lostToTheOutage;
+
+        _failing = null;
+        _said = default;
+        _lostSinceSaid = 0;
+        _lostToTheOutage = 0;
+
+        Report(
+            $"Deliveries to {_ingest} are getting through again, and {lost} entries were "
+            + "lost while they were not.",
+            null);
+    }
+
+    /// <summary>
     /// Says how many entries the queue has shed since this last reported, which
     /// is the one thing a full queue would otherwise do silently.
     /// </summary>
@@ -492,8 +616,37 @@ public sealed class EntryDelivery : IDisposable, IAsyncDisposable
     /// exactly that way.
     /// </remarks>
     private static void ToStandardError(string what, Exception? failure) =>
-        Console.Error.WriteLine(
-            failure is null ? $"logaffe: {what}" : $"logaffe: {what} {failure}");
+        Console.Error.WriteLine(Describe(what, failure));
+
+    /// <summary>
+    /// The one line a built-in report renders as: what happened, and what the
+    /// exception was and said.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Not the stack trace.</b> A delivery fails in the same few frames every
+    /// time and an unreachable installation fails once per batch, so the trace
+    /// is the same paragraph repeated until it is the only thing left in the
+    /// sender's log. The type and the message are what identify the fault, and
+    /// a sender who wants the object itself writes an
+    /// <see cref="EntryDeliveryOptions.OnFailure"/> and gets it unchanged — the
+    /// delegate's signature is untouched, and only the two built-in renderings
+    /// are shorter than they were.
+    /// </para>
+    /// <para>
+    /// <b>Public because there is more than one built-in target.</b> Standard
+    /// error is this class's, and the Serilog sink reports through Serilog's
+    /// <c>SelfLog</c> instead because reporting through the logger would hand a
+    /// failed delivery straight back to this. One rendering rather than two
+    /// keeps them from drifting apart.
+    /// </para>
+    /// </remarks>
+    /// <param name="what">What this had to say, already a whole sentence.</param>
+    /// <param name="failure">The exception behind it, where there was one.</param>
+    public static string Describe(string what, Exception? failure) =>
+        failure is null
+            ? $"logaffe: {what}"
+            : $"logaffe: {what} {failure.GetType().Name}: {failure.Message}";
 
     private void Report(string what, Exception? failure)
     {

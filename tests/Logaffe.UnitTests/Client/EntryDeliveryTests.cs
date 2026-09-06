@@ -365,6 +365,16 @@ public sealed class EntryDeliveryTests
             "logaffe: 1 entries were not delivered",
             written.ToString(),
             StringComparison.Ordinal);
+
+        // What the exception was and what it said, and not the frames it came
+        // from: those are the same every time, and once per batch they are the
+        // only thing left in the sender's log by morning.
+        Assert.Contains(
+            "HttpRequestException: no route to host",
+            written.ToString(),
+            StringComparison.Ordinal);
+
+        Assert.DoesNotContain("   at ", written.ToString(), StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -409,8 +419,103 @@ public sealed class EntryDeliveryTests
             StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// An installation that stays down is one report, not one per batch, and
+    /// its end says what it cost.
+    /// </summary>
+    /// <remarks>
+    /// This is the whole reason the throttle is there. At the default batch
+    /// interval the same failure is a line every second, so an outage over a
+    /// night leaves the sender's own log holding nothing but this component
+    /// complaining about somebody else — and whoever saw it begin would
+    /// otherwise never see it end.
+    /// </remarks>
+    [Fact]
+    public async Task An_installation_that_stays_down_is_said_once_and_its_end_says_the_cost()
+    {
+        _installation.Fails = new HttpRequestException("no route to host");
+
+        await using var delivery = Delivery();
+
+        delivery.Send(Entry("first"));
+
+        Assert.Contains(
+            "1 entries were not delivered",
+            await _reported.UntilAsync(said => said.Contains("were not delivered", StringComparison.Ordinal)),
+            StringComparison.Ordinal);
+
+        delivery.Send(Entry("second"));
+
+        // The second delivery has decided its outcome by the time this returns,
+        // and what follows is that it said nothing about it.
+        await _installation.TakeAsync(2);
+
+        _installation.Fails = null;
+        delivery.Send(Entry("third"));
+
+        var next = await _reported.UntilAsync(_ => true);
+
+        Assert.Contains("are getting through again", next, StringComparison.Ordinal);
+        Assert.Contains("2 entries were lost", next, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A failure that is still going says so again, and says what the quiet cost.
+    /// </summary>
+    [Fact]
+    public async Task A_failure_still_going_after_five_minutes_says_so_and_names_the_entries()
+    {
+        var clock = new StoppedClock(new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.Zero));
+
+        _installation.Fails = new HttpRequestException("no route to host");
+
+        await using var delivery = Delivery(clock: clock);
+
+        delivery.Send(Entry("first"));
+
+        await _reported.UntilAsync(said => said.Contains("were not delivered", StringComparison.Ordinal));
+
+        clock.Now += TimeSpan.FromMinutes(6);
+
+        delivery.Send(Entry("second"));
+
+        var again = await _reported.UntilAsync(_ => true);
+
+        Assert.Contains("1 further entries were not delivered", again, StringComparison.Ordinal);
+        Assert.Contains("still failing the same way", again, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Something else going wrong during an outage is not swallowed by it.
+    /// </summary>
+    /// <remarks>
+    /// The quiet belongs to the cause that is repeating, and a host that cannot
+    /// be resolved is not a connection that was reset: holding the second one
+    /// back on the first one's account would hide the very change an operator
+    /// is waiting to see.
+    /// </remarks>
+    [Fact]
+    public async Task A_second_thing_going_wrong_during_an_outage_is_not_held_back()
+    {
+        _installation.Fails = new HttpRequestException("no route to host");
+
+        await using var delivery = Delivery();
+
+        delivery.Send(Entry("first"));
+
+        await _reported.UntilAsync(said => said.Contains("no route to host", StringComparison.Ordinal));
+
+        _installation.Fails = new HttpRequestException("connection reset by peer");
+        delivery.Send(Entry("second"));
+
+        Assert.Contains(
+            "connection reset by peer",
+            await _reported.UntilAsync(_ => true),
+            StringComparison.Ordinal);
+    }
+
     private EntryDelivery Delivery(
-        TimeSpan? batchInterval = null, int queueCapacity = 10_000) =>
+        TimeSpan? batchInterval = null, int queueCapacity = 10_000, TimeProvider? clock = null) =>
         new(
             new EntryDeliveryOptions
             {
@@ -421,7 +526,19 @@ public sealed class EntryDeliveryTests
                 FlushTimeout = TimeSpan.FromSeconds(10),
                 OnFailure = _reported.Add,
             },
-            new HttpClient(_installation));
+            new HttpClient(_installation),
+            clock ?? TimeProvider.System);
+
+    /// <summary>
+    /// A clock that only moves when a test moves it, so that the report a
+    /// failure makes only after five minutes can be asked about in one.
+    /// </summary>
+    private sealed class StoppedClock(DateTimeOffset now) : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = now;
+
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
 
     private static string Entry(string message) =>
         $$"""{"@t":"2026-08-08T12:00:00.000Z","@mt":"{{message}}"}""";
@@ -434,7 +551,30 @@ public sealed class EntryDeliveryTests
     {
         private readonly Channel<string> _messages = Channel.CreateUnbounded<string>();
 
-        public void Add(string what, Exception? failure) => _messages.Writer.TryWrite(what);
+        /// <summary>
+        /// What a built-in target would have written, rather than the two
+        /// pieces it was handed: the rendering is part of what is being asked
+        /// about, and a test reading only <paramref name="what"/> could not see
+        /// a stack trace come back.
+        /// </summary>
+        public void Add(string what, Exception? failure) =>
+            _messages.Writer.TryWrite(EntryDelivery.Describe(what, failure));
+
+        /// <summary>Everything said so far, taking it as it stands.</summary>
+        public IReadOnlyList<string> SoFar
+        {
+            get
+            {
+                var said = new List<string>();
+
+                while (_messages.Reader.TryRead(out var message))
+                {
+                    said.Add(message);
+                }
+
+                return said;
+            }
+        }
 
         public async Task<string> UntilAsync(Func<string, bool> matches)
         {

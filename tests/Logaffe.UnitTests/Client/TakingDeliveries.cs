@@ -65,7 +65,9 @@ public sealed class TakingDeliveries : HttpMessageHandler
     /// By count rather than by "the next one", so that a delivery arriving
     /// between a test's send and its wait is caught rather than waited past.
     /// </remarks>
-    public async Task<Delivered> TakeAsync(int ordinal)
+    public Task<Delivered> TakeAsync(int ordinal) => NthAsync(_taken, ordinal);
+
+    private async Task<Delivered> NthAsync(List<Delivered> of, int ordinal)
     {
         while (true)
         {
@@ -73,9 +75,9 @@ public sealed class TakingDeliveries : HttpMessageHandler
 
             lock (_guard)
             {
-                if (_taken.Count >= ordinal)
+                if (of.Count >= ordinal)
                 {
-                    return _taken[ordinal - 1];
+                    return of[ordinal - 1];
                 }
 
                 arrived = _arrived.Task;
@@ -88,6 +90,12 @@ public sealed class TakingDeliveries : HttpMessageHandler
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        // Read once, before anything is recorded, so that a test which waits for
+        // a request and then changes the answer changes it for the next request
+        // and not for the one it just waited on.
+        var status = Status;
+        var fails = Fails;
+
         var gzipped = request.Content!.Headers.ContentEncoding.Contains("gzip");
         var bytes = await request.Content.ReadAsByteArrayAsync(cancellationToken);
 
@@ -113,12 +121,12 @@ public sealed class TakingDeliveries : HttpMessageHandler
             await gate.Task.WaitAsync(TimeSpan.FromSeconds(10), cancellationToken);
         }
 
-        if (Fails is { } failure)
+        if (fails is { } failure)
         {
             throw failure;
         }
 
-        return new HttpResponseMessage(Status)
+        return new HttpResponseMessage(status)
         {
             Content = new StringContent(Receipt, Encoding.UTF8, "application/json"),
         };

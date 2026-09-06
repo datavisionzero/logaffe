@@ -248,6 +248,20 @@ blocking** it; a **flush with a timeout** on shutdown; and delivery failures
 reported to the application's own local log, which is exactly where the additive
 model says the record already is.
 
+**A failure is one line in that log.** The built-in reports name the exception's
+type and its message and not the stack trace behind it: a delivery fails in the
+same few frames every time, and an unreachable installation fails once per batch,
+so the trace would be the same paragraph repeated until it is the only thing left
+in the log by morning. A sender who wants the exception itself supplies its own
+failure callback and gets the object unchanged.
+
+**A failure that repeats is said once and then held back** — at most one line
+every five minutes for as long as it is failing the same way, and the repetition
+says how many entries have gone undelivered since the last one. When deliveries
+get through again there is exactly one line about that too, saying what the
+outage cost, because whoever watched an outage begin would otherwise never see it
+end.
+
 ## What is deliberately not here
 
 - **No deduplication.** A proxy retry or a client-level repeat produces two rows
