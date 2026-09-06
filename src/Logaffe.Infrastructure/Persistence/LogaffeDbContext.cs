@@ -79,6 +79,12 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
     /// </summary>
     public DbSet<ProjectAccess> ProjectAccess => Set<ProjectAccess>();
 
+    /// <summary>
+    /// The links an installation has outstanding: invitations, password
+    /// recoveries and changes of address (ADR 0053).
+    /// </summary>
+    public DbSet<OneTimeSecret> OneTimeSecrets => Set<OneTimeSecret>();
+
     public DbSet<Session> Sessions => Set<Session>();
 
     public DbSet<BackupCode> BackupCodes => Set<BackupCode>();

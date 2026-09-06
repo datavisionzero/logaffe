@@ -114,6 +114,246 @@
         }
       }
     },
+    "/users": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Invites somebody, who begins with an account and no project access.",
+        "operationId": "InviteUser",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{id}/invitation": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Sends a fresh invitation, and stops the previous link working.",
+        "operationId": "ReinviteUser",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "description": "Not Found"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/recovery": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Sends a link to that address, if there is an account behind it.",
+        "operationId": "BeginRecovery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          }
+        }
+      }
+    },
+    "/invitation/redemption": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Sets a first password, which is what an invitation is for.",
+        "operationId": "RedeemInvitation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/recovery/redemption": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Sets a new password, and ends every session that account had.",
+        "operationId": "RedeemRecovery",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/address/redemption": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Confirms the new address, which is when it starts signing in.",
+        "operationId": "RedeemAddressChange",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/address": {
+      "post": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "Sends a link to the new address; nothing changes until it is used.",
+        "operationId": "ChangeAddress",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeAddressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HttpValidationProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ingest": {
       "post": {
         "tags": [
@@ -2722,6 +2962,27 @@
           }
         }
       },
+      "ChangeAddressRequest": {
+        "required": [
+          "password",
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
       "ChangePasswordRequest": {
         "required": [
           "currentPassword",
@@ -3360,6 +3621,31 @@
               "null",
               "string"
             ]
+          }
+        }
+      },
+      "InviteRequest": {
+        "required": [
+          "name",
+          "email",
+          "administrator"
+        ],
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "administrator": {
+            "type": "boolean"
           }
         }
       },
@@ -4153,6 +4439,41 @@
           },
           "deliverySnippet": {
             "type": "string"
+          }
+        }
+      },
+      "RecoveryRequest": {
+        "required": [
+          "email"
+        ],
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "RedeemRequest": {
+        "required": [
+          "secret",
+          "password"
+        ],
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "password": {
+            "type": [
+              "null",
+              "string"
+            ]
           }
         }
       },

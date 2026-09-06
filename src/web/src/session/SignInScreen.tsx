@@ -22,12 +22,16 @@ import { Gate, PageTitle } from "../components/Page";
 export function SignInScreen({
   onSignedIn,
   onSettingUp,
+  onRecovering,
 }: {
   /** How many backup codes are left, when one was spent getting in. */
   onSignedIn: (backupCodesRemaining: number | null) => void;
 
   /** Somebody with the bootstrap token in hand, setting this installation up. */
   onSettingUp: () => void;
+
+  /** Somebody who cannot remember their password. */
+  onRecovering: () => void;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -144,6 +148,19 @@ export function SignInScreen({
 
         <Button type="submit" disabled={signingIn} className="mt-1 w-fit">
           Sign in
+        </Button>
+
+        {/* A link to an address rather than an answer here. What this screen
+            must not become is a way of asking who has an account on this
+            installation (ADR 0053). */}
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="w-fit px-0"
+          onClick={onRecovering}
+        >
+          Forgotten your password?
         </Button>
 
         {/* A backup code stands in for the second factor and is consumed when

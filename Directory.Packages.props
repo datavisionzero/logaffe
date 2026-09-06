@@ -95,6 +95,10 @@
     <!-- … and the binder itself. -->
     <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.0" />
     <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />
+    <!-- Mailpit, for the tests that read a delivered message back (ADR 0053).
+         The base package rather than a module: there is no Testcontainers.Mailpit,
+         and what this needs is a container with two ports. -->
+    <PackageVersion Include="Testcontainers" Version="4.13.0" />
 
     <!-- Nothing here calls SSH.NET. It arrives under Testcontainers, and
          GHSA-q939-rpr3-3284 made 2025.1.0 — the version Testcontainers 4.13.0

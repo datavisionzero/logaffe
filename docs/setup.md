@@ -109,6 +109,54 @@ the one external dependency this product takes and is optional
 an installation with no SMTP configured is healthy and complete in every other
 respect, and only those three acts refuse, saying why.
 
+### What a link is, and what it is not
+
+**Only its hash is kept.** The value in the link exists for the length of one
+request, the way a session secret and a backup code do — a store that could
+reproduce it would be a store that could take somebody's account without their
+password.
+
+**One live link per purpose per person.** Asking again issues a fresh one and
+stops the previous one working in the same transaction, so somebody whose first
+message went to spam holds two links and the newer one is the one that works.
+Two live links would be two chances for the older one to be found in a mailbox
+later.
+
+**It works once.** Redeeming spends it before anything about the account is
+touched, so two requests carrying one link cannot both win.
+
+**An invitation lasts seven days; a recovery and a change of address last an
+hour.** The first has to survive a weekend and a spam folder; the other two are
+answers to something somebody is doing right now.
+
+**Every way of a link not opening anything is one answer.** Used already,
+expired, replaced, for the wrong act, or never a link at all: the installation
+does not tell them apart, because the person holding a value it does not
+recognize has no business learning which.
+
+### The three, one at a time
+
+**An invitation** creates the account in the invited state — an address and no
+password — and the link sets the first one. Re-inviting sends a fresh link and
+stops the old one. An account that has already arrived cannot be re-invited: that
+would be a second way to set a password without being asked for the current one.
+
+**A recovery** never says whether an address exists. An address nobody holds, one
+belonging to somebody who was invited and never arrived, and one whose account
+has been deactivated all get the same sentence — *if there is an account at that
+address, a link is on its way* — because saying otherwise turns a public form
+into a way of asking who is here. Redeeming it **ends every session that account
+had**, everywhere: whoever is redeeming it is not signed in, so a session that
+survived would be the one this exists to end.
+
+**A change of address** asks for the password, sends the link to the **new**
+address — what it proves is that somebody reads mail there — and changes nothing
+until it is redeemed. Until then the old address is still the one that signs in,
+so a change that is never confirmed costs nothing. The new address is reserved
+while the change is live, against the people who hold one and against other
+outstanding changes: two people moving to one address would otherwise both be
+told yes.
+
 ## Transactional mail
 
 Three acts send a message and nothing else does: an **invitation**, a **password

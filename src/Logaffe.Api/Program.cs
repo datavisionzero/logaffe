@@ -269,6 +269,16 @@ builder.Services.AddScoped<ResolveReach>();
 builder.Services.AddScoped<AssignProject>();
 builder.Services.AddScoped<ListProjectAccess>();
 
+// The three links, and the templates that say what each of them is for
+// (ADR 0053). The templates are a singleton because they hold the settings and
+// nothing else.
+builder.Services.AddSingleton<MailTemplates>();
+builder.Services.AddScoped<InviteAUser>();
+builder.Services.AddScoped<ReinviteAUser>();
+builder.Services.AddScoped<BeginRecovery>();
+builder.Services.AddScoped<RedeemALink>();
+builder.Services.AddScoped<ChangeAddress>();
+
 // Order is start order. This one is first because what it has to say is about
 // where everything after it is written.
 builder.Services.AddHostedService<FileLogService>();
@@ -344,6 +354,7 @@ app.MapSessions();
 app.MapAccount();
 app.MapProjects();
 app.MapProjectAccess();
+app.MapInvitations();
 app.MapGroups();
 app.MapEntries();
 app.MapHosts();

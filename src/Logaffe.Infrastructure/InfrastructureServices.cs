@@ -36,6 +36,7 @@ public static class InfrastructureServices
         services.AddScoped<ISealedSecrets, SealedSecrets>();
         services.AddScoped<IProjects, Projects>();
         services.AddScoped<IProjectAccess, ProjectAccesses>();
+        services.AddScoped<IOneTimeSecrets, OneTimeSecrets>();
         services.AddScoped<IGroups, Groups>();
         services.AddScoped<IHosts, Hosts>();
         services.AddScoped<ITokens, Tokens>();

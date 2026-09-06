@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { whenSignedOut } from "./api/client";
+import { RecoveryScreen } from "./session/RecoveryScreen";
+import { RedeemScreen, type Redemption } from "./session/RedeemScreen";
 import { SignInScreen } from "./session/SignInScreen";
 import { BootstrapScreen } from "./setup/BootstrapScreen";
 import { FirstRun } from "./setup/FirstRun";
@@ -22,10 +25,24 @@ import { Shell } from "./shell/Shell";
  * is what keeps the first-run guide a guide rather than a stage
  * (`docs/setup.md`) — it cannot know it was skipped, and an installation
  * reloaded from there is simply one somebody is signed into.
+ *
+ * The three redemptions are decided by the address, because that is what a link
+ * in a message points at (ADR 0053). They are checked before anything else: a
+ * person redeeming an invitation has no account yet, and one recovering a
+ * password cannot sign in, so neither of them can be behind the shell.
  */
-type Where = "in" | "signed-out" | "bootstrapping" | "guiding";
+type Where = "in" | "signed-out" | "bootstrapping" | "guiding" | "recovering";
+
+/** The address each of the three links lands on. */
+const REDEMPTIONS: Record<string, Redemption> = {
+  "/invitation": "invitation",
+  "/recovery": "recovery",
+  "/address": "address",
+};
 
 export function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [where, setWhere] = useState<Where>("in");
   const [backupCodesRemaining, setBackupCodesRemaining] = useState<number | null>(null);
 
@@ -45,6 +62,18 @@ export function App() {
     setWhere("in");
   }
 
+  /** Back to the sign-in, with the secret out of the address bar. */
+  function leaveTheLink() {
+    void navigate("/", { replace: true });
+    setWhere("signed-out");
+  }
+
+  const redemption = REDEMPTIONS[location.pathname];
+
+  if (redemption !== undefined) {
+    return <RedeemScreen what={redemption} onDone={leaveTheLink} />;
+  }
+
   switch (where) {
     case "signed-out":
       return (
@@ -54,8 +83,12 @@ export function App() {
             begin();
           }}
           onSettingUp={() => setWhere("bootstrapping")}
+          onRecovering={() => setWhere("recovering")}
         />
       );
+
+    case "recovering":
+      return <RecoveryScreen onDone={() => setWhere("signed-out")} />;
 
     case "bootstrapping":
       return (
