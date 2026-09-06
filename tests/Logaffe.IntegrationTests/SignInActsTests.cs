@@ -6,6 +6,7 @@ using Logaffe.Application.Ports;
 using Logaffe.Domain.Identities;
 using Logaffe.Infrastructure.Persistence;
 using Logaffe.Infrastructure.Secrets;
+using Logaffe.Infrastructure.Throttling;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -186,17 +187,25 @@ public sealed class SignInActsTests(PostgresFixture postgres) : IDisposable
 
         var hasher = new Argon2idPasswordHasher();
 
-        return await new SignIn(
+        var attempt = await new SignIn(
                 new Identities(context),
                 new Sessions(context),
                 hasher,
                 new DummyPasswordHash(hasher),
+                new InProcessSignInThrottle(),
                 new Rfc6238SecondFactor(),
                 CipherOn(_volume),
                 At(Claimed))
             .ExecuteAsync(
                 TheirAddress, password, code, backupCode, "203.0.113.7",
                 TestContext.Current.CancellationToken);
+
+        // A fresh throttle per call, so that what this class asserts is the
+        // sign-in rather than the windows in front of it — those have their own
+        // tests.
+        Assert.False(attempt.Throttled);
+
+        return attempt.Session;
     }
 
     private static async Task<AdmittedSession?> AuthenticateAsync(

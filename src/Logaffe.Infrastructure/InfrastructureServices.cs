@@ -3,6 +3,7 @@ using Logaffe.Infrastructure.Alerts;
 using Logaffe.Infrastructure.Persistence;
 using Logaffe.Infrastructure.Persistence.Log;
 using Logaffe.Infrastructure.Secrets;
+using Logaffe.Infrastructure.Throttling;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -104,6 +105,12 @@ public static class InfrastructureServices
         // hash it produces, the other is arithmetic over a secret the caller
         // brings.
         services.AddSingleton<IPasswordHasher, Argon2idPasswordHasher>();
+
+        // The two rolling windows in front of the sign-in (ADR 0056). A
+        // singleton because that is what "in the process" means: the counts are
+        // deliberately not product data, and a restart forgetting them is the
+        // safer end of the trade.
+        services.AddSingleton<ISignInThrottle, InProcessSignInThrottle>();
         services.AddSingleton<ISecondFactor, Rfc6238SecondFactor>();
 
         return services;

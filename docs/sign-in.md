@@ -247,25 +247,49 @@ set entirely, spent codes and unspent alike. It requires the password, because
 ten of these are ten ways past the second factor. It ends no session: replacing
 the way back in says nothing about the browsers already signed in.
 
-## A wrong password never locks the account
+## The sign-in is throttled per account and per source
 
-Failed sign-ins are throttled **by where they come from**, with the delay growing
-as attempts accumulate. The account itself is never locked
-([ADR 0017](./adr/0017-a-wrong-password-never-locks-the-account.md)).
-
-Concretely: **five attempts in a burst**, which is what a person mistyping a
-passphrase actually makes, and then **one every thirty seconds**, with a couple
-held waiting rather than refused before the rest are answered `429`. Those are
-product values, the same in every installation, and not something an operator is
-asked to have an opinion about. Which address a burst is counted against is
+Failed sign-ins fill **two rolling fifteen-minute windows**: five attempts
+against one normalized address, and twenty from one source address. Either one
+exhausted is answered `429` until it drains
+([ADR 0056](./adr/0056-sign-in-is-throttled-per-account-and-per-source.md)).
+Those are product values, the same in every installation, and not something
+anybody is asked to have an opinion about. Which address a source window is
+counted against is
 [the reverse proxy question](./operations.md#behind-a-reverse-proxy).
 
-With exactly one account, a lockout is a weapon pointed at its owner: anyone able
-to reach the installation could hold the operator out of it indefinitely by
-guessing wrong on purpose, and the only way back would be the command that
-deletes the account. That is worse on an installation with no second factor
-rather than better — a password-only account is one a lockout could hold hostage
-just as easily — which is why the decision stands where it did.
+**It is a throttle that expires, never a lockout that has to be lifted.** Nothing
+latches, no administrator has to unlock anything, and there is no state a
+stranger can put somebody's account into that outlasts a coffee. That is what
+makes counting per account affordable: the old refusal to do it turned on there
+being exactly one account, where a limit is a weapon pointed at its owner and the
+way back is the command that deletes it. With several accounts a window on one
+address touches nobody else, drains on its own in minutes, and inconveniences
+precisely the person whose password is being guessed.
+
+**A successful sign-in clears the account's window and not the source's.**
+Somebody who mistyped four times and then got it right is back to zero. A source
+that has been working through twenty addresses has proven nothing by guessing one
+of them correctly, and clearing its window on a success is exactly what a
+spraying attempt would use.
+
+**An address nobody holds fills its own window.** Counting per account must not
+become a way of asking which addresses exist here, so an attempt against an
+address this installation has never heard of costs the same, counts the same, and
+is refused the same.
+
+**The counters live in a bounded store in the process and are not product data.**
+A restart forgets them, which is the safer end of the trade: the alternative
+makes signing in depend on a table that has to be swept, or on a second service,
+and an installation whose sign-in path can be taken down by its own bookkeeping
+is worse than one that occasionally forgives four wrong guesses. The store is
+bounded because an unauthenticated caller chooses the account key — a flood of
+distinct addresses evicts rather than growing.
+
+**In front of both sits the ordinary rate limit** every public surface carries:
+a burst of five per source and one every thirty seconds after that. It runs
+before a body has been read, so it can only count by where a request came from;
+the two compose, one shaping a burst and the other capping the quarter hour.
 
 **What the throttle can promise depends on the account it protects.** With a
 second factor enrolled, a correctly guessed password on its own opens nothing.

@@ -27,6 +27,24 @@ public sealed record SignedIn(
     SessionSecret Secret, Session Session, int? BackupCodesRemaining);
 
 /// <summary>
+/// How a sign-in ended: with a session, with a refusal, or with neither because
+/// the throttle would not answer it (ADR 0056).
+/// </summary>
+/// <remarks>
+/// The throttle is told apart from a refusal because the caller has to say
+/// something different — a <c>429</c> and how long to wait, rather than the one
+/// refusal every other way of not getting in shares. It says nothing about which
+/// of the two windows is exhausted, and an address nobody holds fills its own
+/// window exactly as one somebody holds does.
+/// </remarks>
+public sealed record SignInAttempt(SignedIn? Session, bool Throttled)
+{
+    public static SignInAttempt Refused => new(null, Throttled: false);
+
+    public static SignInAttempt TooMany => new(null, Throttled: true);
+}
+
+/// <summary>
 /// A user proving what their account asks for and getting a session for it.
 /// </summary>
 /// <remarks>
@@ -51,9 +69,10 @@ public sealed record SignedIn(
 /// that address exactly as a real one does (ADR 0056).
 /// </para>
 /// <para>
-/// <b>Nothing here latches.</b> A failed attempt writes nothing to the account.
-/// What holds the guessing back is the throttle in the adapter, which drains on
-/// its own, and the second factor where one is enrolled.
+/// <b>Nothing here latches.</b> A failed attempt writes nothing to the account —
+/// what it fills is a window that drains on its own, per address and per source
+/// (ADR 0056). Nobody has to unlock anything, and there is no state a stranger
+/// can put somebody's account into that outlasts a coffee.
 /// </para>
 /// </remarks>
 public sealed class SignIn(
@@ -61,6 +80,7 @@ public sealed class SignIn(
     ISessions sessions,
     IPasswordHasher hasher,
     DummyPasswordHash absent,
+    ISignInThrottle throttle,
     ISecondFactor secondFactor,
     ISecretCipher cipher,
     TimeProvider clock)
@@ -81,7 +101,7 @@ public sealed class SignIn(
     /// Where the request came from, which is the column that makes the session
     /// list a security surface rather than a convenience.
     /// </param>
-    public async Task<SignedIn?> ExecuteAsync(
+    public async Task<SignInAttempt> ExecuteAsync(
         string? email,
         string? password,
         string? secondFactorCode,
@@ -89,7 +109,19 @@ public sealed class SignIn(
         string? seenFrom,
         CancellationToken cancellationToken)
     {
-        // The shape first, and before the hasher: hashing is deliberately slow
+        var now = clock.GetUtcNow();
+        var account = AccountKey(email);
+        var source = seenFrom ?? "unknown";
+
+        // Before anything else, including the shape of what was sent: a request
+        // the throttle will not answer must not cost a hash, and it must cost
+        // the same whether or not the rest of it made sense.
+        if (!throttle.Admits(account, source, now))
+        {
+            return SignInAttempt.TooMany;
+        }
+
+        // The shape next, and before the hasher: hashing is deliberately slow
         // and this surface is public, so a megabyte of input is refused here
         // rather than inside Argon2id. The minimum length is not applied — it is
         // a rule about choosing a password, and applying it to one being
@@ -97,7 +129,7 @@ public sealed class SignIn(
         // they set it (ADR 0042).
         if (!Password.TryRead(password, out var presented))
         {
-            return null;
+            return Refuse(account, source, now);
         }
 
         var user = await FindByAddressAsync(email, cancellationToken);
@@ -112,10 +144,8 @@ public sealed class SignIn(
         if (user is null || user.PasswordHash is null || !user.IsActive
             || check is PasswordCheck.Wrong)
         {
-            return null;
+            return Refuse(account, source, now);
         }
-
-        var now = clock.GetUtcNow();
 
         // An account with no second factor has nothing to prove past the
         // password, and anything sent alongside it is ignored rather than
@@ -131,7 +161,7 @@ public sealed class SignIn(
 
         if (spent is null)
         {
-            return null;
+            return Refuse(account, source, now);
         }
 
         // Only now, and only on the way in. A correct password with a wrong
@@ -149,7 +179,45 @@ public sealed class SignIn(
         var session = Session.Start(user.Id, secret, seenFrom, now);
         await sessions.AddAsync(session, cancellationToken);
 
-        return new SignedIn(secret, session, spent.Remaining);
+        // The account's window and not the source's: somebody who mistyped four
+        // times and then got it right is back to zero, and a source that has
+        // been trying twenty addresses has proven nothing by guessing one of
+        // them correctly (ADR 0056).
+        throttle.Succeeded(account);
+
+        return new SignInAttempt(
+            new SignedIn(secret, session, spent.Remaining), Throttled: false);
+    }
+
+    /// <summary>
+    /// The one refusal, counted against both windows on the way out.
+    /// </summary>
+    private SignInAttempt Refuse(string account, string source, DateTimeOffset now)
+    {
+        throttle.Failed(account, source, now);
+
+        return SignInAttempt.Refused;
+    }
+
+    /// <summary>
+    /// What the attempt is counted against: the normalized address if what
+    /// arrived is one, and otherwise the text as it arrived, folded.
+    /// </summary>
+    /// <remarks>
+    /// Something that is not an address at all still gets a key rather than
+    /// being exempt, or the cheapest way past the account window would be to
+    /// send rubbish in that box.
+    /// </remarks>
+    private static string AccountKey(string? email)
+    {
+        try
+        {
+            return User.NormalizeEmailForComparison(email);
+        }
+        catch (ArgumentException)
+        {
+            return (email ?? string.Empty).Trim().ToLowerInvariant();
+        }
     }
 
     /// <summary>

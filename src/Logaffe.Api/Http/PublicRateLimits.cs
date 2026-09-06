@@ -12,29 +12,22 @@ namespace Logaffe.Api.Http;
 public static class PublicRateLimits
 {
     /// <summary>
-    /// The throttle in front of the sign-in, which is public, reachable by
-    /// anyone, and the only place a password can be guessed at over the network.
+    /// The outer throttle in front of the sign-in and the bootstrap exchange,
+    /// which are public, reachable by anyone, and the only two places a
+    /// credential can be guessed at over the network.
     /// </summary>
+    /// <remarks>
+    /// It is the coarse one and it is not the whole of the story: this runs
+    /// before a body is read, so it can only partition by where the request came
+    /// from. What counts a failure against the address that was presented is the
+    /// throttle inside the act
+    /// (<c>ISignInThrottle</c>, ADR 0056), and the two compose — this one shapes
+    /// a burst, that one caps the quarter hour.
+    /// </remarks>
     public const string SignIn = "sign-in";
 
     /// <summary>
-    /// The throttle in front of the two acts that take an installation. It does
-    /// not stop somebody who wins the race honestly — nothing can, and
-    /// <c>VISION.md</c> accepts that — it stops the automated attempt at the
-    /// password afterwards, and it keeps drawing enrolments from being free.
-    /// </summary>
-    public const string Claim = "claim";
-
-    /// <summary>
-    /// The throttle on the one question an unclaimed installation answers for
-    /// nothing: whether it has an operator. It is a single row read and it says
-    /// what the screen says, so it is limited to keep it from being a free
-    /// heartbeat rather than because the answer is worth anything.
-    /// </summary>
-    public const string ClaimState = "claim-state";
-
-    /// <summary>
-    /// The throttle on everything behind the operator's session. It is generous,
+    /// The throttle on everything behind a session. It is generous,
     /// because the only repeating request the interface makes is the tail of the
     /// view being watched (<c>docs/ui.md</c>) — it is here so that a stolen
     /// cookie cannot walk the installation at machine speed, not to ration an
@@ -53,10 +46,9 @@ public static class PublicRateLimits
 
     /// <summary>
     /// The throttle in front of the samples. It is a bucket of its own rather
-    /// than the deliveries', for the reason the claim has one beside the
-    /// sign-in: the two never compete for anything, so sharing a partition would
-    /// only mean a fleet's collectors spending an application's delivery budget
-    /// on the day they sit behind one address.
+    /// than the deliveries': the two never compete for anything, so sharing a
+    /// partition would only mean a fleet's collectors spending an application's
+    /// delivery budget on the day they sit behind one address.
     /// </summary>
     public const string Sample = "sample";
 
@@ -103,16 +95,8 @@ public static class PublicRateLimits
     private const int AgentPerMinute = 120;
 
     /// <summary>
-    /// How often the claim screen may ask whether the installation is still
-    /// unclaimed. It is generous because it is a page load rather than a poll —
-    /// the screen is given a deadline and counts down to it in the browser.
-    /// </summary>
-    private const int ClaimStatePerMinute = 60;
-
-    /// <summary>
     /// What the bucket refills at once the burst is gone, which is what turns
-    /// the sixth attempt into a wait and the eighth into a longer one — the
-    /// growing delay of ADR 0017.
+    /// the sixth request into a wait and the eighth into a longer one.
     /// </summary>
     private static readonly TimeSpan Refill = TimeSpan.FromSeconds(30);
 
@@ -128,11 +112,11 @@ public static class PublicRateLimits
         {
             limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-            // Partitioned by where the attempt came from, and never by the
-            // account: with exactly one account, throttling by account is a
-            // lockout, and a lockout is a weapon pointed at its owner
-            // (ADR 0017). What that address is worth behind a proxy is
-            // RequestSource's business.
+            // Partitioned by where the attempt came from, because that is all
+            // this layer has: the address being signed in as is in a body
+            // nothing has read yet, and counting per address happens inside the
+            // act (ADR 0056). What that source address is worth behind a proxy
+            // is RequestSource's business.
             limiter.AddPolicy(SignIn, context => RateLimitPartition.GetTokenBucketLimiter(
                 context.SeenFrom() ?? "unknown",
                 _ => new TokenBucketRateLimiterOptions
@@ -143,32 +127,6 @@ public static class PublicRateLimits
                     QueueLimit = Waiting,
                     QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                     AutoReplenishment = true,
-                }));
-
-            // The same bucket the sign-in gets, and a separate one rather than
-            // the same policy: the two never compete — an unclaimed
-            // installation has nobody to sign in and a claimed one cannot be
-            // claimed — so sharing a partition would only mean one surface
-            // spending the other's budget on the day they overlap.
-            limiter.AddPolicy(Claim, context => RateLimitPartition.GetTokenBucketLimiter(
-                context.SeenFrom() ?? "unknown",
-                _ => new TokenBucketRateLimiterOptions
-                {
-                    TokenLimit = Burst,
-                    TokensPerPeriod = 1,
-                    ReplenishmentPeriod = Refill,
-                    QueueLimit = Waiting,
-                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                    AutoReplenishment = true,
-                }));
-
-            limiter.AddPolicy(ClaimState, context => RateLimitPartition.GetFixedWindowLimiter(
-                context.SeenFrom() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions
-                {
-                    PermitLimit = ClaimStatePerMinute,
-                    Window = TimeSpan.FromMinutes(1),
-                    QueueLimit = 0,
                 }));
 
             // Partitioned by source here as well rather than by session, so that

@@ -10,6 +10,7 @@ using Logaffe.Domain.Tokens;
 using Logaffe.Infrastructure.Persistence;
 using Logaffe.Infrastructure.Persistence.Log;
 using Logaffe.Infrastructure.Secrets;
+using Logaffe.Infrastructure.Throttling;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -118,6 +119,7 @@ public sealed class RestoreTests(PostgresFixture postgres) : IDisposable
                 new Sessions(context),
                 hasher,
                 new DummyPasswordHash(hasher),
+                new InProcessSignInThrottle(),
                 new Rfc6238SecondFactor(),
                 cipher,
                 At(Claimed))

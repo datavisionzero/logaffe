@@ -19,11 +19,12 @@ public sealed class SignInTests
     {
         var installation = Signed_up_installation();
 
-        var signedIn = await installation.SignIn.ExecuteAsync(
+        var attempt = await installation.SignIn.ExecuteAsync(
             TheirAddress,
             TheirPassword, TheCode, null, "203.0.113.7", TestContext.Current.CancellationToken);
 
-        Assert.NotNull(signedIn);
+        Assert.NotNull(attempt.Session);
+        var signedIn = attempt.Session;
         Assert.Equal([signedIn.Session], installation.Sessions.Stored);
         Assert.Equal("203.0.113.7", signedIn.Session.LastSeenFrom);
 
@@ -36,11 +37,12 @@ public sealed class SignInTests
     {
         var installation = Signed_up_installation();
 
-        var signedIn = await installation.SignIn.ExecuteAsync(
+        var attempt = await installation.SignIn.ExecuteAsync(
             TheirAddress,
             TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken);
 
-        Assert.NotNull(signedIn);
+        Assert.NotNull(attempt.Session);
+        var signedIn = attempt.Session;
 
         // ADR 0032: a session secret is stored as a fast hash and is not
         // readable back. The row must not hold the value the browser holds.
@@ -69,9 +71,9 @@ public sealed class SignInTests
     {
         var installation = Signed_up_installation();
 
-        Assert.Null(await installation.SignIn.ExecuteAsync(
+        Assert.Null((await installation.SignIn.ExecuteAsync(
             TheirAddress,
-            "some other passphrase", TheCode, null, null, TestContext.Current.CancellationToken));
+            "some other passphrase", TheCode, null, null, TestContext.Current.CancellationToken)).Session);
 
         // ADR 0017: with exactly one account a lockout is a weapon pointed at
         // its owner, so there is no counter, no flag, and nothing at all for a
@@ -86,9 +88,9 @@ public sealed class SignInTests
     {
         var installation = Signed_up_installation();
 
-        Assert.Null(await installation.SignIn.ExecuteAsync(
+        Assert.Null((await installation.SignIn.ExecuteAsync(
             TheirAddress,
-            TheirPassword, "000000", null, null, TestContext.Current.CancellationToken));
+            TheirPassword, "000000", null, null, TestContext.Current.CancellationToken)).Session);
         Assert.Empty(installation.Sessions.Stored);
     }
 
@@ -97,9 +99,9 @@ public sealed class SignInTests
     {
         var installation = Signed_up_installation();
 
-        Assert.Null(await installation.SignIn.ExecuteAsync(
+        Assert.Null((await installation.SignIn.ExecuteAsync(
             TheirAddress,
-            "short", TheCode, null, null, TestContext.Current.CancellationToken));
+            "short", TheCode, null, null, TestContext.Current.CancellationToken)).Session);
 
         // The minimum is a rule about choosing a password (ADR 0042). A short
         // one presented here is simply not the one, and it is the hasher that
@@ -114,13 +116,13 @@ public sealed class SignInTests
     {
         var installation = Signed_up_installation();
 
-        Assert.Null(await installation.SignIn.ExecuteAsync(
+        Assert.Null((await installation.SignIn.ExecuteAsync(
             TheirAddress,
             new string('x', Password.MaximumLength + 1),
             TheCode,
             null,
             null,
-            TestContext.Current.CancellationToken));
+            TestContext.Current.CancellationToken)).Session);
 
         // Hashing is deliberately slow and this surface is public, so a megabyte
         // of input is refused before PBKDF2 is asked to spend anything on it.
@@ -129,13 +131,92 @@ public sealed class SignInTests
     }
 
     [Fact]
+    public async Task A_failed_attempt_counts_and_a_successful_one_clears_the_account()
+    {
+        var installation = Signed_up_installation();
+
+        await installation.SignIn.ExecuteAsync(
+            TheirAddress,
+            "some other passphrase", TheCode, null, "203.0.113.7",
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, installation.Throttle.Failures);
+
+        await installation.SignIn.ExecuteAsync(
+            TheirAddress,
+            TheirPassword, TheCode, null, "203.0.113.7", TestContext.Current.CancellationToken);
+
+        // The account's window and not the source's: somebody who mistyped and
+        // then got it right is back to zero, and a source that has been trying
+        // twenty addresses has proven nothing (ADR 0056).
+        Assert.Equal(1, installation.Throttle.Successes);
+        Assert.Equal(1, installation.Throttle.FailuresFrom("203.0.113.7"));
+    }
+
+    [Fact]
+    public async Task An_exhausted_window_is_answered_before_anything_is_hashed()
+    {
+        var installation = Signed_up_installation();
+
+        for (var attempt = 0; attempt < SignInThrottle.AttemptsPerAccount; attempt++)
+        {
+            await installation.SignIn.ExecuteAsync(
+                TheirAddress,
+                "some other passphrase", TheCode, null, "203.0.113.7",
+                TestContext.Current.CancellationToken);
+        }
+
+        var hashes = installation.Hasher.Verifications;
+
+        var refused = await installation.SignIn.ExecuteAsync(
+            TheirAddress,
+            TheirPassword, TheCode, null, "203.0.113.7", TestContext.Current.CancellationToken);
+
+        // Told apart from a refusal, because the caller answers it differently —
+        // and it costs nothing, because a request the throttle will not answer
+        // must not buy an attacker a hash.
+        Assert.True(refused.Throttled);
+        Assert.Null(refused.Session);
+        Assert.Equal(hashes, installation.Hasher.Verifications);
+        Assert.Empty(installation.Sessions.Stored);
+    }
+
+    [Fact]
+    public async Task An_address_nobody_holds_fills_its_own_window()
+    {
+        var installation = Signed_up_installation();
+
+        for (var attempt = 0; attempt < SignInThrottle.AttemptsPerAccount; attempt++)
+        {
+            await installation.SignIn.ExecuteAsync(
+                "nobody@example.com",
+                TheirPassword, TheCode, null, "203.0.113.7",
+                TestContext.Current.CancellationToken);
+        }
+
+        // Counting per address must not become a way of asking which addresses
+        // exist, so an address nobody holds fills its window exactly as one
+        // somebody holds does.
+        Assert.True((await installation.SignIn.ExecuteAsync(
+            "nobody@example.com",
+            TheirPassword, TheCode, null, "203.0.113.7",
+            TestContext.Current.CancellationToken)).Throttled);
+
+        // And the account that does exist is untouched by it.
+        Assert.NotNull((await installation.SignIn.ExecuteAsync(
+            TheirAddress,
+            TheirPassword, TheCode, null, "203.0.113.7",
+            TestContext.Current.CancellationToken)).Session);
+    }
+
+    [Fact]
     public async Task An_installation_with_no_identity_admits_nothing()
     {
         var installation = Installation_with_nobody_on_it();
 
-        Assert.Null(await installation.SignIn.ExecuteAsync(
+        Assert.Null((await installation.SignIn.ExecuteAsync(
             TheirAddress,
-            TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken));
+            TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken)).Session);
 
         // And it still hashed. An address nobody holds has to cost what one
         // somebody holds costs, or the clock says which is which (ADR 0056).
@@ -147,9 +228,9 @@ public sealed class SignInTests
     {
         var installation = Signed_up_installation();
 
-        Assert.Null(await installation.SignIn.ExecuteAsync(
+        Assert.Null((await installation.SignIn.ExecuteAsync(
             "somebody.else@example.com",
-            TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken));
+            TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken)).Session);
 
         Assert.Equal(1, installation.Hasher.Verifications);
         Assert.Equal(0, installation.Identities.Writes);
@@ -162,9 +243,9 @@ public sealed class SignInTests
         installation.Identities.Seed(
             User.Invite("Newcomer", TheirAddress, administrator: false, Claimed));
 
-        Assert.Null(await installation.SignIn.ExecuteAsync(
+        Assert.Null((await installation.SignIn.ExecuteAsync(
             TheirAddress,
-            TheirPassword, null, null, null, TestContext.Current.CancellationToken));
+            TheirPassword, null, null, null, TestContext.Current.CancellationToken)).Session);
     }
 
     [Fact]
@@ -174,9 +255,9 @@ public sealed class SignInTests
         var user = installation.Identities.Stored.OfType<User>().Single();
         user.Deactivate();
 
-        Assert.Null(await installation.SignIn.ExecuteAsync(
+        Assert.Null((await installation.SignIn.ExecuteAsync(
             TheirAddress,
-            TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken));
+            TheirPassword, TheCode, null, null, TestContext.Current.CancellationToken)).Session);
     }
 
     [Fact]
@@ -195,11 +276,12 @@ public sealed class SignInTests
         var installation = Signed_up_installation();
         var code = installation.BackupCodes[0];
 
-        var signedIn = await installation.SignIn.ExecuteAsync(
+        var attempt = await installation.SignIn.ExecuteAsync(
             TheirAddress,
             TheirPassword, null, code.Display, null, TestContext.Current.CancellationToken);
 
-        Assert.NotNull(signedIn);
+        Assert.NotNull(attempt.Session);
+        var signedIn = attempt.Session;
 
         // docs/sign-in.md: the product says how many remain whenever one is
         // spent, because a set that quietly runs out ends at Host Recovery.
@@ -215,7 +297,7 @@ public sealed class SignInTests
 
         // Refusing a code over a dash or a capital is refusing the operator
         // their way back in.
-        var signedIn = await installation.SignIn.ExecuteAsync(
+        var attempt = await installation.SignIn.ExecuteAsync(
             TheirAddress,
             TheirPassword,
             null,
@@ -223,7 +305,8 @@ public sealed class SignInTests
             null,
             TestContext.Current.CancellationToken);
 
-        Assert.NotNull(signedIn);
+        Assert.NotNull(attempt.Session);
+        var signedIn = attempt.Session;
     }
 
     [Fact]
@@ -239,9 +322,9 @@ public sealed class SignInTests
         // A spent code matches exactly as a fresh one does; being single use is
         // what refuses it, and it is refused with the same answer as a code that
         // was never theirs.
-        Assert.Null(await installation.SignIn.ExecuteAsync(
+        Assert.Null((await installation.SignIn.ExecuteAsync(
             TheirAddress,
-            TheirPassword, null, code, null, TestContext.Current.CancellationToken));
+            TheirPassword, null, code, null, TestContext.Current.CancellationToken)).Session);
         Assert.Single(installation.Sessions.Stored);
     }
 
@@ -250,13 +333,13 @@ public sealed class SignInTests
     {
         var installation = Signed_up_installation();
 
-        Assert.Null(await installation.SignIn.ExecuteAsync(
+        Assert.Null((await installation.SignIn.ExecuteAsync(
             TheirAddress,
             TheirPassword,
             null,
             BackupCodeText.Mint().Display,
             null,
-            TestContext.Current.CancellationToken));
+            TestContext.Current.CancellationToken)).Session);
         Assert.Empty(installation.Sessions.Stored);
     }
 
@@ -282,9 +365,9 @@ public sealed class SignInTests
         var installation = Signed_up_installation();
         installation.Hasher.Answer = PasswordCheck.RightAndOutOfDate;
 
-        Assert.Null(await installation.SignIn.ExecuteAsync(
+        Assert.Null((await installation.SignIn.ExecuteAsync(
             TheirAddress,
-            TheirPassword, "000000", null, null, TestContext.Current.CancellationToken));
+            TheirPassword, "000000", null, null, TestContext.Current.CancellationToken)).Session);
 
         // The rewrite is maintenance a sign-in owes the row, not something a
         // correct password on its own gets to trigger.
@@ -317,6 +400,7 @@ public sealed class SignInTests
         var identities = new InMemoryIdentities();
         var sessions = new InMemorySessions();
         var hasher = new StubPasswordHasher();
+        var throttle = new InMemorySignInThrottle();
         var secondFactor = new StubSecondFactor(TheCode);
         var cipher = new ReversingCipher();
 
@@ -327,11 +411,13 @@ public sealed class SignInTests
             Hasher = hasher,
             SecondFactor = secondFactor,
             Cipher = cipher,
+            Throttle = throttle,
             SignIn = new SignIn(
                 identities,
                 sessions,
                 hasher,
                 new DummyPasswordHash(hasher),
+                throttle,
                 secondFactor,
                 cipher,
                 new StoppedClock(Claimed.AddDays(1))),
@@ -349,6 +435,8 @@ public sealed class SignInTests
         public required StubSecondFactor SecondFactor { get; init; }
 
         public required ReversingCipher Cipher { get; init; }
+
+        public required InMemorySignInThrottle Throttle { get; init; }
 
         public required SignIn SignIn { get; init; }
 

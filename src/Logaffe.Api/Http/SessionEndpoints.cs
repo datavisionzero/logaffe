@@ -101,13 +101,25 @@ public static class SessionEndpoints
                 HttpContext context,
                 CancellationToken cancellationToken) =>
             {
-                var signedIn = await signIn.ExecuteAsync(
+                var attempt = await signIn.ExecuteAsync(
                     request.Email,
                     request.Password,
                     request.SecondFactorCode,
                     request.BackupCode,
                     context.SeenFrom(),
                     cancellationToken);
+
+                // The one answer that is not the one refusal, because the caller
+                // has to be told something different: come back later. It says
+                // nothing about which of the two windows filled up, and an
+                // address nobody holds fills its own exactly as one somebody
+                // holds does (ADR 0056).
+                if (attempt.Throttled)
+                {
+                    return Results.StatusCode(StatusCodes.Status429TooManyRequests);
+                }
+
+                var signedIn = attempt.Session;
 
                 // One refusal for every way of not getting in: an address
                 // nobody holds, a wrong password, a wrong code, a code already

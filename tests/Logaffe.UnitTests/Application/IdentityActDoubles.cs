@@ -337,3 +337,42 @@ internal sealed class StubSecondFactor(string accepted) : ISecondFactor
     public string EnrolmentUri(string secret, string account) =>
         $"otpauth://totp/logaffe:{account}?secret={secret}";
 }
+
+/// <summary>
+/// The two rolling windows in front of the sign-in, in memory and without a
+/// clock of their own: what a test needs of them is that a failure counts, a
+/// success clears the account's window and not the source's, and an exhausted
+/// window refuses (ADR 0056).
+/// </summary>
+internal sealed class InMemorySignInThrottle : ISignInThrottle
+{
+    private readonly Dictionary<string, int> _accounts = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _sources = new(StringComparer.Ordinal);
+
+    public int Failures { get; private set; }
+
+    public int Successes { get; private set; }
+
+    public bool Admits(string account, string source, DateTimeOffset now) =>
+        Count(_accounts, account) < SignInThrottle.AttemptsPerAccount
+        && Count(_sources, source) < SignInThrottle.AttemptsPerSource;
+
+    public void Failed(string account, string source, DateTimeOffset now)
+    {
+        _accounts[account] = Count(_accounts, account) + 1;
+        _sources[source] = Count(_sources, source) + 1;
+        Failures++;
+    }
+
+    public void Succeeded(string account)
+    {
+        _accounts.Remove(account);
+        Successes++;
+    }
+
+    /// <summary>How many failures that source has, which a test asserts on.</summary>
+    public int FailuresFrom(string source) => Count(_sources, source);
+
+    private static int Count(Dictionary<string, int> counts, string key) =>
+        counts.TryGetValue(key, out var held) ? held : 0;
+}
