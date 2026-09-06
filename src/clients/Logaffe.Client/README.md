@@ -61,6 +61,14 @@ have gone undelivered since the last one, and when deliveries get through again
 there is one line for that too, saying what the outage cost. Your own `OnFailure`
 receives the `Exception` object unchanged and may render whatever it likes.
 
+**A wrong token is reported when you configure it**, not hours later by an empty
+project. Building an `EntryDelivery` sends one empty batch under the token in the
+background; if the installation refuses it, that is a line in your log saying
+nothing will be delivered. It never throws, does not hold up your start-up and
+delays no entry, and everything other than a refusal — a network error, a
+timeout, a `5xx` — it passes over in silence, because those are what the delivery
+path already reports.
+
 **Disposal flushes, with a deadline.** `Dispose`/`DisposeAsync` spends up to
 `FlushTimeout` delivering what is still queued, and reports how many entries were
 still waiting when the time ran out. What does not go in that time is lost —

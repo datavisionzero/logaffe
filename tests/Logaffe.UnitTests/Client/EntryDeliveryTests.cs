@@ -514,6 +514,78 @@ public sealed class EntryDeliveryTests
             StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// A wrong token is found where it was written, without an entry having
+    /// been logged.
+    /// </summary>
+    /// <remarks>
+    /// A typo in a sending application's environment is otherwise invisible
+    /// until somebody reads a delivery failure, and the operator's own sign of
+    /// it is a project that stays empty. The probe is an empty delivery, which
+    /// is why the endpoint answers it without a body ever being read.
+    /// </remarks>
+    [Fact]
+    public async Task A_refused_token_is_reported_as_the_delivery_is_built()
+    {
+        _installation.Status = HttpStatusCode.Unauthorized;
+
+        await using var delivery = Delivery();
+
+        var probe = await _installation.TakeProbeAsync(1);
+
+        Assert.Equal($"Bearer {Token}", probe.Authorization);
+        Assert.Equal(string.Empty, probe.Body);
+
+        Assert.Contains(
+            "refused the ingest token",
+            await _reported.UntilAsync(said => said.Contains("ingest token", StringComparison.Ordinal)),
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// A token the installation takes costs a sender nothing and says nothing.
+    /// </summary>
+    [Fact]
+    public async Task A_token_the_installation_takes_is_probed_and_passed_over_in_silence()
+    {
+        await using var delivery = Delivery();
+
+        await _installation.TakeProbeAsync(1);
+
+        delivery.Send(Entry("first"));
+
+        await _installation.TakeAsync(1);
+
+        Assert.Empty(_reported.SoFar);
+    }
+
+    /// <summary>
+    /// An installation that cannot be reached is not the probe's business.
+    /// </summary>
+    /// <remarks>
+    /// A probe complaining about an installation that is a second behind its
+    /// sender in a shared restart would be noise in the one moment everything
+    /// comes up together, and the ordinary delivery path reports the state
+    /// anyway. What this asks is that the delivery's report is the first thing
+    /// said: had the probe spoken, it would have spoken before it.
+    /// </remarks>
+    [Fact]
+    public async Task An_installation_that_cannot_be_reached_says_nothing_about_the_token()
+    {
+        _installation.Fails = new HttpRequestException("no route to host");
+
+        await using var delivery = Delivery();
+
+        await _installation.TakeProbeAsync(1);
+
+        delivery.Send(Entry("first"));
+
+        Assert.StartsWith(
+            "logaffe: 1 entries were not delivered",
+            await _reported.UntilAsync(_ => true),
+            StringComparison.Ordinal);
+    }
+
     private EntryDelivery Delivery(
         TimeSpan? batchInterval = null, int queueCapacity = 10_000, TimeProvider? clock = null) =>
         new(

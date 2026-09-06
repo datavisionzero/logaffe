@@ -37,6 +37,13 @@ namespace Logaffe.Client;
 /// Retrying would turn an installation that is down into an application holding
 /// an ever-growing queue of the past, which is the failure this design refuses.
 /// </para>
+/// <para>
+/// <b>It says one thing before anything has been logged.</b> Building this sends
+/// an empty batch under the token and reports a refusal of it, which is the one
+/// request here that is not entries going out
+/// (<see cref="ProbeAsync"/>). Like everything else on this path it happens in
+/// the background, holds nothing up and never throws.
+/// </para>
 /// </remarks>
 public sealed class EntryDelivery : IDisposable, IAsyncDisposable
 {
@@ -156,6 +163,11 @@ public sealed class EntryDelivery : IDisposable, IAsyncDisposable
             itemDropped: _ => Interlocked.Increment(ref _dropped));
 
         _pump = Task.Run(PumpAsync);
+
+        // Not awaited and not held: it reports or it says nothing, it swallows
+        // everything, and a delivery disposed before it answers is one of the
+        // things it says nothing about.
+        _ = Task.Run(ProbeAsync);
     }
 
     /// <summary>
@@ -370,6 +382,75 @@ public sealed class EntryDelivery : IDisposable, IAsyncDisposable
         finally
         {
             ReportDrops();
+        }
+    }
+
+    /// <summary>
+    /// Asks the installation once, as a sender configures this, whether it will
+    /// take this token at all.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Nothing else tells a sender that the address and the token are right. The
+    /// first sign of a typo in an application's environment is a delivery that
+    /// failed, which is a line somebody has to have been looking at, and the
+    /// operator's own sign is a project that stays empty — which is the adoption
+    /// path <c>VISION.md</c> measures everything on.
+    /// </para>
+    /// <para>
+    /// <b>It only ever reports.</b> It does not hold the constructor, it never
+    /// throws, and it delays no entry: logaffe observes an application and may
+    /// not be the thing that keeps it from starting, which is as true of a token
+    /// that expired overnight as of an installation coming up a second behind
+    /// its sender in a shared restart. There is no setting for it either — a
+    /// probe that cannot fail the application has nothing to switch off.
+    /// </para>
+    /// <para>
+    /// <b>An empty <c>POST</c>, not a <c>HEAD</c>.</b> The endpoint
+    /// authenticates before it touches a body, so an empty batch under a good
+    /// token is a receipt over no entries that stores nothing, and under a bad
+    /// one it is the refusal this is asking about. The ingest contract is not
+    /// widened for a diagnostic.
+    /// </para>
+    /// <para>
+    /// <b>Only <c>401</c> speaks.</b> A receipt says nothing, and so does
+    /// everything in between — no route, a timeout, a <c>5xx</c>, a <c>429</c> —
+    /// because those are passing states the ordinary delivery path reports on
+    /// its own, and a probe complaining about an installation that is still
+    /// starting would be noise in the one moment everything restarts together.
+    /// </para>
+    /// </remarks>
+    private async Task ProbeAsync()
+    {
+        try
+        {
+            using var timeout = new CancellationTokenSource(_options.DeliveryTimeout);
+            using var request = new HttpRequestMessage(HttpMethod.Post, _ingest)
+            {
+                Content = Content([], compressed: false),
+            };
+
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", _options.IngestToken);
+
+            using var response = await _http
+                .SendAsync(request, timeout.Token)
+                .ConfigureAwait(false);
+
+            if (response.StatusCode is HttpStatusCode.Unauthorized)
+            {
+                Report(
+                    $"{_ingest} refused the ingest token, so nothing this application logs "
+                    + "will be delivered. Check that it is the token of a project that still "
+                    + "exists and has not been revoked.",
+                    null);
+            }
+        }
+        catch (Exception)
+        {
+            // On purpose, and for the reason the remarks give. What lands here
+            // is the states this says nothing about, plus the disposal of a
+            // client that this was still holding.
         }
     }
 

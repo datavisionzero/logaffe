@@ -31,6 +31,7 @@ public sealed record Delivered(
 public sealed class TakingDeliveries : HttpMessageHandler
 {
     private readonly List<Delivered> _taken = [];
+    private readonly List<Delivered> _probed = [];
     private readonly Lock _guard = new();
 
     private TaskCompletionSource _arrived = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -59,6 +60,21 @@ public sealed class TakingDeliveries : HttpMessageHandler
     }
 
     /// <summary>
+    /// The empty requests, which is what the client's one probe of the token
+    /// looks like from here.
+    /// </summary>
+    public IReadOnlyList<Delivered> Probed
+    {
+        get
+        {
+            lock (_guard)
+            {
+                return [.. _probed];
+            }
+        }
+    }
+
+    /// <summary>
     /// Waits for the <paramref name="ordinal"/>th delivery, counting from one.
     /// </summary>
     /// <remarks>
@@ -66,6 +82,9 @@ public sealed class TakingDeliveries : HttpMessageHandler
     /// between a test's send and its wait is caught rather than waited past.
     /// </remarks>
     public Task<Delivered> TakeAsync(int ordinal) => NthAsync(_taken, ordinal);
+
+    /// <inheritdoc cref="TakeAsync"/>
+    public Task<Delivered> TakeProbeAsync(int ordinal) => NthAsync(_probed, ordinal);
 
     private async Task<Delivered> NthAsync(List<Delivered> of, int ordinal)
     {
@@ -109,7 +128,10 @@ public sealed class TakingDeliveries : HttpMessageHandler
 
         lock (_guard)
         {
-            _taken.Add(delivered);
+            // An empty body is the client asking whether the token is any good,
+            // not a batch. Counting it among the deliveries would put it in
+            // front of every one a test is actually waiting for.
+            (delivered.Body.Length == 0 ? _probed : _taken).Add(delivered);
             arrived = _arrived;
             _arrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         }

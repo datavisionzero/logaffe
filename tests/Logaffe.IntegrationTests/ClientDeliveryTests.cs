@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using Logaffe.Application.Operations;
 using Logaffe.Client;
@@ -131,6 +132,52 @@ public sealed class ClientDeliveryTests(PostgresFixture postgres) : IAsyncLifeti
 
         Assert.Empty(await StoredAsync(project));
         Assert.Contains(refusals, what => what.Contains("token was refused"));
+    }
+
+    /// <summary>
+    /// A token the installation will never take is said so as it is configured,
+    /// without an entry having been logged.
+    /// </summary>
+    /// <remarks>
+    /// Only a running installation answers this one. What the probe leans on is
+    /// that the endpoint authenticates before it reads a body, so an empty
+    /// delivery is a <c>401</c> under a bad token and a receipt over nothing
+    /// under a good one — and a substituted handler, which answers whatever it
+    /// is sent however it was told to, would have agreed with any arrangement at
+    /// all. That it stores nothing is asked here too: an empty batch that landed
+    /// as a row would be a probe with a cost.
+    /// </remarks>
+    [Fact]
+    public async Task A_token_the_installation_will_refuse_is_said_at_configuration()
+    {
+        var (project, _) = await AdmittedAsync();
+        var said = new ConcurrentQueue<string>();
+
+        await using (Delivery(
+            "logaffe_ingest_019fe17900007000800000000000dead_notarealsecret",
+            (what, _) => said.Enqueue(what)))
+        {
+            // Nothing is sent. This is what a sender learns from configuring
+            // alone, which is the whole point of the probe.
+            await UntilAsync(() => said.Any(what => what.Contains("refused the ingest token")));
+        }
+
+        Assert.Empty(await StoredAsync(project));
+    }
+
+    /// <summary>
+    /// Waits for something a background probe is on its way to doing.
+    /// </summary>
+    private static async Task UntilAsync(Func<bool> done)
+    {
+        var giveUp = DateTimeOffset.UtcNow.AddSeconds(30);
+
+        while (!done())
+        {
+            Assert.True(DateTimeOffset.UtcNow < giveUp, "It never happened.");
+
+            await Task.Delay(25, TestContext.Current.CancellationToken);
+        }
     }
 
     /// <summary>

@@ -85,6 +85,10 @@ is reported through `OnFailure` — one line naming the exception's type and
 message, held back to one every five minutes while the same failure repeats, and
 one closing line when deliveries get through again.
 
+**A token the installation refuses is reported as the provider is built**, before
+anything has been logged, so a typo in the environment is found where it was
+written rather than in a project that stays empty.
+
 ## What logaffe does with what you send
 
 **The server renders the template.** The message template and the properties are

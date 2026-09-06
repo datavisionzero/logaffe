@@ -262,6 +262,19 @@ get through again there is exactly one line about that too, saying what the
 outage cost, because whoever watched an outage begin would otherwise never see it
 end.
 
+**A sender learns at once that its token is wrong.** As the delivery is built,
+one empty batch goes out under the token in the background: it never throws, it
+does not hold up the application's start, and it delays no entry. An installation
+that refuses the token is one line in the sender's own log saying that nothing
+will be delivered — otherwise the first sign of a typo in an application's
+environment is a delivery failure somebody has to have been looking at, and the
+operator's sign of it is a project that stays empty. Everything else the probe
+meets is passed over in silence: a network error, a timeout, a `5xx` or a `429`
+are passing states the delivery path reports on its own, and an installation
+coming up a second behind its senders in a shared restart is not something to
+complain about. It needs no setting, because a probe that cannot fail the
+application has nothing to switch off.
+
 ## What is deliberately not here
 
 - **No deduplication.** A proxy retry or a client-level repeat produces two rows

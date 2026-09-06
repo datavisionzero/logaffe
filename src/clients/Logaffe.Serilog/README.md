@@ -108,6 +108,11 @@ five minutes, with one closing line when deliveries get through again. An
 `OnFailure` of your own receives the `Exception` itself and may render it however
 it likes.
 
+**A token the installation refuses is reported as the sink is configured**, in
+one line, before anything has been logged. Nothing else about the probe is
+audible: an installation that is merely unreachable is left to the delivery path
+to report.
+
 **Call `Log.CloseAndFlush()` on shutdown**, as with any Serilog sink. Without it
 the application's last entries never leave.
 
