@@ -1,30 +1,33 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Link, NavLink, Route, Routes, useLocation } from "react-router";
+import { Link, Route, Routes } from "react-router";
 import { api } from "../api/client";
+import { Button } from "../components/ui/button";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "../components/ui/sidebar";
 import { ProjectList } from "../projects/ProjectList";
 import { ProjectScreen } from "../projects/ProjectScreen";
-import { ProjectSwitcher } from "../projects/ProjectSwitcher";
 import { GroupsProvider } from "../projects/groups";
-import { projectIdIn, ProjectsProvider, useProjects } from "../projects/projects";
+import { ProjectsProvider } from "../projects/projects";
 import { InstallationSettings } from "../settings/InstallationSettings";
 import { ProjectSettings } from "../settings/ProjectSettings";
 import { browserTimeZone } from "../shared/time";
+import { AccountMenu } from "./AccountMenu";
+import { AppSidebar } from "./AppSidebar";
 
 /**
  * What is around every screen of a signed-in installation.
  *
- * It carries no user furniture — no avatar, no notification bell, nothing that
- * exists to tell people apart — because there is one operator and no user model
- * (`docs/ui.md`). What it does carry is every way this application is navigated,
- * on two levels: the installation across the top, and the project being read
- * below it.
+ * Navigation is a column on the left and an account menu at the top right —
+ * planaffe's model, taken deliberately, because the two products are meant to
+ * be operated alike and not merely to look alike
+ * ([ADR 0051](../../../../docs/adr/0051-the-web-interface-is-tailwind-base-ui-and-planaffes-own-tokens.md)).
+ * What the column holds and why it is split the way it is belongs to
+ * `AppSidebar`; what is here is the frame around it.
  *
- * The split is what the two levels actually are. The switcher, the zone, the
- * installation's own settings and the sign-out are true wherever the operator
- * is; the log and a project's settings only exist while a project is open, and
- * so does the row that holds them. Before this, a project's settings sat in the
- * status line of the log view and the way back was a sentence — navigation
- * inside the content, which is what left every screen without a place.
+ * The frame is what scrolls least: the sidebar and this header stay where they
+ * are and the surface below is what moves, so navigation is never something to
+ * scroll back up to. The surface says nothing about its own width — each screen
+ * decides how wide it is and how much of the height it takes, which is what
+ * lets the log view be the full height of what is left.
  */
 export function Shell({
   backupCodesRemaining,
@@ -45,77 +48,83 @@ export function Shell({
 
   return (
     <WhatTheInstallationHolds>
-      <header className="shell">
-        <div className="shell-bar">
-          <Link to="/" className="wordmark">
-            logaffe
-          </Link>
+      <SidebarProvider className="min-h-0 flex-1">
+        <AppSidebar />
 
-          <ProjectSwitcher />
+        <SidebarInset className="m-0 min-w-0 max-w-none overflow-hidden p-0">
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+            {/* The handle the log view takes its width back with. It is not a
+                setting and nothing remembers it: every load starts expanded,
+                which is what keeps `docs/ui.md`'s rule against layout settings
+                true and every screenshot comparable to every other. */}
+            <SidebarTrigger />
 
-          {/* Every timestamp below is in this zone, absolute and to the
-              millisecond, and there is no toggle to another one. */}
-          <span className="zone">Times in {browserTimeZone()}</span>
+            <div className="flex-1" />
 
-          {/* The installation's own: the sessions, the agent tokens and the
-              operator's credentials. It is named in full because a project has
-              settings too, and the two are one row apart on this screen. */}
-          <nav className="shell-acts" aria-label="Installation">
-            <NavLink to="/settings">Installation settings</NavLink>
+            {/* Every timestamp below is in this zone, absolute and to the
+                millisecond, and there is no toggle to another one. Too long a
+                sentence for a narrow window, where the account menu says it
+                instead. */}
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              Times in {browserTimeZone()}
+            </span>
 
-            <button type="button" className="plain" onClick={() => void signOut()}>
-              Sign out
-            </button>
-          </nav>
-        </div>
+            <AccountMenu onSignOut={() => void signOut()} />
+          </header>
 
-        <ProjectTabs />
-      </header>
+          <NoSecondFactor />
 
-      <NoSecondFactor />
+          {/* A set of backup codes that quietly runs out ends at Host Recovery,
+              so the product says how many remain whenever one is spent. */}
+          {remaining !== null && (
+            <Notice>
+              A backup code was spent signing in.{" "}
+              {remaining === 0
+                ? "None are left — issue a fresh set."
+                : `${remaining} ${remaining === 1 ? "code is" : "codes are"} left.`}{" "}
+              <Button variant="link" size="xs" onClick={() => setRemaining(null)}>
+                Dismiss
+              </Button>
+            </Notice>
+          )}
 
-      {/* A set of backup codes that quietly runs out ends at Host Recovery, so
-          the product says how many remain whenever one is spent. */}
-      {remaining !== null && (
-        <p className="notice">
-          A backup code was spent signing in.{" "}
-          {remaining === 0
-            ? "None are left — issue a fresh set."
-            : `${remaining} ${remaining === 1 ? "code is" : "codes are"} left.`}{" "}
-          <button type="button" className="plain" onClick={() => setRemaining(null)}>
-            Dismiss
-          </button>
-        </p>
-      )}
-
-      {/* The log view is the full height of what is left below the shell and the
-          project list is a column, so the surface is not constrained here — each
-          screen says how wide it is and how much of the height it takes. */}
-      <main className="surface">
-        {/* The SPA's addresses are singular where the contract's are plural,
-            and that is load-bearing rather than a matter of taste: the server
-            falls back to `index.html` only for what no endpoint matched, and
-            `/projects/{id}` is an endpoint — so a reload of a plural address
-            would answer JSON instead of this application. Every screen below
-            therefore names a space no route of `docs/api/openapi.json` occupies. */}
-        <Routes>
-          <Route path="/" element={<ProjectList />} />
-          <Route path="/project/:id" element={<ProjectScreen />} />
-          <Route path="/project/:id/settings" element={<ProjectSettings />} />
-          {/* An area of a settings screen is an address of its own, so that a
-              reload comes back to it and the back button walks the ones just
-              opened. The screen without a segment is its first area. */}
-          <Route path="/project/:id/settings/:section" element={<ProjectSettings />} />
-          <Route path="/settings" element={<InstallationSettings />} />
-          <Route path="/settings/:section" element={<InstallationSettings />} />
-          {/* One area carries an address of its own inside it, because a host
-              is a screen rather than a row: what it reported, what it reports
-              on, and its end. */}
-          <Route path="/settings/hosts/:hostId" element={<InstallationSettings />} />
-          <Route path="*" element={<ProjectList />} />
-        </Routes>
-      </main>
+          <div className="flex min-h-0 flex-1 flex-col overflow-auto [scrollbar-gutter:stable]">
+            {/* The SPA's addresses are singular where the contract's are
+                plural, and that is load-bearing rather than a matter of taste:
+                the server falls back to `index.html` only for what no endpoint
+                matched, and `/projects/{id}` is an endpoint — so a reload of a
+                plural address would answer JSON instead of this application.
+                Every screen below therefore names a space no route of
+                `docs/api/openapi.json` occupies. */}
+            <Routes>
+              <Route path="/" element={<ProjectList />} />
+              <Route path="/project/:id" element={<ProjectScreen />} />
+              <Route path="/project/:id/settings" element={<ProjectSettings />} />
+              {/* An area of a settings screen is an address of its own, so that
+                  a reload comes back to it and the back button walks the ones
+                  just opened. The screen without a segment is its first area. */}
+              <Route path="/project/:id/settings/:section" element={<ProjectSettings />} />
+              <Route path="/settings" element={<InstallationSettings />} />
+              <Route path="/settings/:section" element={<InstallationSettings />} />
+              {/* One area carries an address of its own inside it, because a
+                  host is a screen rather than a row: what it reported, what it
+                  reports on, and its end. */}
+              <Route path="/settings/hosts/:hostId" element={<InstallationSettings />} />
+              <Route path="*" element={<ProjectList />} />
+            </Routes>
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
     </WhatTheInstallationHolds>
+  );
+}
+
+/** A sentence the frame says above the surface, and never inside it. */
+function Notice({ children }: { children: ReactNode }) {
+  return (
+    <p className="shrink-0 border-b border-brand/30 bg-brand-soft px-3 py-2 text-sm text-foreground">
+      {children}
+    </p>
   );
 }
 
@@ -157,11 +166,14 @@ function NoSecondFactor() {
   }
 
   return (
-    <p className="notice">
+    <Notice>
       This installation has no second factor. Its password is the only thing between the
       internet and everything it holds.{" "}
-      <Link to="/settings/credentials">Enrol one</Link>.
-    </p>
+      <Link to="/settings/credentials" className="font-medium underline underline-offset-4">
+        Enrol one
+      </Link>
+      .
+    </Notice>
   );
 }
 
@@ -180,39 +192,5 @@ function WhatTheInstallationHolds({ children }: { children: ReactNode }) {
     <ProjectsProvider>
       <GroupsProvider>{children}</GroupsProvider>
     </ProjectsProvider>
-  );
-}
-
-/**
- * The two surfaces a project has, shown while one is open and not otherwise.
- *
- * A row that is present but empty on the project list would be a place the eye
- * learns to skip; this way the second level appearing *is* the statement that
- * the operator is inside a project.
- *
- * An address naming a project this installation does not hold — ordinarily one
- * deleted from another browser — gets no tabs, since both of them would lead
- * back into the same dead end the screen is already saying.
- */
-function ProjectTabs() {
-  const at = projectIdIn(useLocation().pathname);
-  const { state } = useProjects();
-
-  if (at === null || state.status !== "held") {
-    return null;
-  }
-
-  if (!state.projects.some((project) => project.id === at)) {
-    return null;
-  }
-
-  return (
-    <nav className="shell-tabs" aria-label="Project">
-      {/* `end`, so that the settings address does not also mark the log. */}
-      <NavLink end to={`/project/${at}`}>
-        Log
-      </NavLink>
-      <NavLink to={`/project/${at}/settings`}>Project settings</NavLink>
-    </nav>
   );
 }
