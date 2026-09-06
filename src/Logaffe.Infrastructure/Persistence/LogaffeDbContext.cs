@@ -1,5 +1,6 @@
 using Logaffe.Domain.Alerts;
 using Logaffe.Domain.Entries;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Hosts;
 using Logaffe.Domain.Identities;
 using Logaffe.Domain.Projects;
@@ -84,6 +85,12 @@ public sealed class LogaffeDbContext(DbContextOptions<LogaffeDbContext> options)
     /// recoveries and changes of address (ADR 0053).
     /// </summary>
     public DbSet<OneTimeSecret> OneTimeSecrets => Set<OneTimeSecret>();
+
+    /// <summary>
+    /// What was changed on this installation and by whom — everything that
+    /// changes configuration, and never an entry.
+    /// </summary>
+    public DbSet<Change> History => Set<Change>();
 
     public DbSet<Session> Sessions => Set<Session>();
 

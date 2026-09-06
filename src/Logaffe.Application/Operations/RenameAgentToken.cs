@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Identities;
 using Logaffe.Domain.Tokens;
 
@@ -21,7 +22,8 @@ namespace Logaffe.Application.Operations;
 /// lying.
 /// </para>
 /// </remarks>
-public sealed class RenameAgentToken(ITokens tokens, IIdentities identities)
+public sealed class RenameAgentToken(
+    ITokens tokens, IIdentities identities, RecordAChange record)
 {
     /// <summary>
     /// Whether there was a token to rename.
@@ -39,8 +41,18 @@ public sealed class RenameAgentToken(ITokens tokens, IIdentities identities)
             return false;
         }
 
+        var was = token.Name;
+
         token.Rename(name);
         await tokens.RecordRenameAsync(token, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.AgentToken,
+            token.Id,
+            token.Name,
+            Act.Renamed,
+            cancellationToken,
+            from: was,
+            to: token.Name);
 
         if (await identities.FindAsync(token.IdentityId, cancellationToken) is Agent agent)
         {

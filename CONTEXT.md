@@ -117,6 +117,15 @@ ingest tokens, settings and entries. The way back in afterwards is a
 is the only route back into an installation nobody can sign in to.
 _Avoid_: Password reset, admin override, rescue mode, break-glass, escape hatch
 
+**Change**:
+One thing somebody did to an **Installation**'s configuration, written down as it
+happened: who did it, when, what they touched and what moved. Every one is an act
+a person or an **Agent** performed deliberately — nothing the installation does
+on its own is one, and no **Log Entry** ever is. The list is an
+**Administrator**'s, it is read-only everywhere, and a row outlives the thing it
+names.
+_Avoid_: Audit log, event log, activity, trail, journal, revision
+
 **Project**:
 The unit of separation: every log entry belongs to exactly one, the operator
 creates them explicitly, and separation holds in storage, in the UI and in agent

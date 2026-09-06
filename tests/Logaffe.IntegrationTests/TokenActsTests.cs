@@ -66,7 +66,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
 
         await using (var context = ContextFor(installation))
         {
-            Assert.True(await new RevokeToken(new Tokens(context))
+            Assert.True(await new RevokeToken(new Tokens(context), Recording.Nobody())
                 .IngestTokenAsync(issued.Id, TestContext.Current.CancellationToken));
         }
 
@@ -84,7 +84,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
 
         await using (var context = ContextFor(installation))
         {
-            await new RevokeToken(new Tokens(context))
+            await new RevokeToken(new Tokens(context), Recording.Nobody())
                 .IngestTokenAsync(issued!.Id, TestContext.Current.CancellationToken);
         }
 
@@ -132,7 +132,8 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
         IssuedToken issued;
         await using (var context = ContextFor(installation))
         {
-            issued = await new IssueAgentToken(new Tokens(context), cipher, At(Now)).ExecuteAsync(
+            issued = await new IssueAgentToken(
+                new Tokens(context), cipher, Recording.Nobody(), At(Now)).ExecuteAsync(
                 owner,
                 "claude-code",
                 AgentTokenKind.Reading,
@@ -142,7 +143,8 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
 
         await using (var context = ContextFor(installation))
         {
-            Assert.True(await new RenameAgentToken(new Tokens(context), new Identities(context))
+            Assert.True(await new RenameAgentToken(
+                new Tokens(context), new Identities(context), Recording.Nobody())
                 .ExecuteAsync(issued.Id, "laptop", TestContext.Current.CancellationToken));
 
             // The agent's own name moves with the label, because that is what a
@@ -171,7 +173,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
 
         await using (var context = ContextFor(installation))
         {
-            Assert.True(await new RevokeToken(new Tokens(context))
+            Assert.True(await new RevokeToken(new Tokens(context), Recording.Nobody())
                 .AgentTokenAsync(issued.Id, TestContext.Current.CancellationToken));
         }
 
@@ -190,7 +192,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
 
         await using (var context = ContextFor(installation))
         {
-            Assert.True(await new DeleteProject(new Projects(context))
+            Assert.True(await new DeleteProject(new Projects(context), Recording.Nobody())
                 .ExecuteAsync(
                     Reach.TheInstallation, project, TestContext.Current.CancellationToken));
         }
@@ -236,7 +238,7 @@ public sealed class TokenActsTests(PostgresFixture postgres) : IDisposable
     {
         await using var context = ContextFor(connectionString);
         var issue = new IssueIngestToken(
-            new Projects(context), new Tokens(context), cipher, At(now));
+            new Projects(context), new Tokens(context), cipher, Recording.Nobody(), At(now));
 
         return (await issue.ExecuteAsync(
             Reach.TheInstallation, project, TestContext.Current.CancellationToken)).Token;

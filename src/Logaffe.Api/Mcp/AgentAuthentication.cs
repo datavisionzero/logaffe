@@ -158,6 +158,11 @@ public sealed class AgentAuthenticationHandler(
         Context.RequestServices.GetRequiredService<TheCallingAgent>()
             .Admitted(admitted.Owner, reach);
 
+        // The agent and not its owner: a row naming the person and not saying
+        // that an agent was holding the keyboard would be true and misleading at
+        // once (ADR 0052).
+        Context.RequestServices.GetRequiredService<TheActor>().Admitted(admitted.Agent);
+
         var claims = new List<Claim>
         {
             new(AgentAuthentication.KindClaim, admitted.Kind.ToString()),

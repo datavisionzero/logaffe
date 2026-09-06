@@ -1,6 +1,8 @@
+using Logaffe.Application.Operations;
 using Logaffe.Application.Ports;
 using Logaffe.Domain.Alerts;
 using Logaffe.Domain.Hosts;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Identities;
 using Logaffe.Domain.Projects;
 
@@ -383,4 +385,62 @@ internal sealed class InMemorySignInThrottle : ISignInThrottle
 
     private static int Count(Dictionary<string, int> counts, string key) =>
         counts.TryGetValue(key, out var held) ? held : 0;
+}
+
+/// <summary>
+/// What was changed and by whom, in memory.
+/// </summary>
+/// <remarks>
+/// Append-only, like the real one: there is a write and a read, and nothing here
+/// edits or removes a row.
+/// </remarks>
+internal sealed class InMemoryHistory : IHistory
+{
+    private readonly List<Change> _changes = [];
+
+    public IReadOnlyList<Change> Recorded => _changes;
+
+    public Task RecordAsync(Change change, CancellationToken cancellationToken)
+    {
+        _changes.Add(change);
+
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<Change>> ListAsync(
+        long? before, int limit, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<Change>>([.. Enumerable.Reverse(_changes).Take(limit)]);
+}
+
+/// <summary>
+/// A recorder with somebody behind it, for the acts that write a row on the way
+/// past. Most tests assert nothing about the history and take this so that the
+/// act under them can be built at all.
+/// </summary>
+internal static class Recording
+{
+    /// <summary>The person every act in a test is performed by unless it says otherwise.</summary>
+    public static User Somebody { get; } = SomebodyActive();
+
+    public static RecordAChange Nobody() => Of(new InMemoryHistory());
+
+    public static RecordAChange Of(InMemoryHistory history, Identity? actor = null)
+    {
+        var who = new TheActor();
+        who.Admitted(actor ?? Somebody);
+
+        return new RecordAChange(history, who, TimeProvider.System);
+    }
+
+    private static User SomebodyActive()
+    {
+        var user = User.Bootstrap(
+            "The Administrator",
+            "administrator@example.com",
+            new DateTimeOffset(2026, 9, 6, 9, 0, 0, TimeSpan.Zero));
+
+        user.ActivateWith("$argon2id$v=19$m=19456,t=2,p=1$not-a-real-hash");
+
+        return user;
+    }
 }

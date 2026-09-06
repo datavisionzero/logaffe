@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Projects;
 using Logaffe.Domain.Tokens;
 
@@ -54,7 +55,11 @@ public sealed record IssueAttempt(IssueOutcome Outcome, IssuedToken? Token);
 /// </para>
 /// </remarks>
 public sealed class IssueIngestToken(
-    IProjects projects, ITokens tokens, ISecretCipher cipher, TimeProvider clock)
+    IProjects projects,
+    ITokens tokens,
+    ISecretCipher cipher,
+    RecordAChange record,
+    TimeProvider clock)
 {
     /// <summary>
     /// The token the project may now receive on, or why it got none.
@@ -102,6 +107,12 @@ public sealed class IssueIngestToken(
             projectId, minted.Identifier, cipher.Encrypt(minted.Secret), issuedAt);
 
         await tokens.AddAsync(token, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.IngestToken,
+            token.Id,
+            minted.Identifier.Value,
+            Act.Issued,
+            cancellationToken);
 
         return new IssueAttempt(
             IssueOutcome.Issued, new IssuedToken(token.Id, minted, issuedAt));

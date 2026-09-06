@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 
 namespace Logaffe.Application.Operations;
 
@@ -27,7 +28,7 @@ namespace Logaffe.Application.Operations;
 /// copy and nothing else.
 /// </para>
 /// </remarks>
-public sealed class RevokeToken(ITokens tokens)
+public sealed class RevokeToken(ITokens tokens, RecordAChange record)
 {
     /// <summary>
     /// Whether there was a token to revoke. <c>false</c> is a token already gone
@@ -47,7 +48,17 @@ public sealed class RevokeToken(ITokens tokens)
             return false;
         }
 
+        // The identifier and never the secret: what a token was is not part of
+        // the record, and a history that carried one would be a place to read a
+        // credential out of.
         await tokens.RemoveAsync(token, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.IngestToken,
+            token.Id,
+            token.Identifier.Value,
+            Act.Revoked,
+            cancellationToken);
+
         return true;
     }
 
@@ -65,6 +76,9 @@ public sealed class RevokeToken(ITokens tokens)
         // (ADR 0052). What is left behind is an agent that authenticates
         // nothing, which is what a revoked credential means.
         await tokens.RemoveAsync(token, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.AgentToken, token.Id, token.Name, Act.Revoked, cancellationToken);
+
         return true;
     }
 
@@ -83,6 +97,13 @@ public sealed class RevokeToken(ITokens tokens)
         }
 
         await tokens.RemoveAsync(token, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.HostToken,
+            token.Id,
+            token.Identifier.Value,
+            Act.Revoked,
+            cancellationToken);
+
         return true;
     }
 }

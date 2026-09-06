@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
@@ -32,7 +33,7 @@ public enum RenameGroupOutcome
 /// its name (ADR 0039), which is the whole reason the identity is there, and a
 /// rename is therefore a word on a heading changing and nothing else.
 /// </remarks>
-public sealed class RenameGroup(IGroups groups)
+public sealed class RenameGroup(IGroups groups, RecordAChange record)
 {
     /// <exception cref="ArgumentException">
     /// <paramref name="name"/> is not a name — it is blank, or longer than
@@ -56,8 +57,18 @@ public sealed class RenameGroup(IGroups groups)
             return RenameGroupOutcome.NameTaken;
         }
 
+        var was = group.Name;
+
         group.Rename(normalized);
         await groups.RecordAsync(group, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.Group,
+            group.Id,
+            group.Name,
+            Act.Renamed,
+            cancellationToken,
+            from: was,
+            to: group.Name);
 
         return RenameGroupOutcome.Renamed;
     }

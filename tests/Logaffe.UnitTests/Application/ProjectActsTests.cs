@@ -36,12 +36,12 @@ public sealed class ProjectActsTests
     [Fact]
     public async Task A_created_project_receives_nothing_until_a_token_is_issued()
     {
-        // Creation mints no credential. A project with no token is a project
+        // Creation mints no credential. A project with no token is a projec
         // whose door is closed, which is a state the operator can also arrive
         // at by revoking.
         var project = await CreateAsync("api", 7);
 
-        var listed = Assert.Single(await Listing().ExecuteAsync(Reach.TheInstallation, 
+        var listed = Assert.Single(await Listing().ExecuteAsync(Reach.TheInstallation,
             TestContext.Current.CancellationToken));
 
         Assert.Equal(project!.Id, listed.Id);
@@ -76,7 +76,7 @@ public sealed class ProjectActsTests
 
         Assert.Equal(
             RenameOutcome.Renamed,
-            await Renaming().ExecuteAsync(Reach.TheInstallation, 
+            await Renaming().ExecuteAsync(Reach.TheInstallation,
                 project!.Id, "orders-api", TestContext.Current.CancellationToken));
 
         var stored = Assert.Single(_projects.Stored);
@@ -92,7 +92,7 @@ public sealed class ProjectActsTests
 
         Assert.Equal(
             RenameOutcome.NameTaken,
-            await Renaming().ExecuteAsync(Reach.TheInstallation, 
+            await Renaming().ExecuteAsync(Reach.TheInstallation,
                 web!.Id, "api", TestContext.Current.CancellationToken));
         Assert.Equal("web", _projects.Stored.Single(p => p.Id == web.Id).Name);
     }
@@ -105,7 +105,7 @@ public sealed class ProjectActsTests
 
         Assert.Equal(
             RenameOutcome.Renamed,
-            await Renaming().ExecuteAsync(Reach.TheInstallation, 
+            await Renaming().ExecuteAsync(Reach.TheInstallation,
                 project!.Id, "api", TestContext.Current.CancellationToken));
     }
 
@@ -114,7 +114,7 @@ public sealed class ProjectActsTests
     {
         Assert.Equal(
             RenameOutcome.NoSuchProject,
-            await Renaming().ExecuteAsync(Reach.TheInstallation, 
+            await Renaming().ExecuteAsync(Reach.TheInstallation,
                 Guid.CreateVersion7(), "api", TestContext.Current.CancellationToken));
     }
 
@@ -123,17 +123,17 @@ public sealed class ProjectActsTests
     {
         var project = await CreateAsync("api", 90);
 
-        Assert.True(await Changing().ExecuteAsync(Reach.TheInstallation, 
+        Assert.True(await Changing().ExecuteAsync(Reach.TheInstallation,
             project!.Id, RetentionWindow.OfDays(7), TestContext.Current.CancellationToken));
 
-        // Lowering it puts entries outside the window; the sweep is what
+        // Lowering it puts entries outside the window; the sweep is wha
         // removes them, and it is not this act.
         Assert.Equal(7, Assert.Single(_projects.Stored).Retention.Days);
     }
 
     [Fact]
     public async Task Changing_the_window_of_a_project_that_is_not_there_says_so() =>
-        Assert.False(await Changing().ExecuteAsync(Reach.TheInstallation, 
+        Assert.False(await Changing().ExecuteAsync(Reach.TheInstallation,
             Guid.CreateVersion7(),
             RetentionWindow.OfDays(7),
             TestContext.Current.CancellationToken));
@@ -143,7 +143,7 @@ public sealed class ProjectActsTests
     {
         var project = await CreateAsync("api", 7);
 
-        Assert.True(await Deleting().ExecuteAsync(Reach.TheInstallation, 
+        Assert.True(await Deleting().ExecuteAsync(Reach.TheInstallation,
             project!.Id, TestContext.Current.CancellationToken));
 
         Assert.Empty(_projects.Stored);
@@ -154,13 +154,13 @@ public sealed class ProjectActsTests
     public async Task Deleting_a_project_that_is_already_gone_says_so_and_writes_nothing()
     {
         var project = await CreateAsync("api", 7);
-        Assert.True(await Deleting().ExecuteAsync(Reach.TheInstallation, 
+        Assert.True(await Deleting().ExecuteAsync(Reach.TheInstallation,
             project!.Id, TestContext.Current.CancellationToken));
         var writesBefore = _projects.Writes;
 
         // A second click, or another browser tab, and not a failure of
         // anything.
-        Assert.False(await Deleting().ExecuteAsync(Reach.TheInstallation, 
+        Assert.False(await Deleting().ExecuteAsync(Reach.TheInstallation,
             project.Id, TestContext.Current.CancellationToken));
         Assert.Equal(writesBefore, _projects.Writes);
     }
@@ -188,7 +188,7 @@ public sealed class ProjectActsTests
     public async Task What_each_project_can_receive_on_is_one_read_for_the_whole_list()
     {
         // The same read the settings tree is assembled from, and the reason the
-        // count on this list is not a second way of asking: it is one statement
+        // count on this list is not a second way of asking: it is one statemen
         // here whether the installation holds two projects or a hundred.
         var api = await CreateAsync("api", 7);
         var web = await CreateAsync("web", 30);
@@ -228,7 +228,7 @@ public sealed class ProjectActsTests
         // minute ago has no receipt, and its creation time is not one.
         var project = await CreateAsync("api", 7);
 
-        var listed = Assert.Single(await Listing().ExecuteAsync(Reach.TheInstallation, 
+        var listed = Assert.Single(await Listing().ExecuteAsync(Reach.TheInstallation,
             TestContext.Current.CancellationToken));
 
         Assert.Null(listed.LastReceivedAt);
@@ -240,11 +240,11 @@ public sealed class ProjectActsTests
     {
         var project = await CreateAsync("api", 7);
 
-        var read = await new ReadProject(_projects).ExecuteAsync(Reach.TheInstallation, 
+        var read = await new ReadProject(_projects).ExecuteAsync(Reach.TheInstallation,
             project!.Id, TestContext.Current.CancellationToken);
 
         Assert.Equal(project.Id, read?.Id);
-        Assert.Null(await new ReadProject(_projects).ExecuteAsync(Reach.TheInstallation, 
+        Assert.Null(await new ReadProject(_projects).ExecuteAsync(Reach.TheInstallation,
             Guid.CreateVersion7(), TestContext.Current.CancellationToken));
     }
 
@@ -254,7 +254,8 @@ public sealed class ProjectActsTests
     /// <c>GroupActsTests</c>'s subject.
     /// </summary>
     private async Task<Project?> CreateAsync(string name, int retentionDays) =>
-        (await new CreateProject(_projects, _groups, _access, _clock).ExecuteAsync(
+        (await new CreateProject(
+            _projects, _groups, _access, Recording.Nobody(), _clock).ExecuteAsync(
             Creator,
             name,
             RetentionWindow.OfDays(retentionDays),
@@ -262,14 +263,14 @@ public sealed class ProjectActsTests
             TestContext.Current.CancellationToken)).Project;
 
     private Task<IssueAttempt> IssueAsync(Guid project) =>
-        new IssueIngestToken(_projects, _tokens, new ReversingCipher(), _clock)
+        new IssueIngestToken(_projects, _tokens, new ReversingCipher(), Recording.Nobody(), _clock)
             .ExecuteAsync(Reach.TheInstallation, project, TestContext.Current.CancellationToken);
 
     private ListProjects Listing() => new(_projects, _tokens, _entries);
 
-    private RenameProject Renaming() => new(_projects);
+    private RenameProject Renaming() => new(_projects, Recording.Nobody());
 
-    private ChangeRetentionWindow Changing() => new(_projects);
+    private ChangeRetentionWindow Changing() => new(_projects, Recording.Nobody());
 
-    private DeleteProject Deleting() => new(_projects);
+    private DeleteProject Deleting() => new(_projects, Recording.Nobody());
 }

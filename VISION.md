@@ -61,6 +61,15 @@ every project assignment and every record of who changed something keeps pointin
 at somebody. There is always at least one active administrator, and the last one
 can be neither deactivated nor stripped of the role.
 
+**What anybody changed is written down.** Everything that alters an
+installation's configuration — a project, a group, a token, a retention window,
+an alert switch, somebody's access, somebody's role — is recorded with who did
+it, and an act an agent performed says so rather than naming the person whose
+authority it borrowed. With one operator there was nothing to ask; with several,
+*who deleted that project* and *who rotated that token* are questions a product
+that cannot answer them has no business being trusted with. The entries
+themselves are never in it: they are written once and never altered.
+
 ## Publicly reachable by design
 
 A logaffe installation is meant to be put on the open internet and be safe there.

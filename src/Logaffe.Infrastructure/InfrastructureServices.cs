@@ -37,6 +37,7 @@ public static class InfrastructureServices
         services.AddScoped<IProjects, Projects>();
         services.AddScoped<IProjectAccess, ProjectAccesses>();
         services.AddScoped<IOneTimeSecrets, OneTimeSecrets>();
+        services.AddScoped<IHistory, Histories>();
         services.AddScoped<IGroups, Groups>();
         services.AddScoped<IHosts, Hosts>();
         services.AddScoped<ITokens, Tokens>();

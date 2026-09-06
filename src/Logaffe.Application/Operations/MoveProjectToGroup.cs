@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
@@ -48,7 +49,8 @@ public enum MoveProjectOutcome
 /// first, which is a decision this act has no business making for them.
 /// </para>
 /// </remarks>
-public sealed class MoveProjectToGroup(IProjects projects, IGroups groups)
+public sealed class MoveProjectToGroup(
+    IProjects projects, IGroups groups, RecordAChange record)
 {
     /// <param name="groupId">The group to list it under, or <c>null</c> for none.</param>
     public async Task<MoveProjectOutcome> ExecuteAsync(
@@ -79,9 +81,31 @@ public sealed class MoveProjectToGroup(IProjects projects, IGroups groups)
             return MoveProjectOutcome.NameTaken;
         }
 
+        var was = project.GroupId;
+
         project.MoveTo(groupId);
         await projects.RecordAsync(project, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.Project,
+            project.Id,
+            project.Name,
+            Act.Changed,
+            cancellationToken,
+            field: "group",
+            from: await NameOfAsync(was, cancellationToken),
+            to: await NameOfAsync(groupId, cancellationToken));
 
         return MoveProjectOutcome.Moved;
     }
+
+    /// <summary>
+    /// What a group is called, for the row. <c>null</c> is written as a word
+    /// rather than left blank: *moved out of a group* and *nothing recorded* are
+    /// different sentences.
+    /// </summary>
+    private async Task<string> NameOfAsync(Guid? groupId, CancellationToken cancellationToken) =>
+        groupId is null
+            ? "none"
+            : (await groups.FindAsync(groupId.Value, cancellationToken))?.Name ?? "none";
+
 }

@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Identities;
 
 namespace Logaffe.Application.Operations;
@@ -100,7 +101,8 @@ public enum UserActOutcome
 /// an administrator removing their own role by accident is the likeliest way in.
 /// </para>
 /// </remarks>
-public sealed class ChangeAUser(IIdentities identities, ISessions sessions)
+public sealed class ChangeAUser(
+    IIdentities identities, ISessions sessions, RecordAChange record)
 {
     public async Task<UserActOutcome> DeactivateAsync(
         Guid userId, CancellationToken cancellationToken)
@@ -118,6 +120,8 @@ public sealed class ChangeAUser(IIdentities identities, ISessions sessions)
 
         user.Deactivate();
         await identities.RecordAsync(user, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.User, user.Id, user.Email, Act.Deactivated, cancellationToken);
 
         // Every session, immediately. The state is read on every request, so
         // this is housekeeping rather than what makes the deactivation take
@@ -139,6 +143,8 @@ public sealed class ChangeAUser(IIdentities identities, ISessions sessions)
 
         user.Reactivate();
         await identities.RecordAsync(user, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.User, user.Id, user.Email, Act.Reactivated, cancellationToken);
 
         return UserActOutcome.Done;
     }
@@ -158,8 +164,19 @@ public sealed class ChangeAUser(IIdentities identities, ISessions sessions)
             return UserActOutcome.TheLastAdministrator;
         }
 
+        var was = user.Administrator;
+
         user.ChangeAdministratorRole(administrator);
         await identities.RecordAsync(user, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.User,
+            user.Id,
+            user.Email,
+            Act.Changed,
+            cancellationToken,
+            field: "role",
+            from: was ? "administrator" : "none",
+            to: administrator ? "administrator" : "none");
 
         return UserActOutcome.Done;
     }

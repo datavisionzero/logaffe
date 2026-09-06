@@ -172,7 +172,7 @@ public sealed class ProjectAccessActsTests
     }
 
     private Task<CreationAttempt> CreateAsync(string name, User creator) =>
-        new CreateProject(_projects, _groups, _access, _clock).ExecuteAsync(
+        new CreateProject(_projects, _groups, _access, Recording.Nobody(), _clock).ExecuteAsync(
             creator.Id,
             name,
             RetentionWindow.OfDays(7),
@@ -181,7 +181,8 @@ public sealed class ProjectAccessActsTests
 
     private ResolveReach Reaching() => new(_access);
 
-    private AssignProject Assigning() => new(_projects, _identities, _access, _clock);
+    private AssignProject Assigning() =>
+        new(_projects, _identities, _access, Recording.Nobody(), _clock);
 
     private static User Active(string email)
     {

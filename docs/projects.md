@@ -325,6 +325,14 @@ not: it stops a sender delivering, and nothing that is already stored is gone.
 mint one would hand itself what its owner withheld — and neither are anybody's
 credentials or their sessions.
 
+**Every one of these acts is written down.** *Who deleted `orders-api`* and *who
+rotated that ingest token* are the two questions a shared installation actually
+gets asked — the first destroys entries, the second brings a sender silently to a
+halt — and both are answered on the installation's own history screen, whichever
+door the act came through ([The Web UI](./ui.md#history)). What is recorded is
+the act and not the data: nothing about a log entry ever appears there, because
+an entry is written once and never altered.
+
 ## What is deliberately not here
 
 - **No implicit project creation.** Settled in `VISION.md`.

@@ -64,7 +64,7 @@ public sealed class RestoreTests(PostgresFixture postgres) : IDisposable
 
         var restored = await RestoreIntoAsync(elsewhere, into, artifact);
 
-        Assert.Equal(17, restored.Tables);
+        Assert.Equal(18, restored.Tables);
         Assert.Equal(original.Migration, restored.Manifest.Migration);
 
         await using var context = ContextFor(elsewhere.ConnectionString);

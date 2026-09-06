@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Hosts;
 
 namespace Logaffe.Application.Operations;
@@ -41,7 +42,7 @@ public sealed record HostCreationAttempt(CreateHostOutcome Outcome, Host? Host);
 /// token is handed rather than a permission (ADR 0046).
 /// </para>
 /// </remarks>
-public sealed class CreateHost(IHosts hosts, TimeProvider clock)
+public sealed class CreateHost(IHosts hosts, RecordAChange record, TimeProvider clock)
 {
     /// <exception cref="ArgumentException">
     /// <paramref name="name"/> is not a name — it is blank, or longer than
@@ -58,6 +59,8 @@ public sealed class CreateHost(IHosts hosts, TimeProvider clock)
 
         var host = Host.Create(name, clock.GetUtcNow());
         await hosts.AddAsync(host, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.Host, host.Id, host.Name, Act.Created, cancellationToken);
 
         return new HostCreationAttempt(CreateHostOutcome.Created, host);
     }
@@ -87,7 +90,7 @@ public enum RenameHostOutcome
 /// them notices. That is the whole reason a host is a row rather than a word
 /// written on each project (ADR 0039).
 /// </remarks>
-public sealed class RenameHost(IHosts hosts)
+public sealed class RenameHost(IHosts hosts, RecordAChange record)
 {
     /// <inheritdoc cref="CreateHost.ExecuteAsync"/>
     public async Task<RenameHostOutcome> ExecuteAsync(
@@ -107,8 +110,18 @@ public sealed class RenameHost(IHosts hosts)
             return RenameHostOutcome.NameTaken;
         }
 
+        var was = host.Name;
+
         host.Rename(normalized);
         await hosts.RecordAsync(host, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.Host,
+            host.Id,
+            host.Name,
+            Act.Renamed,
+            cancellationToken,
+            from: was,
+            to: host.Name);
 
         return RenameHostOutcome.Renamed;
     }
@@ -136,7 +149,7 @@ public sealed class RenameHost(IHosts hosts)
 /// name back would protect nobody who issued the request deliberately.
 /// </para>
 /// </remarks>
-public sealed class DeleteHost(IHosts hosts)
+public sealed class DeleteHost(IHosts hosts, RecordAChange record)
 {
     /// <summary>
     /// Whether there was a host to delete. <c>false</c> is one already gone — a
@@ -150,7 +163,12 @@ public sealed class DeleteHost(IHosts hosts)
             return false;
         }
 
+        var name = host.Name;
+
         await hosts.RemoveAsync(host, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.Host, host.Id, name, Act.Removed, cancellationToken);
+
         return true;
     }
 }

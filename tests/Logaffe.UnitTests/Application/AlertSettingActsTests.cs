@@ -15,7 +15,7 @@ public sealed class AlertSettingActsTests
     [Fact]
     public async Task All_three_are_off_until_the_operator_switches_one_on()
     {
-        var switches = new ChangeTheAlertSwitches(_scene.Installation);
+        var switches = new ChangeTheAlertSwitches(_scene.Installation, Recording.Nobody());
 
         Assert.Equal(
             AlertSwitches.AllOff,
@@ -25,7 +25,7 @@ public sealed class AlertSettingActsTests
     [Fact]
     public async Task The_switches_are_written_and_read_back_as_one_setting()
     {
-        var switches = new ChangeTheAlertSwitches(_scene.Installation);
+        var switches = new ChangeTheAlertSwitches(_scene.Installation, Recording.Nobody());
 
         await switches.ExecuteAsync(
             new AlertSwitches(
@@ -144,7 +144,7 @@ public sealed class MuteAProjectTests
 
         Assert.False(project.Muted);
 
-        var mute = new MuteAProject(_projects);
+        var mute = new MuteAProject(_projects, Recording.Nobody());
 
         Assert.Equal(
             MuteAProjectOutcome.Muted,
@@ -165,7 +165,7 @@ public sealed class MuteAProjectTests
         var project = _projects.Holding(
             "api", RetentionWindow.OfDays(30), DateTimeOffset.UnixEpoch);
 
-        var mute = new MuteAProject(_projects);
+        var mute = new MuteAProject(_projects, Recording.Nobody());
         await mute.ExecuteAsync(Reach.TheInstallation,
             project.Id, true, TestContext.Current.CancellationToken);
 
@@ -182,7 +182,8 @@ public sealed class MuteAProjectTests
     {
         Assert.Equal(
             MuteAProjectOutcome.NoSuchProject,
-            await new MuteAProject(_projects).ExecuteAsync(Reach.TheInstallation, 
+            await new MuteAProject(_projects, Recording.Nobody()).ExecuteAsync(
+                Reach.TheInstallation,
                 Guid.NewGuid(), true, TestContext.Current.CancellationToken));
     }
 }

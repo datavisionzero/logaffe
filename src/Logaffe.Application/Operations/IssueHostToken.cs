@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Tokens;
 
 namespace Logaffe.Application.Operations;
@@ -48,7 +49,11 @@ public sealed record HostTokenAttempt(IssueHostTokenOutcome Outcome, IssuedToken
 /// </para>
 /// </remarks>
 public sealed class IssueHostToken(
-    IHosts hosts, ITokens tokens, ISecretCipher cipher, TimeProvider clock)
+    IHosts hosts,
+    ITokens tokens,
+    ISecretCipher cipher,
+    RecordAChange record,
+    TimeProvider clock)
 {
     public async Task<HostTokenAttempt> ExecuteAsync(
         Guid hostId, CancellationToken cancellationToken)
@@ -70,6 +75,12 @@ public sealed class IssueHostToken(
             hostId, minted.Identifier, cipher.Encrypt(minted.Secret), issuedAt);
 
         await tokens.AddAsync(token, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.HostToken,
+            token.Id,
+            minted.Identifier.Value,
+            Act.Issued,
+            cancellationToken);
 
         return new HostTokenAttempt(
             IssueHostTokenOutcome.Issued, new IssuedToken(token.Id, minted, issuedAt));

@@ -266,7 +266,7 @@ public sealed class OneTimeSecretTests(PostgresFixture postgres, MailpitFixture 
                 new Identities(context),
                 new OneTimeSecrets(context),
                 Mail(),
-                Templates(),
+                Templates(), Recording.Nobody(),
                 At(Now))
             .ExecuteAsync(
                 "Newcomer", email, administrator: false, TestContext.Current.CancellationToken);

@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
@@ -28,7 +29,7 @@ namespace Logaffe.Application.Operations;
 /// also why raising it again brings nothing back.
 /// </para>
 /// </remarks>
-public sealed class ChangeRetentionWindow(IProjects projects)
+public sealed class ChangeRetentionWindow(IProjects projects, RecordAChange record)
 {
     /// <summary>Whether there was a project to change.</summary>
     public async Task<bool> ExecuteAsync(
@@ -43,8 +44,22 @@ public sealed class ChangeRetentionWindow(IProjects projects)
             return false;
         }
 
+        var was = project.Retention;
+
         project.KeepFor(retention);
         await projects.RecordAsync(project, cancellationToken);
+
+        // The one setting on this list that removes stored entries when it moves
+        // down, which is why it is recorded whichever way it went.
+        await record.ExecuteAsync(
+            Subject.Project,
+            project.Id,
+            project.Name,
+            Act.Changed,
+            cancellationToken,
+            field: "retention",
+            from: $"{was.Days} days",
+            to: $"{retention.Days} days");
 
         return true;
     }

@@ -4,6 +4,7 @@ import { Alerts } from "./Alerts";
 import { BackupCodes } from "./BackupCodes";
 import { ChangePassword } from "./ChangePassword";
 import { Groups } from "./Groups";
+import { History } from "./History";
 import { Hosts } from "./Hosts";
 import { ChangeAddress } from "./ChangeAddress";
 import { SecondFactor } from "./SecondFactor";
@@ -15,20 +16,20 @@ import { SettingsScreen } from "./SettingsScreen";
 /**
  * What is changed rarely about the installation itself.
  *
- * There is **no user management** here and there is nothing to add: one
- * operator, no invitations, no roles (`docs/ui.md`). There are also no
- * installation-wide defaults for a project's retention — a window is set per
- * project, up to a ceiling no installation can raise (ADR 0020) — and no host
- * recovery, no export and no backup button, because those are verbs on the
- * binary and are never reachable over the network (ADR 0013).
+ * There are **no installation-wide defaults for a project's retention** — a
+ * window is set per project, up to a ceiling no installation can raise
+ * (ADR 0020) — and no host recovery, no export and no backup button, because
+ * those are verbs on the binary and are never reachable over the network
+ * (ADR 0013).
  *
- * What is left is the six things that are the installation's rather than a
- * project's, and they are six areas because that is what they are: the browsers
- * signed in, the tokens agents connect with, the operator's own credentials, the
- * groups the projects are listed under, the machines they run on, and what this
- * installation says unasked. Four of them are lists of what exists and the
- * credentials are three acts on one account, which is why those stay together on
- * one area rather than becoming three.
+ * What is left is the things that are the installation's rather than a
+ * project's, and they are areas because that is what they are: the browsers
+ * signed in, the tokens agents connect with, this account's own credentials, the
+ * people with accounts here, what any of them has changed, the groups the
+ * projects are listed under, the machines they run on, and what this
+ * installation says unasked. Most are lists of what exists and the credentials
+ * are three acts on one account, which is why those stay together on one area
+ * rather than becoming three.
  *
  * **The alerts area is the last of them and the smallest**: a notifier, three
  * switches and what each of them currently works out to. It is not a
@@ -101,8 +102,14 @@ export function InstallationSettings() {
         // Offered only to an administrator, which is a courtesy rather than a
         // boundary: the installation refuses the acts either way, and a tab that
         // does nothing but refuse is a tab nobody should be shown (ADR 0055).
+        // Offered only to an administrator for the same reason People is, and
+        // the two sit together: what somebody may do and what they have done
+        // are one question asked twice.
         ...(me?.administrator === true
-          ? [{ at: "people", name: "People", panel: <Users me={me.id} /> }]
+          ? [
+              { at: "people", name: "People", panel: <Users me={me.id} /> },
+              { at: "history", name: "History", panel: <History /> },
+            ]
           : []),
         { at: "groups", name: "Groups", panel: <Groups /> },
         { at: "hosts", name: "Hosts", panel: <Hosts hostId={hostId} /> },

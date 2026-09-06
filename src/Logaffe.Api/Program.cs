@@ -281,6 +281,13 @@ builder.Services.AddScoped<ChangeAddress>();
 builder.Services.AddScoped<ListUsers>();
 builder.Services.AddScoped<ChangeAUser>();
 
+// What was changed and by whom (CONTEXT.md, Change). The actor is a property of
+// the request, filled in by whichever door admitted it, which is what keeps
+// twenty-odd acts from each carrying one through their own signature.
+builder.Services.AddScoped<TheActor>();
+builder.Services.AddScoped<RecordAChange>();
+builder.Services.AddScoped<ReadTheHistory>();
+
 // Order is start order. This one is first because what it has to say is about
 // where everything after it is written.
 builder.Services.AddHostedService<FileLogService>();
@@ -358,6 +365,7 @@ app.MapProjects();
 app.MapProjectAccess();
 app.MapInvitations();
 app.MapUsers();
+app.MapHistory();
 app.MapGroups();
 app.MapEntries();
 app.MapHosts();

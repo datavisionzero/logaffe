@@ -16,14 +16,16 @@ namespace Logaffe.Application.Operations;
 /// issued (ADR 0046).
 /// </para>
 /// <para>
-/// The third is the owner, and it is what everything else about the agent is
-/// resolved through (ADR 0052): the projects it can reach are that user's, and
-/// the installation-wide acts are within reach only while that user is an
-/// administrator. It comes back here because asking for it a second time would
-/// be a second lookup on every call an agent makes.
+/// The last two are the agent and the person it acts for, and they are what
+/// everything else is resolved through (ADR 0052): the projects within reach are
+/// that user's, the installation-wide acts are reachable only while that user is
+/// an administrator, and what a record of a change names is the agent. They come
+/// back here because asking again would be a second lookup on every call an
+/// agent makes.
 /// </para>
 /// </remarks>
-public sealed record AdmittedAgent(AgentTokenKind Kind, bool MayDestroy, User Owner);
+public sealed record AdmittedAgent(
+    AgentTokenKind Kind, bool MayDestroy, Agent Agent, User Owner);
 
 /// <summary>
 /// What a presented token admits: for a delivery of entries, the project it goes
@@ -188,8 +190,12 @@ public sealed class AuthenticateToken(
         // is gone — which is Host Recovery a moment ago, since nothing else
         // removes one. The rows are left where they are: silencing an agent is
         // the act that deactivated its owner, and this path is a read.
-        var owner = await OwnerAsync(token, cancellationToken);
-        if (owner is null || !owner.IsActive)
+        var agent = await identities.FindAsync(token.IdentityId, cancellationToken) as Agent;
+        var owner = agent is null
+            ? null
+            : await identities.FindUserAsync(agent.OwnerId, cancellationToken);
+
+        if (agent is null || owner is null || !owner.IsActive)
         {
             return null;
         }
@@ -201,19 +207,7 @@ public sealed class AuthenticateToken(
             await tokens.RecordUseAsync(token, cancellationToken);
         }
 
-        return new AdmittedAgent(token.Kind, token.MayDestroy, owner);
-    }
-
-    /// <summary>
-    /// The user an agent acts for, through the agent identity its token names.
-    /// </summary>
-    private async Task<User?> OwnerAsync(AgentToken token, CancellationToken cancellationToken)
-    {
-        var agent = await identities.FindAsync(token.IdentityId, cancellationToken) as Agent;
-
-        return agent is null
-            ? null
-            : await identities.FindUserAsync(agent.OwnerId, cancellationToken);
+        return new AdmittedAgent(token.Kind, token.MayDestroy, agent, owner);
     }
 
     /// <summary>

@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
@@ -65,7 +66,11 @@ public sealed record CreationAttempt(CreateProjectOutcome Outcome, Project? Proj
 /// </para>
 /// </remarks>
 public sealed class CreateProject(
-    IProjects projects, IGroups groups, IProjectAccess access, TimeProvider clock)
+    IProjects projects,
+    IGroups groups,
+    IProjectAccess access,
+    RecordAChange record,
+    TimeProvider clock)
 {
     /// <param name="groupId">
     /// The group to list it under, or <c>null</c> for none — which is what the
@@ -132,6 +137,9 @@ public sealed class CreateProject(
         // (ADR 0055).
         await access.GrantAsync(
             ProjectAccess.Grant(project.Id, creator, creator, now), cancellationToken);
+
+        await record.ExecuteAsync(
+            Subject.Project, project.Id, project.Name, Act.Created, cancellationToken);
 
         return new CreationAttempt(CreateProjectOutcome.Created, project);
     }

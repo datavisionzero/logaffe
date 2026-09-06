@@ -51,7 +51,8 @@ they actually are, the caps and the truncation, the project with its retention
 window and the group it is listed under, the two tokens with the identifier and
 the alphabet they are written in,
 the identity under which a user and an agent are the same thing, with the
-session, the password and the backup code, the
+session, the password and the backup code, the change that records what somebody
+did to the installation, the
 filters with the cursor, and what a retention window costs — the per-entry and
 per-row figures [Storage](./storage.md) measured, and the arithmetic that turns a
 rate into bytes

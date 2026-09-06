@@ -321,12 +321,12 @@ column, where they are true of every project at once.
 Both screens are their **areas**, listed beside what is being read and marked
 while it is: a project's are *the project*, *ingest tokens* and *delete this
 project*; the installation's are *signed-in browsers*, *agent tokens*, *your
-credentials*, *people*, *groups*, *hosts* and *alerts*. One is on the screen at a
-time. Stacked, the answer to *where is the retention window* was to read the
+credentials*, *people*, *history*, *groups*, *hosts* and *alerts*. One is on the
+screen at a time. Stacked, the answer to *where is the retention window* was to read the
 page.
 
-**People is offered to an administrator and to nobody else.** That is a courtesy
-rather than a boundary: the installation refuses the acts either way, and a tab
+**People and history are offered to an administrator and to nobody else.** That
+is a courtesy rather than a boundary: the installation refuses the acts either way, and a tab
 that does nothing but refuse is a tab nobody should be shown
 ([ADR 0055](./adr/0055-project-access-is-one-filter.md)). The screen waits for the
 answer to *who is reading this* only when the address names that area, so every
@@ -383,6 +383,35 @@ than one person now, and *as whom am I looking at this* has an answer worth
 reading — on an installation somebody administers for other people it is the
 difference between two browser windows. Still no avatar: a picture would be a
 thing to upload.
+
+### History
+
+Everything anybody has changed about this installation, newest first: when, who,
+and what they did, one row to a sentence
+([`CONTEXT.md`](../CONTEXT.md), Change). It is offered to an administrator, like
+People, and the two sit together — what somebody may do and what they have done
+are one question asked twice.
+
+**A row reads as a sentence rather than as its parts.** *Deleted project
+orders-api*, *Changed retention on project orders-api from 7 days to 30 days*.
+The question this exists to answer is asked in words, and a table of
+enumerations would make the reader assemble the sentence themselves every time.
+
+**A row says when an agent held the keyboard**, beside the name. An agent acts
+with its owner's authority, so a row naming a person and saying nothing else
+would be true and misleading at once
+([ADR 0052](./adr/0052-a-user-and-an-agent-are-one-identity.md)).
+
+**Nothing here links anywhere.** The deletions are the rows most worth having and
+they are exactly the ones whose subject is gone, so what a row shows is the name
+as it read at the time rather than an address that would be dead half the time.
+
+**It is a page and a button.** The newest hundred, and *show more* walks back
+from there — no infinite scroll, no filter, no search, and no export. Log entries
+never appear here at all: they are written once and never altered, so there is
+nothing about one to record.
+
+### The two screens, area by area
 
 **The retention field states the cost of the number in it**, live, as three
 figures beside the box: what the installation holds today, what this window

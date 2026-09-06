@@ -397,6 +397,44 @@
         }
       }
     },
+    "/history": {
+      "get": {
+        "tags": [
+          "logaffe"
+        ],
+        "summary": "What was changed on this installation, newest first.",
+        "operationId": "ReadHistory",
+        "parameters": [
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ChangeResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/ingest": {
       "post": {
         "tags": [
@@ -2978,6 +3016,21 @@
   },
   "components": {
     "schemas": {
+      "Act": {
+        "enum": [
+          "created",
+          "renamed",
+          "changed",
+          "removed",
+          "issued",
+          "revoked",
+          "invited",
+          "deactivated",
+          "reactivated",
+          "granted",
+          "withdrawn"
+        ]
+      },
       "AgentTokenKind": {
         "enum": [
           "reading",
@@ -3138,6 +3191,81 @@
             ]
           },
           "newPassword": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "ChangeResponse": {
+        "required": [
+          "id",
+          "actorId",
+          "actorKind",
+          "actorName",
+          "at",
+          "subject",
+          "subjectId",
+          "subjectName",
+          "act",
+          "field",
+          "from",
+          "to"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "actorId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actorKind": {
+            "$ref": "#/components/schemas/IdentityKind"
+          },
+          "actorName": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/Subject"
+          },
+          "subjectId": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "format": "uuid"
+          },
+          "subjectName": {
+            "type": "string"
+          },
+          "act": {
+            "$ref": "#/components/schemas/Act"
+          },
+          "field": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "to": {
             "type": [
               "null",
               "string"
@@ -3742,6 +3870,12 @@
             }
           }
         }
+      },
+      "IdentityKind": {
+        "enum": [
+          "user",
+          "agent"
+        ]
       },
       "InstallationHostRequest": {
         "required": [
@@ -5071,6 +5205,19 @@
             "format": "int32"
           }
         }
+      },
+      "Subject": {
+        "enum": [
+          "project",
+          "group",
+          "host",
+          "ingestToken",
+          "hostToken",
+          "agentToken",
+          "user",
+          "projectAccess",
+          "installation"
+        ]
       },
       "TailResponse": {
         "required": [

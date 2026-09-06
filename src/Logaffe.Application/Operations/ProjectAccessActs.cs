@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Identities;
 using Logaffe.Domain.Projects;
 
@@ -115,7 +116,11 @@ public enum AssignProjectOutcome
 /// </para>
 /// </remarks>
 public sealed class AssignProject(
-    IProjects projects, IIdentities identities, IProjectAccess access, TimeProvider clock)
+    IProjects projects,
+    IIdentities identities,
+    IProjectAccess access,
+    RecordAChange record,
+    TimeProvider clock)
 {
     public async Task<AssignProjectOutcome> GrantAsync(
         Guid projectId, Guid userId, Guid grantedBy, CancellationToken cancellationToken)
@@ -129,6 +134,8 @@ public sealed class AssignProject(
         await access.GrantAsync(
             ProjectAccess.Grant(projectId, userId, grantedBy, clock.GetUtcNow()),
             cancellationToken);
+
+        await RecordAsync(projectId, userId, Act.Granted, cancellationToken);
 
         return AssignProjectOutcome.Assigned;
     }
@@ -144,7 +151,29 @@ public sealed class AssignProject(
 
         await access.RevokeAsync(projectId, userId, cancellationToken);
 
+        await RecordAsync(projectId, userId, Act.Withdrawn, cancellationToken);
+
         return AssignProjectOutcome.Withdrawn;
+    }
+
+    /// <summary>
+    /// One row naming both halves, because *who gave this person access* is a
+    /// question about a pair and neither half alone answers it.
+    /// </summary>
+    private async Task RecordAsync(
+        Guid projectId, Guid userId, Act act, CancellationToken cancellationToken)
+    {
+        var project = await projects.FindAsync(
+            Reach.TheInstallation, projectId, cancellationToken);
+        var user = await identities.FindUserAsync(userId, cancellationToken);
+
+        await record.ExecuteAsync(
+            Subject.ProjectAccess,
+            projectId,
+            project?.Name ?? "a project",
+            act,
+            cancellationToken,
+            to: user?.Email);
     }
 
     /// <summary>

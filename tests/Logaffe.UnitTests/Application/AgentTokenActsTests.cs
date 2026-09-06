@@ -228,15 +228,16 @@ public sealed class AgentTokenActsTests
         string name,
         AgentTokenKind kind = AgentTokenKind.Reading,
         bool mayDestroy = false) =>
-        Issuing().ExecuteAsync(_owner, name, kind, mayDestroy, TestContext.Current.CancellationToken);
+        Issuing().ExecuteAsync(
+            _owner, name, kind, mayDestroy, TestContext.Current.CancellationToken);
 
-    private IssueAgentToken Issuing() => new(_tokens, _cipher, _clock);
+    private IssueAgentToken Issuing() => new(_tokens, _cipher, Recording.Nobody(), _clock);
 
     private ListAgentTokens Listing() => new(_tokens);
 
     private ReadTokenBack ReadingBack() => new(_tokens, _cipher);
 
-    private RenameAgentToken Renaming() => new(_tokens, _identities);
+    private RenameAgentToken Renaming() => new(_tokens, _identities, Recording.Nobody());
 
-    private RevokeToken Revoking() => new(_tokens);
+    private RevokeToken Revoking() => new(_tokens, Recording.Nobody());
 }

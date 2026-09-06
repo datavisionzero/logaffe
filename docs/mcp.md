@@ -339,6 +339,14 @@ the acts the settings screens carry, named as the product already names them
 ([Projects and tokens](./projects.md), [Metrics](./metrics.md)) rather than in a
 vocabulary invented for this door.
 
+**Every one of them is written down, under the agent's own name.** An act that
+changes this installation's configuration is recorded whichever door it came
+through, and the record says an agent did it rather than naming the person whose
+authority it borrowed ([`CONTEXT.md`](../CONTEXT.md), Change). What an
+administrator reads afterwards is *the deployment agent deleted project
+orders-api*, which is the sentence that makes handing a credential to a model a
+thing anybody can review.
+
 **`get_settings`** — the whole surface in one answer: the groups, the projects
 with the group each sits in, the host each sits on and its retention window, the
 hosts, the installation's window for samples, and for each project and host how
@@ -463,7 +471,7 @@ projects belonging to several people
 What it exposes is a machine name and four numbers, and never anything anybody
 logged.
 
-### Three things no token reaches
+### Four things no token reaches
 
 Absent from the interface rather than withheld by a flag, the way this whole
 surface was absent before.
@@ -475,6 +483,10 @@ surface was absent before.
   that can re-enrol a second factor owns the account.
 - **Sessions.** Ending one denies the operator their own access, and listing them
   is a record of where the operator has been.
+- **The history.** An agent writes to it with everything it does and reads none
+  of it. A credential handed to a model is not a credential for finding out what
+  the people on an installation have been doing, and the one surface that answers
+  that question stays behind a person's own sign-in.
 
 ## What the agent cannot do
 

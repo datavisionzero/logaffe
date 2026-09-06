@@ -555,6 +555,60 @@ remain* is a filtered count and a spent code stays visibly spent
 The index on `user_id` is the cascade's and every read's: a set belongs to one
 person and is only ever counted for that person.
 
+## The history table
+
+```
+change
+  id            bigint, the database's own, and the order rows are read in
+  actor_id      cascades with the identity
+  actor_kind    user or agent
+  actor_name    as it read when the row was written
+  at
+  subject       project, group, host, token, user, access, installation
+  subject_id    no foreign key
+  subject_name  as it read when the row was written
+  act           created, renamed, changed, removed, issued, revoked, …
+  field         the setting that moved, on `changed` and on nothing else
+  moved_from
+  moved_to
+```
+
+One row is one thing somebody did to this installation's configuration, and
+there is no act anywhere that edits or removes one. It is the smallest table in
+the schema by some distance — an installation writes a handful of these a week
+where the log store takes millions a day — so nothing here is arranged for size.
+
+**The key is the order.** `id` is a `bigint` the database assigns, the rows are
+read newest first, and a page resumes on the id it ended at. Ordering on `at`
+would need a tiebreak, because several changes made in one request share a
+timestamp to the microsecond; ordering on the key needs none, because there are
+no ties. That is also why the cursor is not a timestamp: a client walking back
+through the history is walking the primary key backwards.
+
+**The subject has no foreign key, deliberately.** *Who deleted `orders-api`* is
+the question this table exists to answer, and a key pointing at the project would
+take the answer away with the project. What the row carries instead is the
+identity as it was and the name as it read, which is why `subject_name` is a
+column rather than a join.
+
+**The actor has one, and it cascades.** Host Recovery removes every identity on
+an installation
+([ADR 0058](./adr/0058-host-recovery-removes-every-identity.md)), and a history
+naming people who no longer exist would be a list nobody can read. `actor_name`
+is still stored beside it for the ordinary case: a row says who acted without a
+join, and an agent's row names the agent rather than the person who owns it
+([ADR 0052](./adr/0052-a-user-and-an-agent-are-one-identity.md)).
+
+**The one index beyond the key is `(subject, subject_id)`.** Two questions are
+asked of this table: what happened lately, which is the key walked backwards, and
+everything that was ever done to one thing, which is this.
+
+**Nothing writes here on the way past.** The stores do not record what they were
+told to do; the acts record what they did. A store that wrote a row for every
+change it made would have written one for each of the millions the retention
+sweep deletes, and would then have needed telling which of those were
+configuration.
+
 ## What is deliberately not here
 
 - **No partitioning.** Settled in ADR 0023: per-project retention means a

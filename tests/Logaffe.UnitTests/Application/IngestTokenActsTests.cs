@@ -120,7 +120,7 @@ public sealed class IngestTokenActsTests
     {
         // The foreign key would refuse it as a failure of the installation;
         // what happened is that the operator named something that is gone.
-        var attempt = await Issuing().ExecuteAsync(Reach.TheInstallation, 
+        var attempt = await Issuing().ExecuteAsync(Reach.TheInstallation,
             Guid.CreateVersion7(), TestContext.Current.CancellationToken);
 
         Assert.Equal(IssueOutcome.NoSuchProject, attempt.Outcome);
@@ -165,7 +165,7 @@ public sealed class IngestTokenActsTests
         Assert.True(await Revoking().IngestTokenAsync(
             first!.Id, TestContext.Current.CancellationToken));
 
-        // Removed rather than marked: nothing of the revoked token is left, not
+        // Removed rather than marked: nothing of the revoked token is left, no
         // its identifier and not its sealed secret.
         var left = Assert.Single(_tokens.Stored);
         Assert.Equal(second!.Id, left.Id);
@@ -257,7 +257,7 @@ public sealed class IngestTokenActsTests
         Assert.Equal(readsBefore + 1, _tokens.Reads);
 
         // And it is the same answer as asking one project at a time, project by
-        // project — including that a project whose door is closed is absent
+        // project — including that a project whose door is closed is absen
         // rather than present and empty.
         Assert.Equal([.. many.Order()], [.. held.Keys.Order()]);
         Assert.DoesNotContain(quiet, held.Keys);
@@ -295,11 +295,12 @@ public sealed class IngestTokenActsTests
             Reach.TheInstallation, project, TestContext.Current.CancellationToken)
         ?? throw new InvalidOperationException("The project is there.");
 
-    private IssueIngestToken Issuing() => new(_projects, _tokens, _cipher, _clock);
+    private IssueIngestToken Issuing() =>
+        new(_projects, _tokens, _cipher, Recording.Nobody(), _clock);
 
     private ListIngestTokens Listing() => new(_projects, _tokens);
 
     private ReadTokenBack ReadingBack() => new(_tokens, _cipher);
 
-    private RevokeToken Revoking() => new(_tokens);
+    private RevokeToken Revoking() => new(_tokens, Recording.Nobody());
 }

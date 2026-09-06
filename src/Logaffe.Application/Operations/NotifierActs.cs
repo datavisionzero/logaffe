@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Alerts;
 
 namespace Logaffe.Application.Operations;
@@ -35,7 +36,8 @@ public sealed record TheNotifier(string Server, string Topic, string? AccessToke
 /// clearing it is clearing the notifier.
 /// </para>
 /// </remarks>
-public sealed class ChangeTheNotifier(IInstallation installation, ISecretCipher cipher)
+public sealed class ChangeTheNotifier(
+    IInstallation installation, ISecretCipher cipher, RecordAChange record)
 {
     /// <summary>
     /// Writes the notifier down.
@@ -64,8 +66,22 @@ public sealed class ChangeTheNotifier(IInstallation installation, ISecretCipher 
                 ? null
                 : cipher.Encrypt(accessToken);
 
+        var was = await installation.ReadNotifierAsync(cancellationToken);
+
         await installation.RecordNotifierAsync(
             notifier.Sealing(sealedToken), cancellationToken);
+
+        // The server and the topic and never the access token: a history is not
+        // a place to read a credential out of.
+        await record.ExecuteAsync(
+            Subject.Installation,
+            subjectId: null,
+            "this installation",
+            Act.Changed,
+            cancellationToken,
+            field: "notifier",
+            from: was is null ? "none" : $"{was.Server} {was.Topic}",
+            to: $"{notifier.Server} {notifier.Topic}");
     }
 
     /// <summary>

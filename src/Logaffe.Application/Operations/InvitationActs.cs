@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Identities;
 
 namespace Logaffe.Application.Operations;
@@ -58,6 +59,7 @@ public sealed class InviteAUser(
     IOneTimeSecrets secrets,
     IMail mail,
     MailTemplates templates,
+    RecordAChange record,
     TimeProvider clock)
 {
     /// <param name="administrator">Whether the invited account administers.</param>
@@ -88,6 +90,12 @@ public sealed class InviteAUser(
         {
             return InviteOutcome.AddressTaken;
         }
+
+        // Recorded whether or not the message went out: the account exists
+        // either way, and *who invited this person* is answered by the act
+        // rather than by the delivery.
+        await record.ExecuteAsync(
+            Subject.User, invited.Id, invited.Email, Act.Invited, cancellationToken);
 
         return await new SendALink(secrets, mail, templates, clock).ExecuteAsync(
             invited, OneTimeSecretPurpose.Invitation, cancellationToken)

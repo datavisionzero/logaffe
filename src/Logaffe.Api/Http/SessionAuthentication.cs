@@ -159,6 +159,10 @@ public sealed class SessionAuthenticationHandler(
 
         Context.SetCurrentIdentity(admitted.Session, admitted.User, reach);
 
+        // Who is doing this, for whatever the request goes on to change
+        // (CONTEXT.md, Change).
+        Context.RequestServices.GetRequiredService<TheActor>().Admitted(admitted.User);
+
         // What identifies the row, and the one role there is. Project access is
         // deliberately not here: it is a set that every read narrows to and not
         // a claim on a principal, and a claim would be a copy of it that could

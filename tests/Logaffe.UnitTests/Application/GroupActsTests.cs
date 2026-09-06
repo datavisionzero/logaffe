@@ -330,13 +330,14 @@ public sealed class GroupActsTests
     }
 
     private Task<Group?> MakingAsync(string name) =>
-        new CreateGroup(_groups, _clock).ExecuteAsync(name, TestContext.Current.CancellationToken);
+        new CreateGroup(_groups, Recording.Nobody(), _clock).ExecuteAsync(
+            name, TestContext.Current.CancellationToken);
 
     private async Task<Project?> CreateAsync(string name, Guid? groupId = null) =>
         (await CreatingAsync(name, groupId)).Project;
 
     private Task<CreationAttempt> CreatingAsync(string name, Guid? groupId = null) =>
-        new CreateProject(_projects, _groups, _access, _clock).ExecuteAsync(
+        new CreateProject(_projects, _groups, _access, Recording.Nobody(), _clock).ExecuteAsync(
             Creator,
             name,
             RetentionWindow.OfDays(7),
@@ -344,16 +345,17 @@ public sealed class GroupActsTests
             TestContext.Current.CancellationToken);
 
     private Task<RenameOutcome> RenameAsync(Guid project, string name) =>
-        new RenameProject(_projects).ExecuteAsync(Reach.TheInstallation, 
+        new RenameProject(_projects, Recording.Nobody()).ExecuteAsync(Reach.TheInstallation,
             project, name, TestContext.Current.CancellationToken);
 
     private Task<MoveProjectOutcome> MoveAsync(Guid project, Guid? group) =>
-        new MoveProjectToGroup(_projects, _groups).ExecuteAsync(Reach.TheInstallation, 
+        new MoveProjectToGroup(_projects, _groups, Recording.Nobody()).ExecuteAsync(
+            Reach.TheInstallation,
             project, group, TestContext.Current.CancellationToken);
 
     private ListGroups Listing() => new(_groups);
 
-    private RenameGroup Renaming() => new(_groups);
+    private RenameGroup Renaming() => new(_groups, Recording.Nobody());
 
-    private DeleteGroup Removing() => new(_groups);
+    private DeleteGroup Removing() => new(_groups, Recording.Nobody());
 }

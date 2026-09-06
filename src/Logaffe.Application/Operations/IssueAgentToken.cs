@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Identities;
 using Logaffe.Domain.Tokens;
 
@@ -48,7 +49,8 @@ namespace Logaffe.Application.Operations;
 /// only the adapter knows.
 /// </para>
 /// </remarks>
-public sealed class IssueAgentToken(ITokens tokens, ISecretCipher cipher, TimeProvider clock)
+public sealed class IssueAgentToken(
+    ITokens tokens, ISecretCipher cipher, RecordAChange record, TimeProvider clock)
 {
     /// <param name="owner">
     /// The user issuing it, which is who the agent will act for and never an
@@ -81,6 +83,12 @@ public sealed class IssueAgentToken(ITokens tokens, ISecretCipher cipher, TimePr
             issuedAt);
 
         await tokens.AddAsync(agent, token, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.AgentToken,
+            token.Id,
+            token.Name,
+            Act.Issued,
+            cancellationToken);
 
         return new IssuedToken(token.Id, minted, issuedAt);
     }

@@ -1,4 +1,5 @@
 using Logaffe.Application.Ports;
+using Logaffe.Domain.History;
 using Logaffe.Domain.Projects;
 
 namespace Logaffe.Application.Operations;
@@ -11,7 +12,7 @@ namespace Logaffe.Application.Operations;
 /// into it, and being empty is an ordinary state rather than a step that has not
 /// finished (ADR 0039).
 /// </remarks>
-public sealed class CreateGroup(IGroups groups, TimeProvider clock)
+public sealed class CreateGroup(IGroups groups, RecordAChange record, TimeProvider clock)
 {
     /// <summary>
     /// The group, or <c>null</c> when the installation already holds one by that
@@ -32,6 +33,8 @@ public sealed class CreateGroup(IGroups groups, TimeProvider clock)
 
         var group = Group.Create(name, clock.GetUtcNow());
         await groups.AddAsync(group, cancellationToken);
+        await record.ExecuteAsync(
+            Subject.Group, group.Id, group.Name, Act.Created, cancellationToken);
 
         return group;
     }

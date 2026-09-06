@@ -132,7 +132,7 @@ public sealed class UserActsTests
             await Changing().DeactivateAsync(
                 Guid.CreateVersion7(), TestContext.Current.CancellationToken));
 
-    private ChangeAUser Changing() => new(_identities, _sessions);
+    private ChangeAUser Changing() => new(_identities, _sessions, Recording.Nobody());
 
     private static User Active(string email, bool administrator)
     {
