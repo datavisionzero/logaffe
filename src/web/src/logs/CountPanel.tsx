@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { api, asNumber } from "../api/client";
 import { formatTimestamp } from "../shared/time";
 import { addressOf, queryOf, type Filters, type Level } from "./filters";
+import { Button } from "../components/ui/button";
+import { Select } from "../components/ui/select";
 
 /** The groupings a count takes. The trace is not among them, deliberately. */
 const GROUPINGS = ["None", "Level", "LoggerName", "Instance", "Time"] as const;
@@ -122,64 +124,77 @@ export function CountPanel({
   }, [projectId, address, grouping, bucket]);
 
   return (
-    <section className="count" aria-label="Count">
-      <div className="count-head">
-        <label>
-          <span className="visually-hidden">Grouping</span>
-          <select value={grouping} onChange={(e) => setGrouping(e.target.value as Grouping)}>
+    <section
+      className="my-2 rounded-lg border bg-muted px-3 py-2"
+      aria-label="Count"
+    >
+      <div className="flex items-center gap-3">
+        <label className="inline-flex items-center gap-1.5">
+          <span className="sr-only">Grouping</span>
+          <Select
+            className="w-auto"
+            value={grouping}
+            onChange={(e) => setGrouping(e.target.value as Grouping)}
+          >
             {GROUPINGS.map((one) => (
               <option key={one} value={one}>
                 {GROUPING_NAMES[one]}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
 
         {grouping === "Time" && (
-          <label>
-            <span className="visually-hidden">Bucket</span>
-            <select value={bucket} onChange={(e) => setBucket(e.target.value as Bucket)}>
+          <label className="inline-flex items-center gap-1.5">
+            <span className="sr-only">Bucket</span>
+            <Select
+              className="w-auto"
+              value={bucket}
+              onChange={(e) => setBucket(e.target.value as Bucket)}
+            >
               {BUCKETS.map((one) => (
                 <option key={one} value={one}>
                   Per {one.toLowerCase()}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         )}
 
-        <button type="button" className="plain" onClick={onClose}>
+        <Button type="button" variant="link" size="sm" onClick={onClose}>
           Close
-        </button>
+        </Button>
       </div>
 
-      {counting.status === "counting" && <p className="quiet">Counting…</p>}
+      {counting.status === "counting" && <p className="quiet text-sm">Counting…</p>}
 
       {counting.status === "unreachable" && (
-        <p className="refusal">This installation did not answer the count.</p>
+        <p className="refusal text-sm">This installation did not answer the count.</p>
       )}
 
       {counting.status === "expired" && <ReadExpired narrow={counting.narrow} />}
 
       {counting.status === "counted" && (
-        <table className="count-table">
+        <table className="mt-2 border-collapse text-sm">
           <tbody>
             {counting.groups.map((group) => (
               <tr key={group.value ?? "all"}>
-                <td>
+                <td className="border-b py-0.5 pr-3">
                   {grouping === "None" || group.value === null ? (
                     <span className="quiet">{grouping === "None" ? "Matching" : "No value"}</span>
                   ) : (
                     <button
                       type="button"
-                      className="plain narrows"
+                      className="underline decoration-dotted underline-offset-2"
                       onClick={() => onNarrow(narrowedTo(filters, grouping, bucket, group.value!))}
                     >
                       {grouping === "Time" ? formatTimestamp(new Date(group.value)) : group.value}
                     </button>
                   )}
                 </td>
-                <td className="count-number">{group.entries}</td>
+                <td className="border-b py-0.5 pr-3 text-right font-mono tabular-nums">
+                  {group.entries}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -195,9 +210,11 @@ export function CountPanel({
  */
 export function ReadExpired({ narrow }: { narrow: string[] }) {
   return (
-    <div className="expired">
+    // Named for what it is, not by a class: what a test needs to scope to
+    // should not move when the box around it is redrawn.
+    <div data-slot="expired" className="grid max-w-2xl gap-2 p-4">
       <p>This read took longer than the five seconds it gets. The filters are unchanged.</p>
-      <ul>
+      <ul className="list-inside list-disc text-muted-foreground">
         {narrow.map((one) => (
           <li key={one}>{SENTENCES[one] ?? one}</li>
         ))}

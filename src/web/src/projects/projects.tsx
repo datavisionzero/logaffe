@@ -9,6 +9,7 @@ import {
 } from "react";
 import { Link } from "react-router";
 import { api, asInstant, asNumber } from "../api/client";
+import { Page, PageTitle } from "../components/Page";
 
 /**
  * One project as the list and the switcher both read it, with the contract's
@@ -170,14 +171,16 @@ export function projectIdIn(pathname: string): string | null {
  */
 export function NoSuchProject() {
   return (
-    <section className="narrow">
-      <h1>No such project</h1>
-      <p>
+    <Page className="grid gap-4">
+      <PageTitle>No such project</PageTitle>
+      <p className="max-w-prose">
         This installation holds no project by that identity. It may have been deleted from
         another browser.
       </p>
-      <Link to="/">Back to the projects</Link>
-    </section>
+      <Link to="/" className="w-fit text-brand underline-offset-4 hover:underline">
+        Back to the projects
+      </Link>
+    </Page>
   );
 }
 

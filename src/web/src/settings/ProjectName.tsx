@@ -1,6 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { api, problemWith } from "../api/client";
 import type { HeldProject } from "../projects/projects";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
+import { About, Area, Said } from "./Area";
 
 /**
  * Renaming a project, which moves nothing.
@@ -63,18 +67,16 @@ export function ProjectName({
   }
 
   return (
-    <section>
-      <h2>Name</h2>
-      <p>
+    <Area title="Name">
+      <About>
         Unique within this project's group, and the only thing about a project a person
         reads. Renaming moves nothing: entries, tokens and queries are attached to the
         project's identity, so no sender notices and nothing has to be redeployed.
-      </p>
+      </About>
 
-      <form onSubmit={rename}>
-        <label>
-          Name
-          <input
+      <form onSubmit={rename} className="grid max-w-md gap-3">
+        <Field label="Name">
+          <Input
             value={name}
             onChange={(e) => {
               setName(e.target.value);
@@ -82,14 +84,18 @@ export function ProjectName({
             }}
             aria-invalid={problem !== undefined || undefined}
           />
-        </label>
-        {problem !== undefined && <p className="refusal">{problem}</p>}
-        {renamed && <p className="quiet">Renamed.</p>}
+        </Field>
 
-        <button type="submit" disabled={renaming || name.trim() === project.name}>
+        <Said problem={problem} note={renamed ? "Renamed." : undefined} />
+
+        <Button
+          type="submit"
+          disabled={renaming || name.trim() === project.name}
+          className="w-fit"
+        >
           Rename the project
-        </button>
+        </Button>
       </form>
-    </section>
+    </Area>
   );
 }

@@ -422,7 +422,7 @@ describe("a read that took too long", () => {
     const view = open(PROJECT, "/project/p1?exception=nullreference");
 
     const said = await screen.findByText(/shorter one/i);
-    const expired = said.closest(".expired") as HTMLElement;
+    const expired = said.closest('[data-slot="expired"]') as HTMLElement;
 
     expect(within(expired).getByText(/no index serves it/i)).toBeInTheDocument();
 
@@ -479,7 +479,7 @@ describe("the live tail", () => {
       const list = screen.getByRole("listbox", { name: "Entries" });
       const messages = within(list)
         .getAllByRole("option")
-        .map((line) => line.querySelector(".entry-message")?.textContent);
+        .map((line) => line.querySelector('[data-slot="message"]')?.textContent);
 
       // The cursor runs on receipt time and the list stays ordered by event
       // time, so what arrived last is not what is on top (ADR 0009).

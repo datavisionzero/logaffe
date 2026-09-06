@@ -3,6 +3,9 @@ import { Link } from "react-router";
 import { api } from "../api/client";
 import { byName, useHosts } from "../hosts/hosts";
 import type { HeldProject } from "../projects/projects";
+import { Select } from "../components/ui/select";
+import { Field } from "../components/Field";
+import { About, Area, Said } from "./Area";
 
 /** The value the select carries for a project on no host. */
 const none = "";
@@ -66,48 +69,49 @@ export function ProjectHost({
   }
 
   return (
-    <section>
-      <h2>Runs on</h2>
-      <p>
+    <Area title="Runs on">
+      <About>
         The machine this project runs on, which is what puts a band of that machine's
         processor, memory and disk above this project's entries. It is not a scope: no
         search narrows by a host, and two projects on one machine are still two projects.
-      </p>
+      </About>
 
       {state.status === "asking" && <p className="quiet">Reading the hosts…</p>}
 
       {state.status === "unreachable" && (
-        <p className="refusal">This installation did not answer.</p>
+        <p className="refusal text-sm">This installation did not answer.</p>
       )}
 
       {state.status === "held" && state.hosts.length === 0 ? (
         <p className="quiet">
           This installation holds no hosts.{" "}
-          <Link to="/settings/hosts">Make a host in the installation's settings</Link>,
-          start its collector, and this project can be put on it here.
+          <Link to="/settings/hosts" className="text-brand underline-offset-4 hover:underline">
+            Make a host in the installation's settings
+          </Link>
+          , start its collector, and this project can be put on it here.
         </p>
       ) : (
-        <label>
-          Host
-          <select
-            value={project.hostId ?? none}
-            disabled={moving || state.status !== "held"}
-            onChange={(e) => void put(e.target.value)}
-            aria-invalid={problem !== undefined || undefined}
-          >
-            <option value={none}>No host</option>
-            {state.status === "held" &&
-              byName(state.hosts).map((host) => (
-                <option key={host.id} value={host.id}>
-                  {host.name}
-                </option>
-              ))}
-          </select>
-        </label>
+        <div className="max-w-md">
+          <Field label="Host">
+            <Select
+              value={project.hostId ?? none}
+              disabled={moving || state.status !== "held"}
+              onChange={(e) => void put(e.target.value)}
+              aria-invalid={problem !== undefined || undefined}
+            >
+              <option value={none}>No host</option>
+              {state.status === "held" &&
+                byName(state.hosts).map((host) => (
+                  <option key={host.id} value={host.id}>
+                    {host.name}
+                  </option>
+                ))}
+            </Select>
+          </Field>
+        </div>
       )}
 
-      {problem !== undefined && <p className="refusal">{problem}</p>}
-      {moved && <p className="quiet">Saved.</p>}
-    </section>
+      <Said problem={problem} note={moved ? "Saved." : undefined} />
+    </Area>
   );
 }

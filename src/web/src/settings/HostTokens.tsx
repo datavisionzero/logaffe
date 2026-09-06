@@ -3,6 +3,9 @@ import { api, asInstant } from "../api/client";
 import { copyToClipboard, whyNotCopied, type Copying } from "../shared/clipboard";
 import { formatTimestamp } from "../shared/time";
 import { LastUse } from "./LastUse";
+import { Button } from "../components/ui/button";
+import { Snippet } from "../components/Page";
+import { About, Area, Cell, Head, Listing, RowName, Said } from "./Area";
 
 /** One of a host's tokens as the list carries it, which is no secret at all. */
 interface HeldToken {
@@ -160,22 +163,21 @@ export function HostTokens({
   }
 
   return (
-    <section>
-      <h3>Host tokens</h3>
-      <p>
+    <Area title="Host tokens">
+      <About>
         A token is what admits a sample to this host, and it reads nothing at all. There
         is one ordinarily and two while it is being rotated: issue the second, restart the
         collector with it, watch the old one's last use stop moving, and revoke it.
-      </p>
+      </About>
 
       {listing.status === "asking" && <p className="quiet">Reading the host's tokens…</p>}
 
       {listing.status === "unreachable" && (
-        <p className="refusal">This installation did not answer.</p>
+        <p className="refusal text-sm">This installation did not answer.</p>
       )}
 
       {listing.status === "gone" && (
-        <p className="refusal">
+        <p className="refusal text-sm">
           This host is gone. It may have been deleted from another browser.
         </p>
       )}
@@ -188,109 +190,122 @@ export function HostTokens({
       )}
 
       {listing.status === "held" && listing.tokens.length > 0 && (
-        <table className="listing">
+        <Listing>
           <thead>
             <tr>
-              <th scope="col">Token</th>
-              <th scope="col">Issued</th>
-              <th scope="col">Last used</th>
-              <th scope="col">
-                <span className="visually-hidden">Acts</span>
-              </th>
+              <Head>Token</Head>
+              <Head>Issued</Head>
+              <Head>Last used</Head>
+              <Head>
+                <span className="sr-only">Acts</span>
+              </Head>
             </tr>
           </thead>
           <tbody>
             {listing.tokens.map((token) => (
               <tr key={token.id}>
-                <th scope="row">
+                <RowName>
                   <code>{token.identifier}</code>
-                </th>
-                <td>
+                </RowName>
+                <Cell>
                   <time dateTime={token.issuedAt.toISOString()}>
                     {formatTimestamp(token.issuedAt)}
                   </time>
-                </td>
-                <td>
+                </Cell>
+                <Cell>
                   <LastUse at={token.lastUsedAt} />
-                </td>
-                <td>
-                  <button type="button" className="plain" onClick={() => void show(token.id)}>
+                </Cell>
+                <Cell>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={() => void show(token.id)}
+                  >
                     Show the command
-                  </button>{" "}
+                  </Button>{" "}
                   {revoking === token.id ? (
                     <>
-                      <button
+                      <Button
                         type="button"
-                        className="plain refusal"
+                        variant="link"
+                        size="sm" className="text-destructive"
                         disabled={busy}
                         onClick={() => void revoke(token.id)}
                       >
                         Revoke it — a collector still reporting with it gets 401
-                      </button>{" "}
-                      <button
+                      </Button>{" "}
+                      <Button
                         type="button"
-                        className="plain"
+                        variant="link"
+                        size="sm"
                         onClick={() => setRevoking(undefined)}
                       >
                         Keep it
-                      </button>
+                      </Button>
                     </>
                   ) : (
-                    <button
+                    <Button
                       type="button"
-                      className="plain"
+                      variant="link"
+                      size="sm"
                       onClick={() => setRevoking(token.id)}
                     >
                       Revoke
-                    </button>
+                    </Button>
                   )}
-                </td>
+                </Cell>
               </tr>
             ))}
           </tbody>
-        </table>
+        </Listing>
       )}
 
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
+      <Said problem={refusal} />
 
       {listing.status === "held" && listing.tokens.length < 2 && (
-        <button type="button" disabled={busy} onClick={() => void issue()}>
+        <Button type="button" disabled={busy} onClick={() => void issue()} className="w-fit">
           {listing.tokens.length === 0 ? "Issue a host token" : "Issue a second token"}
-        </button>
+        </Button>
       )}
 
       {shown !== undefined && (
-        <section>
-          <h3>The collector</h3>
+        <div className="grid gap-3 rounded-lg border bg-card p-4">
+          <h3 className="text-sm font-semibold">The collector</h3>
           <p>
             The address, the token and the two mounts are already in it. Run it on the
             machine this host stands for, and the first sample arrives within a minute.
           </p>
-          <pre>{shown.command}</pre>
+          <Snippet>{shown.command}</Snippet>
           <p className="quiet">
-            The two mounts are the whole of what it asks for: the host's <code>/proc</code>{" "}
-            and its root filesystem, both read-only. It is not privileged, it does not join
+            The two mounts are the whole of what it asks for: the host's{" "}
+            <code className="font-mono">/proc</code> and its root filesystem, both
+            read-only. It is not privileged, it does not join
             the host's process namespace, it does not touch the Docker socket, and it opens
             no port — it posts outbound and is never connected to.
           </p>
           <p className="quiet">
-            The token by itself: <code>{shown.token}</code>
+            The token by itself:{" "}
+            <code className="font-mono break-all">{shown.token}</code>
           </p>
-          <button
-            type="button"
-            onClick={() => void copyToClipboard(shown.command).then(setCopying)}
-          >
-            {copying === "copied" ? "Copied" : "Copy the command"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void copyToClipboard(shown.command).then(setCopying)}
+            >
+              {copying === "copied" ? "Copied" : "Copy the command"}
+            </Button>
+            <Button type="button" variant="link" size="sm" onClick={() => setShown(undefined)}>
+              Hide it
+            </Button>
+          </div>
           {whyNotCopied(copying) !== undefined && (
-            <p className="refusal">{whyNotCopied(copying)}</p>
+            <p className="refusal text-sm">{whyNotCopied(copying)}</p>
           )}
-          <button type="button" className="plain" onClick={() => setShown(undefined)}>
-            Hide it
-          </button>
-        </section>
+        </div>
       )}
-    </section>
+    </Area>
   );
 }
 

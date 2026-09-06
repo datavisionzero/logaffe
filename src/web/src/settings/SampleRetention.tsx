@@ -2,6 +2,10 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { api, asNumber, problemWith } from "../api/client";
 import { RETENTION_MAXIMUM, RETENTION_MINIMUM } from "../projects/retention";
 import { Footprint, type ReadFootprint } from "./Footprint";
+import { Button } from "../components/ui/button";
+import { About, Area, Confirming } from "./Area";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
 
 /**
  * What the field is waiting on. Only one of these is a screen the operator has
@@ -167,30 +171,28 @@ export function SampleRetention() {
   }
 
   return (
-    <section>
-      <h2>Samples are kept for</h2>
-      <p>
+    <Area title="Samples are kept for">
+      <About>
         One number for this installation, counted from receipt and capped at{" "}
         {RETENTION_MAXIMUM} days. There is no reason to keep one machine's numbers longer
         than another's, so there is nothing to set per host. What the window will cost is
         below, worked out from what the collectors are reporting.
-      </p>
-      <p>
+      </About>
+      <About>
         <b>Lowering it removes samples</b>, across every host, and you are told how many
         before it takes effect. Raising it again brings nothing back.
-      </p>
+      </About>
 
       {asked.at === "reading" && <p className="quiet">Reading the window…</p>}
 
       {asked.at === "unreachable" && (
-        <p className="refusal">This installation did not answer.</p>
+        <p className="refusal text-sm">This installation did not answer.</p>
       )}
 
       {held !== undefined && (
-        <form onSubmit={ask}>
-          <label>
-            Kept for
-            <input
+        <form onSubmit={ask} className="grid max-w-md gap-3">
+          <Field label="Kept for" after="days" said={problem}>
+            <Input
               type="number"
               min={RETENTION_MINIMUM}
               max={RETENTION_MAXIMUM}
@@ -202,9 +204,7 @@ export function SampleRetention() {
               }}
               aria-invalid={problem !== undefined || undefined}
             />
-            days
-          </label>
-          {problem !== undefined && <p className="refusal">{problem}</p>}
+          </Field>
 
           <Footprint read={readFootprint} days={wanted} counting="samples" />
 
@@ -215,34 +215,41 @@ export function SampleRetention() {
           )}
 
           {asked.at === "confirming" ? (
-            <div className="notice">
+            <Confirming>
               <p>
                 Lowering this to {asked.days} {asked.days === 1 ? "day" : "days"} puts{" "}
-                <b>
+                <b className="font-medium">
                   {asked.samples} {asked.samples === 1 ? "sample" : "samples"}
                 </b>{" "}
                 outside the window, across every host. The sweep removes them, and raising
                 the window again does not bring them back.
               </p>
-              <button type="button" onClick={() => void apply(asked.days)}>
-                Lower it and remove them
-              </button>
-              <button
-                type="button"
-                className="plain"
-                onClick={() => setAsked({ at: "settled" })}
-              >
-                Leave it at {held}
-              </button>
-            </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" size="sm" onClick={() => void apply(asked.days)}>
+                  Lower it and remove them
+                </Button>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  onClick={() => setAsked({ at: "settled" })}
+                >
+                  Leave it at {held}
+                </Button>
+              </div>
+            </Confirming>
           ) : (
-            <button type="submit" disabled={asked.at !== "settled" || wanted === held}>
+            <Button
+              type="submit"
+              disabled={asked.at !== "settled" || wanted === held}
+              className="w-fit"
+            >
               {asked.at === "counting" ? "Counting what this removes…" : "Change the window"}
-            </button>
+            </Button>
           )}
         </form>
       )}
-    </section>
+    </Area>
   );
 }
 

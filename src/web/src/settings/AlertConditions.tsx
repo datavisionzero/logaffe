@@ -3,6 +3,10 @@ import { Link } from "react-router";
 import { api } from "../api/client";
 import { byName, useHosts } from "../hosts/hosts";
 import { hours, type HeldAlerts } from "./alerting";
+import { Select } from "../components/ui/select";
+import { Check, Field } from "../components/Field";
+import { About, Area, Said } from "./Area";
+import { Callout } from "../components/Page";
 
 /** The value the host select carries for an installation that names none. */
 const none = "";
@@ -136,29 +140,29 @@ export function AlertConditions({
     mount === none || mounts.includes(mount) ? mounts : [...mounts, mount];
 
   return (
-    <section>
-      <h2>The conditions</h2>
-      <p>
+    <Area title="The conditions">
+      <About>
         Four things this installation will say something about unasked, and no others.
         There is no rule to write and no threshold to type: what each of them compares
         against comes from this installation's own recent history, which is why there is
         nothing here to guess wrong. All four are off until you switch them on.
-      </p>
+      </About>
 
-      {problem !== undefined && <p className="refusal">{problem}</p>}
+      <Said problem={problem} />
 
-      <fieldset>
-        <legend>The store is filling up</legend>
+      <fieldset className="grid gap-2">
+        <legend className="pb-1 text-sm font-semibold">The store is filling up</legend>
 
-        <label className="confirm">
+        <Check>
           <input
             type="checkbox"
             checked={switches.fillingUp}
             disabled={busy}
             onChange={(e) => void flip("fillingUp", e.target.checked)}
+            className="mt-0.5 size-4 shrink-0 accent-brand"
           />
           Say something when the disk under this installation fills
-        </label>
+        </Check>
 
         <p className="quiet">
           Once when the filesystem holding this installation's database crosses{" "}
@@ -167,9 +171,8 @@ export function AlertConditions({
           disk size to type in and nothing to go stale.
         </p>
 
-        <label>
-          The machine this installation runs on
-          <select
+        <Field label="The machine this installation runs on">
+          <Select
             value={chosen}
             disabled={busy || hostState.status !== "held"}
             onChange={(e) => {
@@ -187,13 +190,12 @@ export function AlertConditions({
                   {host.name}
                 </option>
               ))}
-          </select>
-        </label>
+                    </Select>
+        </Field>
 
         {chosen !== none && (
-          <label>
-            The mount holding its database
-            <select
+          <Field label="The mount holding its database">
+            <Select
               value={mount}
               disabled={busy || offered.length === 0}
               onChange={(e) => void name(chosen, e.target.value)}
@@ -206,8 +208,8 @@ export function AlertConditions({
                   {mount}
                 </option>
               ))}
-            </select>
-          </label>
+                        </Select>
+          </Field>
         )}
 
         {chosen !== none && mounts.length === 0 && (
@@ -227,18 +229,19 @@ export function AlertConditions({
         </p>
       </fieldset>
 
-      <fieldset>
-        <legend>A project has gone quiet</legend>
+      <fieldset className="grid gap-2">
+        <legend className="pb-1 text-sm font-semibold">A project has gone quiet</legend>
 
-        <label className="confirm">
+        <Check>
           <input
             type="checkbox"
             checked={switches.goneQuiet}
             disabled={busy}
             onChange={(e) => void flip("goneQuiet", e.target.checked)}
+            className="mt-0.5 size-4 shrink-0 accent-brand"
           />
           Say something when a project stops delivering
-        </label>
+        </Check>
 
         <p className="quiet">
           Nothing received for more than {quiet.multiple} times the project's own longest
@@ -253,30 +256,31 @@ export function AlertConditions({
             says nothing until one has.
           </p>
         ) : (
-          <p className="notice">
+          <Callout>
             As things stand: <strong>{quiet.busiest.name}</strong> would be noticed after{" "}
             {hours(quiet.busiest.toleratedHours)} of silence, and{" "}
             <strong>{quiet.quietest.name}</strong> after{" "}
             {hours(quiet.quietest.toleratedHours)}. Both are judged on the hour, so the
             notification arrives some time after that.
-          </p>
+          </Callout>
         )}
 
         <Fortnight alerts={alerts} />
       </fieldset>
 
-      <fieldset>
-        <legend>A project is delivering far more than it does</legend>
+      <fieldset className="grid gap-2">
+        <legend className="pb-1 text-sm font-semibold">A project is delivering far more than it does</legend>
 
-        <label className="confirm">
+        <Check>
           <input
             type="checkbox"
             checked={switches.flooding}
             disabled={busy}
             onChange={(e) => void flip("flooding", e.target.checked)}
+            className="mt-0.5 size-4 shrink-0 accent-brand"
           />
           Say something when a project floods
-        </label>
+        </Check>
 
         <p className="quiet">
           A closed hour above {flood.multiple} times the median of that hour of the day
@@ -289,18 +293,19 @@ export function AlertConditions({
         <Fortnight alerts={alerts} />
       </fieldset>
 
-      <fieldset>
-        <legend>A project is failing far more than it does</legend>
+      <fieldset className="grid gap-2">
+        <legend className="pb-1 text-sm font-semibold">A project is failing far more than it does</legend>
 
-        <label className="confirm">
+        <Check>
           <input
             type="checkbox"
             checked={switches.failing}
             disabled={busy}
             onChange={(e) => void flip("failing", e.target.checked)}
+            className="mt-0.5 size-4 shrink-0 accent-brand"
           />
           Say something when a project starts failing
-        </label>
+        </Check>
 
         <p className="quiet">
           {failure.multiple} times the median of that hour of the day across the last{" "}
@@ -328,7 +333,7 @@ export function AlertConditions({
         project's normal by hour of the day, which is the same idea and needs nothing
         entered.
       </p>
-    </section>
+    </Area>
   );
 }
 
@@ -360,7 +365,7 @@ function Blind({ alerts }: { alerts: HeldAlerts }) {
         ? "This condition is on and cannot see: that machine has not reported in the last hour."
         : "This condition is on and cannot see: the mount named above is not among what that machine reports. It was renamed, or taken out of its collector.";
 
-  return <p className="refusal">{said}</p>;
+  return <p className="refusal text-sm">{said}</p>;
 }
 
 /** The guard that keeps the first fortnight of every project quiet. */

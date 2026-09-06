@@ -1,5 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import { Button } from "../components/ui/button";
+import { Check } from "../components/Field";
+import { Callout } from "../components/Page";
 
 /**
  * A second factor and a sheet of backup codes the installation drew and stored
@@ -42,26 +45,41 @@ export function ShowEnrolment({
   const [kept, setKept] = useState(false);
 
   return (
-    <section>
-      <h2>{heading}</h2>
+    <section className="grid gap-3">
+      <h2 className="text-base font-semibold">{heading}</h2>
       {children}
 
-      <QRCodeSVG value={enrolment.enrolmentUri} size={192} marginSize={2} />
+      {/* The code paints its own ground — dark on light, with a quiet zone —
+          whatever the operating system's colour scheme is, because a camera
+          reads it that way round and an inverted one fails for a reason nobody
+          can see. The frame is ours; the two colours inside it are the
+          component's defaults and are left alone. */}
+      <div className="w-fit rounded-lg border p-2">
+        <QRCodeSVG value={enrolment.enrolmentUri} size={192} marginSize={2} />
+      </div>
 
       <p>
-        Or type the secret in by hand: <code>{enrolment.secondFactorSecret}</code>
+        Or type the secret in by hand:{" "}
+        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs break-all">
+          {enrolment.secondFactorSecret}
+        </code>
       </p>
 
       <BackupCodeSheet codes={enrolment.backupCodes} replacing={replacing} />
 
-      <label className="confirm">
-        <input type="checkbox" checked={kept} onChange={(e) => setKept(e.target.checked)} />I
-        have the authenticator enrolled and the codes kept
-      </label>
+      <Check>
+        <input
+          type="checkbox"
+          className="mt-0.5 size-4 accent-brand"
+          checked={kept}
+          onChange={(e) => setKept(e.target.checked)}
+        />
+        I have the authenticator enrolled and the codes kept
+      </Check>
 
-      <button type="button" disabled={!kept} onClick={onKept}>
+      <Button type="button" disabled={!kept} onClick={onKept} className="w-fit">
         Continue
-      </button>
+      </Button>
     </section>
   );
 }
@@ -90,27 +108,27 @@ export function BackupCodeSheet({
   }
 
   return (
-    <>
-      <h3>Backup codes</h3>
-      <p className="notice">
+    <div className="grid gap-2">
+      <h3 className="text-sm font-semibold">Backup codes</h3>
+      <Callout>
         These are shown once and are stored in a form nobody can read back. Each is used
         once, and they are what stands in for the second factor when the phone is gone.
         Keep them somewhere that is not the phone.
         {replacing === true &&
           " They replace the sheet you have now — spent codes and unspent alike."}
-      </p>
+      </Callout>
 
-      <ul className="codes">
+      <ul className="grid max-w-md grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-x-4 gap-y-1 rounded-lg border bg-muted p-3">
         {codes.map((code) => (
           <li key={code}>
-            <code>{code}</code>
+            <code className="font-mono text-sm">{code}</code>
           </li>
         ))}
       </ul>
 
-      <button type="button" onClick={() => void copy()}>
+      <Button type="button" variant="outline" onClick={() => void copy()} className="w-fit">
         {copied ? "Copied" : "Copy the codes"}
-      </button>
-    </>
+      </Button>
+    </div>
   );
 }

@@ -6,6 +6,10 @@ import { useProjects } from "../projects/projects";
 import { LastUse } from "./LastUse";
 import { HostScreen } from "./HostScreen";
 import { SampleRetention } from "./SampleRetention";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
+import { About, Area, Cell, Head, Listing, RowName, Said } from "./Area";
 
 /**
  * The machines the operator runs their projects on.
@@ -79,21 +83,25 @@ export function Hosts({ hostId }: { hostId: string | undefined }) {
     }
 
     if (state.status === "unreachable") {
-      return <p className="refusal">This installation did not answer.</p>;
+      return <p className="refusal text-sm">This installation did not answer.</p>;
     }
 
     const host = state.hosts.find((held) => held.id === hostId);
 
     if (host === undefined) {
       return (
-        <section>
-          <h2>No such host</h2>
-          <p>
+        <Area title="No such host">
+          <About>
             This installation holds no host by that identity. It may have been deleted
             from another browser.
-          </p>
-          <Link to="/settings/hosts">Back to the hosts</Link>
-        </section>
+          </About>
+          <Link
+            to="/settings/hosts"
+            className="w-fit text-brand underline-offset-4 hover:underline"
+          >
+            Back to the hosts
+          </Link>
+        </Area>
       );
     }
 
@@ -102,8 +110,7 @@ export function Hosts({ hostId }: { hostId: string | undefined }) {
 
   return (
     <>
-      <section>
-        <h2>Hosts</h2>
+      <Area title="Hosts">
         <p>
           A host is a machine you run projects on. It holds its samples and the token its
           collector reports with, and what it buys is a band of processor, memory and disk
@@ -118,7 +125,7 @@ export function Hosts({ hostId }: { hostId: string | undefined }) {
         {state.status === "asking" && <p className="quiet">Reading the hosts…</p>}
 
         {state.status === "unreachable" && (
-          <p className="refusal">This installation did not answer.</p>
+          <p className="refusal text-sm">This installation did not answer.</p>
         )}
 
         {state.status === "held" && state.hosts.length === 0 && (
@@ -129,29 +136,29 @@ export function Hosts({ hostId }: { hostId: string | undefined }) {
         )}
 
         {state.status === "held" && state.hosts.length > 0 && (
-          <table className="listing">
+          <Listing>
             <thead>
               <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Last reported</th>
-                <th scope="col">Projects</th>
-                <th scope="col">Tokens</th>
+                <Head>Name</Head>
+                <Head>Last reported</Head>
+                <Head>Projects</Head>
+                <Head>Tokens</Head>
               </tr>
             </thead>
             <tbody>
               {byName(state.hosts).map((host) => (
                 <tr key={host.id}>
-                  <th scope="row">
+                  <RowName>
                     <Link to={`/settings/hosts/${host.id}`}>{host.name}</Link>
-                  </th>
+                  </RowName>
                   {/* Read off its newest sample rather than written beside it:
                       a field saying the host reported a minute ago while its
                       newest sample is a day old is the disagreement that comes
                       free with storing the same fact twice (ADR 0039). */}
-                  <td>
+                  <Cell>
                     <LastUse at={host.lastReportedAt} />
-                  </td>
-                  <td>{host.projects}</td>
+                  </Cell>
+                  <Cell>{host.projects}</Cell>
                   {/* Nothing can report to a host holding none, which is the
                       same closed door the project list names. */}
                   <td className={host.hostTokens === 0 ? "closed" : undefined}>
@@ -160,7 +167,7 @@ export function Hosts({ hostId }: { hostId: string | undefined }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </Listing>
         )}
 
         <p className="quiet">
@@ -168,22 +175,21 @@ export function Hosts({ hostId }: { hostId: string | undefined }) {
           rename it or to delete it.
         </p>
 
-        {refusal !== undefined && <p className="refusal">{refusal}</p>}
+        <Said problem={refusal} />
 
-        <form onSubmit={create}>
-          <label>
-            Name for a new host
-            <input
+        <form onSubmit={create} className="grid max-w-md gap-3">
+          <Field label="Name for a new host">
+            <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               aria-invalid={problem !== undefined || undefined}
             />
-          </label>
-          {problem !== undefined && <p className="refusal">{problem}</p>}
+          </Field>
+          <Said problem={problem} />
 
-          <button type="submit" disabled={busy || name.trim() === ""}>
+          <Button type="submit" disabled={busy || name.trim() === ""} className="w-fit">
             Make a host
-          </button>
+          </Button>
         </form>
 
         <p className="quiet">
@@ -191,7 +197,7 @@ export function Hosts({ hostId }: { hostId: string | undefined }) {
           its token does, exactly as an ingest token hands back a delivery snippet. Open
           the host and issue one.
         </p>
-      </section>
+      </Area>
 
       <SampleRetention />
     </>

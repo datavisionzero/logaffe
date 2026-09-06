@@ -1,4 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Select } from "../components/ui/select";
 import {
   chipsOf,
   isLongEnough,
@@ -33,15 +36,22 @@ export function FilterBar({
   searchRef: React.RefObject<HTMLInputElement | null>;
 }) {
   return (
-    <div className="filters">
-      <div className="filter-row">
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <TimeRange filters={filters} onChange={onChange} />
         <LevelThreshold filters={filters} onChange={onChange} />
         <SearchText filters={filters} onChange={onChange} boxRef={searchRef} />
 
-        <button type="button" onClick={onCount} aria-pressed={counting}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onCount}
+          aria-pressed={counting}
+          className="aria-pressed:bg-muted"
+        >
           Count
-        </button>
+        </Button>
       </div>
 
       <Chips filters={filters} onChange={onChange} />
@@ -69,10 +79,11 @@ function TimeRange({
   const absolute = filters.span === null;
 
   return (
-    <span className="filter">
+    <span className="flex items-center gap-2">
       <label>
-        <span className="visually-hidden">Time range</span>
-        <select
+        <span className="sr-only">Time range</span>
+        <Select
+          className="w-auto"
           value={filters.span ?? "absolute"}
           onChange={(event) =>
             onChange(
@@ -88,14 +99,15 @@ function TimeRange({
             </option>
           ))}
           <option value="absolute">From and to…</option>
-        </select>
+        </Select>
       </label>
 
       {absolute && (
         <>
           <label>
-            <span className="visually-hidden">From</span>
-            <input
+            <span className="sr-only">From</span>
+            <Input
+              className="w-auto"
               type="datetime-local"
               step="1"
               value={asLocalInput(filters.from)}
@@ -105,8 +117,9 @@ function TimeRange({
             />
           </label>
           <label>
-            <span className="visually-hidden">To</span>
-            <input
+            <span className="sr-only">To</span>
+            <Input
+              className="w-auto"
               type="datetime-local"
               step="1"
               value={asLocalInput(filters.until)}
@@ -137,9 +150,10 @@ function LevelThreshold({
   onChange: (filters: Filters) => void;
 }) {
   return (
-    <label className="filter">
-      <span className="visually-hidden">Level</span>
-      <select
+    <label className="flex items-center">
+      <span className="sr-only">Level</span>
+      <Select
+        className="w-auto"
         value={filters.minimumLevel ?? ""}
         onChange={(event) =>
           onChange({
@@ -154,7 +168,7 @@ function LevelThreshold({
             {level} and above
           </option>
         ))}
-      </select>
+      </Select>
     </label>
   );
 }
@@ -190,10 +204,11 @@ function SearchText({
   }
 
   return (
-    <form className="filter" onSubmit={apply}>
+    <form className="flex items-center gap-2" onSubmit={apply}>
       <label>
-        <span className="visually-hidden">Search the message</span>
-        <input
+        <span className="sr-only">Search the message</span>
+        <Input
+          className="w-56"
           ref={boxRef}
           type="search"
           placeholder="Search the message"
@@ -203,7 +218,9 @@ function SearchText({
         />
       </label>
       {tooShort && (
-        <span className="refusal">A search text is at least {SEARCH_MINIMUM} characters.</span>
+        <span className="refusal text-sm">
+          A search text is at least {SEARCH_MINIMUM} characters.
+        </span>
       )}
     </form>
   );
@@ -230,12 +247,16 @@ function Chips({
   }
 
   return (
-    <div className="chips">
+    <div className="flex flex-wrap items-center gap-2">
       {chips.map((chip) => (
-        <span key={chip.of} className="chip">
-          {chip.name} <code>{chip.value}</code>
+        <span
+          key={chip.of}
+          className="inline-flex items-center gap-1.5 rounded-4xl border bg-muted py-0.5 pr-1 pl-2.5 text-xs"
+        >
+          {chip.name} <code className="font-mono">{chip.value}</code>
           <button
             type="button"
+            className="rounded-full px-1 text-muted-foreground hover:bg-accent hover:text-foreground"
             aria-label={`Remove the ${chip.name.toLowerCase()} filter`}
             onClick={() => onChange({ ...filters, [chip.of]: null })}
           >
@@ -278,10 +299,11 @@ function ExceptionText({
   }
 
   return (
-    <form className="exception-filter" onSubmit={apply}>
-      <label>
+    <form className="flex flex-wrap items-center gap-2" onSubmit={apply}>
+      <label className="flex items-center gap-2 text-sm">
         Exception
-        <input
+        <Input
+          className="w-56"
           type="search"
           placeholder="nullreference"
           value={typed}
@@ -289,11 +311,13 @@ function ExceptionText({
           aria-invalid={tooShort || undefined}
         />
       </label>
-      <span className="quiet">
+      <span className="quiet text-xs">
         Searches the exception, not the message — and it is the one filter that can be slow.
       </span>
       {tooShort && (
-        <span className="refusal">An exception text is at least {SEARCH_MINIMUM} characters.</span>
+        <span className="refusal text-sm">
+          An exception text is at least {SEARCH_MINIMUM} characters.
+        </span>
       )}
     </form>
   );

@@ -7,6 +7,11 @@ import type { HeldHost } from "../hosts/hosts";
 import { ReadExpired } from "../logs/CountPanel";
 import { formatTimestamp } from "../shared/time";
 import { HostTokens } from "./HostTokens";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Select } from "../components/ui/select";
+import { Field } from "../components/Field";
+import { About, Area, Said } from "./Area";
 
 /** The plain range this screen offers, which is the whole of what it offers. */
 const SPANS = {
@@ -46,14 +51,14 @@ export function HostScreen({
   const samples = useSamples(host.id, from, to, minute.getTime());
 
   return (
-    <section>
-      <h2>{host.name}</h2>
-
-      <p className="quiet">
-        <Link to="/settings/hosts">Back to the hosts</Link>
+    <Area title={host.name}>
+      <p className="text-sm">
+        <Link to="/settings/hosts" className="text-brand underline-offset-4 hover:underline">
+          Back to the hosts
+        </Link>
       </p>
 
-      <p>
+      <About>
         Last reported{" "}
         {host.lastReportedAt === null ? (
           <b>never</b>
@@ -64,27 +69,26 @@ export function HostScreen({
         )}
         . {host.projects === 0 ? "No project runs" : host.projects === 1 ? "One project runs" : `${host.projects} projects run`}{" "}
         on it.
-      </p>
+      </About>
 
-      <label>
-        Over
-        <select value={span} onChange={(e) => setSpan(e.target.value as Span)}>
+      <Field label="Over">
+        <Select value={span} onChange={(e) => setSpan(e.target.value as Span)}>
           {Object.entries(SPANS).map(([key, offered]) => (
             <option key={key} value={key}>
               {offered.name}
             </option>
           ))}
-        </select>
-      </label>
+                </Select>
+      </Field>
 
       {samples.status === "asking" && <p className="quiet">Reading the machine…</p>}
 
       {samples.status === "unreachable" && (
-        <p className="refusal">This installation did not answer.</p>
+        <p className="refusal text-sm">This installation did not answer.</p>
       )}
 
       {samples.status === "gone" && (
-        <p className="refusal">
+        <p className="refusal text-sm">
           This host is gone. It may have been deleted from another browser.
         </p>
       )}
@@ -100,7 +104,7 @@ export function HostScreen({
       <RenameHost host={host} onRenamed={onChanged} />
 
       <DeleteHost host={host} onDeleted={onChanged} />
-    </section>
+    </Area>
   );
 }
 
@@ -143,17 +147,15 @@ function RenameHost({ host, onRenamed }: { host: HeldHost; onRenamed: () => void
   }
 
   return (
-    <section>
-      <h3>Name</h3>
-      <p>
+    <Area title="Name">
+      <About>
         What this machine is called here. Renaming it moves nothing: the samples, the
         token and the projects on it all point at the host's identity rather than at its
         name.
-      </p>
+      </About>
 
-      <label>
-        Name
-        <input
+      <Field label="Name">
+        <Input
           value={name}
           onChange={(e) => {
             setName(e.target.value);
@@ -161,19 +163,20 @@ function RenameHost({ host, onRenamed }: { host: HeldHost; onRenamed: () => void
           }}
           aria-invalid={problem !== undefined || undefined}
         />
-      </label>
+      </Field>
 
-      {problem !== undefined && <p className="refusal">{problem}</p>}
+      <Said problem={problem} />
       {renamed && <p className="quiet">Renamed.</p>}
 
-      <button
+      <Button
         type="button"
         disabled={renaming || name.trim() === "" || name === host.name}
         onClick={() => void rename()}
+        className="w-fit"
       >
         Rename it
-      </button>
-    </section>
+      </Button>
+    </Area>
   );
 }
 
@@ -219,34 +222,41 @@ function DeleteHost({ host, onDeleted }: { host: HeldHost; onDeleted: () => void
   }
 
   return (
-    <section className="grave">
-      <h3>Delete this host</h3>
-      <p>
+    <Area title="Delete this host" grave>
+      <About>
         Immediate and irreversible. The host, its token and its samples go, and there is
-        no undelete. A collector still reporting with its token gets <code>401</code> from
-        its next sample and carries on doing nothing else.
-      </p>
-      <p>
+        no undelete. A collector still reporting with its token gets{" "}
+        <code className="rounded bg-muted px-1 font-mono text-xs">401</code> from its next
+        sample and carries on doing nothing else.
+      </About>
+      <About>
         {host.projects === 0
           ? "No project sits on it."
           : `${host.projects} ${host.projects === 1 ? "project is" : "projects are"} left sitting on no host. Nothing else about them changes — they lose the band over their entries and keep every entry they hold.`}
-      </p>
+      </About>
 
-      <label>
-        Type <b>{host.name}</b> to confirm
-        <input value={typed} onChange={(e) => setTyped(e.target.value)} />
-      </label>
+      <div className="max-w-md">
+        <Field
+          label={
+            <>
+              Type <b className="font-semibold">{host.name}</b> to confirm
+            </>
+          }
+          said={refusal}
+        >
+          <Input value={typed} onChange={(e) => setTyped(e.target.value)} />
+        </Field>
+      </div>
 
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
-
-      <button
+      <Button
         type="button"
-        className="grave"
+        variant="destructive"
+        className="w-fit"
         disabled={deleting || typed.trim() !== host.name}
         onClick={() => void remove()}
       >
         Delete {host.name}
-      </button>
-    </section>
+      </Button>
+    </Area>
   );
 }

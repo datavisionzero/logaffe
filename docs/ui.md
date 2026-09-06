@@ -62,24 +62,35 @@ list that answers *where did the group I just created go*.
 
 ## The shell navigates on two levels
 
-Every screen above sits under one bar, and it is the only place this product
-navigates from. It carries two levels, because that is what there are.
+Every screen above sits inside one frame — a column down the left and a thin bar
+across the top — and it is the only place this product navigates from. The
+column carries two levels, because that is what there are.
 
-**The first is the installation**, and it is true wherever the operator is: the
-wordmark, the **project switcher**, the zone every timestamp is in, the
-installation's own settings, and the sign-out.
+**The first is the project being read**, at the top: the **project switcher**,
+then its log and its settings. The two destinations are present while a project
+is open and absent otherwise, so that the second entry appearing is itself the
+statement that the operator is inside one. Which of the two surfaces is being
+read is marked in the column rather than left to be inferred from the screen.
 
-**The second is the project being read** — its log and its settings — and the row
-holding it is present while a project is open and absent otherwise, so that the
-second level appearing is itself the statement that the operator is inside one.
-Which of the two surfaces is being read is marked in the bar rather than left to
-be inferred from the screen.
+**The second is the installation**, at the bottom behind a separator, and it is
+true wherever the operator is: the installation's own settings. The wordmark
+stands above everything as the way back to the list, and the account menu at the
+top right carries the sign-out. The zone every timestamp is in is stated in the
+top bar, and again in that menu where the bar is too narrow to say it.
 
 Nothing navigates from inside a screen. A settings link in the status line of the
 log view and a *back to the log* sentence at the top of the settings are
 navigation hidden in the content: they are in a different place on every screen,
 they say where they go rather than where the operator is, and between them they
-leave no screen with a place. The bar says both at once.
+leave no screen with a place. The frame says both at once.
+
+**The column collapses, and nothing remembers that it did.** The log is a list
+of lines that must not wrap, and on a narrow window it wants the width the
+column is standing on — so the top bar carries a handle that puts the column
+away, and on a phone the column is a drawer that handle opens. Every load starts
+with it open. That is what keeps it a handle rather than the layout setting the
+next section refuses, and it is why two screenshots of the same screen are still
+the same screenshot.
 
 **The switcher is present everywhere**, because moving from one project to
 another is the frequent act and it should never be a trip back to a start page.
@@ -301,9 +312,9 @@ integration is broken while the truth is that the time range is set to yesterday
 
 ## Settings
 
-They are two screens and the bar keeps them apart: a project's sit on the second
-level beside its log, and the installation's are on the first, where they are
-true of every project at once.
+They are two screens and the column keeps them apart: a project's sit beside its
+log, under the project being read, and the installation's are at the foot of the
+column, where they are true of every project at once.
 
 ### Each screen is its areas
 
@@ -501,12 +512,13 @@ nobody asked.
   product `VISION.md` says logaffe is not.
 - **No column configuration, no layout settings, no theme setting.** The row is
   what it is, and the interface follows the colour scheme the operating system
-  asks for.
-- **No sidebar in the shell.** There are three surfaces and one of them is a list
-  of lines that must not wrap; a permanent column beside it would spend the width
-  the log is read in on a menu of three entries. The settings screen lists its own
-  areas down its left, which is a column inside one screen and not the frame
-  around all of them.
+  asks for. There is a `dark` class on `<html>` and it is set from
+  `prefers-color-scheme` and from nothing else
+  ([ADR 0051](./adr/0051-the-web-interface-is-tailwind-base-ui-and-planaffes-own-tokens.md)) —
+  the mechanism a token layer needs, with no control in front of it. Putting the
+  navigation column away is not one of these either: it is not stored anywhere
+  and every load starts with the column open, so no screenshot carries a
+  question about the state it was taken in.
 - **No export of a filtered result to a file.** A single entry copies as JSON,
   and an agent reads through [MCP](./mcp.md); a bulk export is a second read path
   with its own limits and its own answer to what happens at ten million rows.

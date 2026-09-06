@@ -74,3 +74,4 @@ material value to understanding the decision.
 - [0048 – Retention's ceiling is a year, and the setting says what it costs](./0048-retentions-ceiling-is-a-year-and-the-setting-says-what-it-costs.md)
 - [0049 – A notification carries numbers and names, never log content](./0049-a-notification-carries-numbers-and-names-never-log-content.md)
 - [0050 – The alert conditions are a closed set](./0050-the-alert-conditions-are-a-closed-set.md)
+- [0051 – The web interface is Tailwind, Base UI, and planaffe's own tokens](./0051-the-web-interface-is-tailwind-base-ui-and-planaffes-own-tokens.md)

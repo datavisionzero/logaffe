@@ -1,9 +1,18 @@
+import tailwindcss from "@tailwindcss/vite";
 // From vitest rather than vite, so that the test section below is typed too.
 import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+
+  // The components copied from planaffe address each other by this alias
+  // (ADR 0051), so that carrying a fix across is a copy and not a rewrite.
+  resolve: {
+    alias: {
+      "@": new URL("./src/", import.meta.url).pathname,
+    },
+  },
 
   // A local `npm run build` lands where the server serves static files from, so
   // that one `dotnet run` gives the whole product. The image build does the same
@@ -17,7 +26,9 @@ export default defineConfig({
   // Vite serves the SPA and forwards what belongs to the backend. Every route
   // of the contract is listed, because the session cookie is `SameSite=Strict`
   // and only reaches the installation when the browser thinks it is talking to
-  // one origin — which is what this forwarding is for.
+  // one origin — which is what this forwarding is for. A route left out of this
+  // list is a screen that works in the image and not on this machine, and
+  // nothing says so: the request is answered by the SPA's own `index.html`.
   server: {
     port: 5173,
     proxy: Object.fromEntries(
@@ -27,6 +38,8 @@ export default defineConfig({
         "/ingest",
         "/ingest-tokens",
         "/claim",
+        "/groups",
+        "/alerts",
         "/sign-in",
         "/sign-out",
         "/sessions",

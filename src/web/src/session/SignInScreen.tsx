@@ -1,5 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { api, asNumber } from "../api/client";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
+import { Gate, PageTitle } from "../components/Page";
 
 /**
  * How the operator gets back in, from whatever machine they happen to be at.
@@ -68,34 +72,34 @@ export function SignInScreen({
   }
 
   return (
-    <main>
-      <h1>logaffe</h1>
+    <Gate>
+      <div className="flex items-center gap-2">
+        <span aria-hidden className="size-5 rounded-sm bg-brand" />
+        <PageTitle>logaffe</PageTitle>
+      </div>
 
-      <form onSubmit={signIn}>
-        <label>
-          Password
-          <input
+      <form onSubmit={signIn} className="grid max-w-md gap-3">
+        <Field label="Password">
+          <Input
             type="password"
             name="password"
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-        </label>
+        </Field>
 
         {usingBackupCode ? (
-          <label>
-            Backup code
-            <input
+          <Field label="Backup code">
+            <Input
               name="backup-code"
               autoComplete="off"
               value={backupCode}
               onChange={(e) => setBackupCode(e.target.value)}
             />
-          </label>
+          </Field>
         ) : (
-          <label>
-            The six digits from the app, if you enrolled one
+          <Field label="The six digits from the app, if you enrolled one">
             {/* `autocomplete` is the standard's answer and browsers honour it,
                 but password managers find this field by their own heuristics,
                 and those read `name` and `id` before anything else.
@@ -108,7 +112,7 @@ export function SignInScreen({
                 call the mechanism, and unlike `otp` and `2fa` it is not a term
                 `CONTEXT.md` tells us to avoid. Tidying this back to match the
                 attribute below it would silently cost the operator the fill. */}
-            <input
+            <Input
               id="totp"
               name="totp"
               inputMode="numeric"
@@ -117,29 +121,31 @@ export function SignInScreen({
               value={secondFactorCode}
               onChange={(e) => setSecondFactorCode(e.target.value)}
             />
-          </label>
+          </Field>
         )}
 
-        {refusal !== undefined && <p className="refusal">{refusal}</p>}
+        {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
 
-        <button type="submit" disabled={signingIn}>
+        <Button type="submit" disabled={signingIn} className="mt-1 w-fit">
           Sign in
-        </button>
+        </Button>
 
         {/* A backup code stands in for the second factor and is consumed when
             used. It is the ordinary way in when the phone is not to hand, so it
             is one click away rather than something to be found. */}
-        <button
+        <Button
           type="button"
-          className="plain"
+          variant="link"
+          size="sm"
+          className="w-fit px-0"
           onClick={() => {
             setUsingBackupCode(!usingBackupCode);
             setRefusal(undefined);
           }}
         >
           {usingBackupCode ? "Use the authenticator app" : "Use a backup code instead"}
-        </button>
+        </Button>
       </form>
-    </main>
+    </Gate>
   );
 }

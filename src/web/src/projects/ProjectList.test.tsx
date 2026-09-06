@@ -265,7 +265,9 @@ describe("the project switcher", () => {
 
     const operator = userEvent.setup();
 
-    const shell = within(screen.getByRole("banner"));
+    // Scoped to the frame's own navigation rather than to the screen: the
+    // point of the switcher is that it is never a trip back to the list.
+    const shell = within(screen.getByRole("navigation", { name: "Projects" }));
 
     await operator.click(await screen.findByRole("button", { name: /^project/i }));
     await operator.click(shell.getByRole("link", { name: "billing" }));

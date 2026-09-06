@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
+import { ChevronsUpDownIcon } from "lucide-react";
 import { addressOf, carriedToAnotherProject, filtersIn } from "../logs/filters";
 import { arrangedByGroup, groupOf, useGroups } from "./groups";
 import { projectIdIn, useProjects } from "./projects";
@@ -81,30 +82,34 @@ export function ProjectSwitcher() {
   );
 
   return (
-    <div className="switcher" ref={box}>
+    <div className="relative" ref={box}>
       <button
         type="button"
         ref={button}
-        className="switcher-button"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-2 rounded-lg border border-transparent px-2 py-1.5 text-left text-sm outline-none hover:bg-sidebar-accent focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-expanded:bg-sidebar-accent"
       >
         {/* Two spans and the space between them, which is what the button is
             called: "Project billing" and not the two run together. The group
             stands in front of the name where there is one, because the name
             alone is unique only inside it. */}
-        <span className="switcher-label">Project</span>{" "}
-        <span className={held === null ? "switcher-name quiet" : "switcher-name"}>
+        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          Project
+        </span>{" "}
+        <span className={held === null ? "quiet flex-1 truncate" : "flex-1 truncate font-medium"}>
           {held === null ? "Choose a project" : under === null ? held.name : `${under} / ${held.name}`}
         </span>
-        <span aria-hidden="true">▾</span>
+        <ChevronsUpDownIcon aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
       </button>
 
       {open && (
-        <ul className="switcher-menu">
+        <ul className="absolute z-20 mt-1 max-h-96 w-full min-w-56 overflow-auto rounded-lg border bg-popover p-1 text-popover-foreground shadow-md">
           {/* The way back to the list, which is otherwise only the wordmark. */}
-          <li className="switcher-all">
-            <Link to="/">All projects</Link>
+          <li className="mb-1 border-b pb-1">
+            <Link to="/" className={row}>
+              All projects
+            </Link>
           </li>
 
           {/* The same arrangement the list has, for the same reason: the
@@ -114,6 +119,7 @@ export function ProjectSwitcher() {
               <Link
                 to={`/project/${project.id}${carried}`}
                 aria-current={project.id === at ? "true" : undefined}
+                className={row}
               >
                 {project.name}
               </Link>
@@ -126,13 +132,16 @@ export function ProjectSwitcher() {
               <li key={group.id}>
                 {/* A heading in a menu and not a thing to choose: a group is
                     for finding a project, never for opening. */}
-                <p className="switcher-group">{group.name}</p>
+                <p className="px-2 pt-2 pb-1 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  {group.name}
+                </p>
                 <ul>
                   {projects.map((project) => (
                     <li key={project.id}>
                       <Link
                         to={`/project/${project.id}${carried}`}
                         aria-current={project.id === at ? "true" : undefined}
+                        className={row}
                       >
                         {project.name}
                       </Link>
@@ -146,3 +155,11 @@ export function ProjectSwitcher() {
     </div>
   );
 }
+
+/**
+ * One line of the menu. It stays a link rather than becoming a menu item: these
+ * are addresses, and an operator who opens one in a second tab is doing
+ * something the product should not have to be asked about.
+ */
+const row =
+  "block truncate rounded-md px-2 py-1.5 text-sm outline-none hover:bg-accent focus-visible:bg-accent aria-[current=true]:bg-accent aria-[current=true]:font-medium";

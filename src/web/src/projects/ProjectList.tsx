@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
+import { Button } from "../components/ui/button";
+import { Page, PageTitle } from "../components/Page";
 import { formatTimestamp } from "../shared/time";
 import { CreateProject } from "./CreateProject";
 import { arrangedByGroup, useGroups } from "./groups";
@@ -26,23 +28,31 @@ export function ProjectList() {
   const [creating, setCreating] = useState(false);
 
   if (state.status === "asking") {
-    return <p className="narrow quiet">Asking the installation what it holds…</p>;
+    return (
+      <Page>
+        <p className="quiet">Asking the installation what it holds…</p>
+      </Page>
+    );
   }
 
   if (state.status === "unreachable") {
-    return <p className="narrow refusal">This installation did not answer.</p>;
+    return (
+      <Page>
+        <p className="refusal">This installation did not answer.</p>
+      </Page>
+    );
   }
 
   if (state.projects.length === 0) {
     return (
-      <section className="narrow">
-        <h1>No projects yet</h1>
-        <p>
+      <Page className="grid gap-4">
+        <PageTitle>No projects yet</PageTitle>
+        <p className="max-w-prose">
           A project is the unit of separation: every log entry belongs to exactly one, and
           nothing can be delivered until there is one to deliver to. Create the first.
         </p>
         <CreateProject onCreated={reload} />
-      </section>
+      </Page>
     );
   }
 
@@ -52,14 +62,14 @@ export function ProjectList() {
   );
 
   return (
-    <section className="narrow">
-      <h1>Projects</h1>
+    <Page className="grid gap-6">
+      <PageTitle>Projects</PageTitle>
 
       {ungrouped.length > 0 && <Projects projects={ungrouped} />}
 
       {grouped.map(({ group, projects }) => (
-        <section key={group.id} className="project-group">
-          <h2>{group.name}</h2>
+        <section key={group.id} className="grid gap-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">{group.name}</h2>
 
           {/* A group with nothing in it says so rather than being left out: it
               is something the operator made and not a side effect of what the
@@ -74,8 +84,8 @@ export function ProjectList() {
       ))}
 
       {creating ? (
-        <section>
-          <h2>A new project</h2>
+        <section className="grid gap-3 rounded-lg border bg-card p-4">
+          <h2 className="text-base font-semibold">A new project</h2>
           <CreateProject
             onCreated={() => {
               setCreating(false);
@@ -84,11 +94,11 @@ export function ProjectList() {
           />
         </section>
       ) : (
-        <button type="button" onClick={() => setCreating(true)}>
+        <Button variant="outline" className="w-fit" onClick={() => setCreating(true)}>
           Create a project
-        </button>
+        </Button>
       )}
-    </section>
+    </Page>
   );
 }
 
@@ -98,49 +108,67 @@ export function ProjectList() {
  */
 function Projects({ projects }: { projects: HeldProject[] }) {
   return (
-    <table className="projects">
-      <thead>
-        <tr>
-          <th scope="col">Project</th>
-          <th scope="col">Last entry received</th>
-          <th scope="col">Ingest tokens</th>
-          <th scope="col">Kept for</th>
-        </tr>
-      </thead>
-      <tbody>
-        {projects.map((project) => (
-          <ProjectRow key={project.id} project={project} />
-        ))}
-      </tbody>
-    </table>
+    <div className="overflow-x-auto rounded-lg border bg-card">
+      <table className="w-full border-collapse text-left text-sm">
+        <thead>
+          <tr className="border-b">
+            <Th>Project</Th>
+            <Th>Last entry received</Th>
+            <Th>Ingest tokens</Th>
+            <Th>Kept for</Th>
+          </tr>
+        </thead>
+        <tbody>
+          {projects.map((project) => (
+            <ProjectRow key={project.id} project={project} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Th({ children }: { children: string }) {
+  return (
+    <th
+      scope="col"
+      className="px-3 py-2 text-xs font-medium tracking-wide text-muted-foreground uppercase"
+    >
+      {children}
+    </th>
   );
 }
 
 function ProjectRow({ project }: { project: HeldProject }) {
   return (
-    <tr>
-      <th scope="row">
-        <Link to={`/project/${project.id}`}>{project.name}</Link>
+    <tr className="border-b last:border-b-0 hover:bg-muted/50">
+      <th scope="row" className="px-3 py-2 font-medium">
+        <Link
+          to={`/project/${project.id}`}
+          className="rounded-sm text-brand underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          {project.name}
+        </Link>
       </th>
 
-      <td>
+      <td className="px-3 py-2">
         {/* The receipt clock and not the event clock: an entry that arrives
             carrying yesterday's timestamp arrived today, and the question this
             column answers is whether the application is still delivering. */}
         {project.lastReceivedAt === null ? (
           <span className="quiet">Nothing has ever arrived</span>
         ) : (
-          <time dateTime={project.lastReceivedAt.toISOString()}>
+          <time dateTime={project.lastReceivedAt.toISOString()} className="font-mono text-xs">
             {formatTimestamp(project.lastReceivedAt)}
           </time>
         )}
       </td>
 
-      <td>
+      <td className="px-3 py-2">
         <IngestTokens held={project.ingestTokens} />
       </td>
 
-      <td>{project.retentionDays} days</td>
+      <td className="px-3 py-2 whitespace-nowrap">{project.retentionDays} days</td>
     </tr>
   );
 }

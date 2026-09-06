@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { api } from "../api/client";
 import type { HeldProject } from "../projects/projects";
+import { Check } from "../components/Field";
+import { About, Area, Said } from "./Area";
 
 /**
  * Whether this project's alert conditions are evaluated.
@@ -62,34 +64,36 @@ export function ProjectMute({
   }
 
   return (
-    <section>
-      <h2>Alerts</h2>
-      <p>
+    <Area title="Alerts">
+      <About>
         This installation says something unasked on four conditions and no others: its
         store filling up, a project going quiet, a project delivering far more than it
         does, and a project failing far more than it does. Muting takes this project out
         of the three that are about a project — they are not evaluated for it at all,
         rather than evaluated and kept quiet.
-      </p>
+      </About>
 
-      <label className="confirm">
+      <Check>
         <input
           type="checkbox"
+          className="mt-0.5 size-4 accent-brand"
           checked={project.muted}
           disabled={saving}
           onChange={(e) => void put(e.target.checked)}
         />
         Do not evaluate this project's conditions
-      </label>
+      </Check>
 
-      <p className="quiet">
+      <p className="quiet max-w-prose text-sm">
         Nothing else changes: what it receives, what it keeps and what it answers are
         exactly what they were. Which conditions this installation runs at all is{" "}
-        <Link to="/settings/alerts">in the installation's settings</Link>.
+        <Link to="/settings/alerts" className="text-brand underline-offset-4 hover:underline">
+          in the installation's settings
+        </Link>
+        .
       </p>
 
-      {problem !== undefined && <p className="refusal">{problem}</p>}
-      {saved && <p className="quiet">Saved.</p>}
-    </section>
+      <Said problem={problem} note={saved ? "Saved." : undefined} />
+    </Area>
   );
 }

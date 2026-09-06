@@ -10,3 +10,20 @@ afterEach(cleanup);
 // not what a screen falls over on.
 Element.prototype.scrollIntoView ??= () => undefined;
 Element.prototype.scrollTo ??= () => undefined;
+
+// The same emptiness, one level up: the sidebar asks the viewport whether it is
+// a phone's, and the theme asks it which colour scheme the operating system
+// wants. Neither question has an answer in jsdom, and the false both get here
+// is the desktop in its light scheme — the shape every test was written
+// against.
+window.matchMedia ??= (query: string) =>
+  ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    dispatchEvent: () => false,
+  }) as MediaQueryList;

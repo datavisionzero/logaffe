@@ -3,6 +3,9 @@ import { Link } from "react-router";
 import { api } from "../api/client";
 import { useGroups } from "../projects/groups";
 import type { HeldProject } from "../projects/projects";
+import { Select } from "../components/ui/select";
+import { Field } from "../components/Field";
+import { About, Area, Said } from "./Area";
 
 /** The value the select carries for a project in no group. */
 const none = "";
@@ -71,49 +74,50 @@ export function ProjectGroup({
   }
 
   return (
-    <section>
-      <h2>Group</h2>
-      <p>
+    <Area title="Group">
+      <About>
         The heading this project is listed under, which is there so that a list of twenty
         projects can be read. Moving it changes nothing else: deliveries carry on
         untouched, nothing has to be redeployed, and a group is never what a search runs
         inside.
-      </p>
+      </About>
 
       {state.status === "unreachable" && (
-        <p className="refusal">This installation did not answer.</p>
+        <p className="refusal text-sm">This installation did not answer.</p>
       )}
 
       {state.status === "held" && state.groups.length === 0 ? (
         <p className="quiet">
           This installation holds no groups.{" "}
-          <Link to="/settings/groups">Make one in the installation's settings</Link>, and
-          this project can be put into it here.
+          <Link to="/settings/groups" className="text-brand underline-offset-4 hover:underline">
+            Make one in the installation's settings
+          </Link>
+          , and this project can be put into it here.
         </p>
       ) : (
-        <label>
-          Group
-          <select
-            value={project.groupId ?? none}
-            disabled={moving || state.status !== "held"}
-            onChange={(e) => void move(e.target.value)}
-            aria-invalid={problem !== undefined || undefined}
-          >
-            <option value={none}>No group</option>
-            {state.status === "held" &&
-              [...state.groups]
-                .sort((one, other) => one.name.localeCompare(other.name))
-                .map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-          </select>
-        </label>
+        <div className="max-w-md">
+          <Field label="Group">
+            <Select
+              value={project.groupId ?? none}
+              disabled={moving || state.status !== "held"}
+              onChange={(e) => void move(e.target.value)}
+              aria-invalid={problem !== undefined || undefined}
+            >
+              <option value={none}>No group</option>
+              {state.status === "held" &&
+                [...state.groups]
+                  .sort((one, other) => one.name.localeCompare(other.name))
+                  .map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+            </Select>
+          </Field>
+        </div>
       )}
 
-      {problem !== undefined && <p className="refusal">{problem}</p>}
-      {moved && <p className="quiet">Moved.</p>}
-    </section>
+      <Said problem={problem} note={moved ? "Moved." : undefined} />
+    </Area>
   );
 }

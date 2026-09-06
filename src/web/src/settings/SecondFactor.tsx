@@ -1,6 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { api, problemWith } from "../api/client";
 import { EnrolSecondFactor } from "../session/EnrolSecondFactor";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
+import { About, Area, Said } from "./Area";
+import { Callout } from "../components/Page";
 
 /**
  * The second factor: enrolled, replaced or turned off, and this is the only
@@ -38,20 +43,19 @@ export function SecondFactor() {
   }, []);
 
   return (
-    <section>
-      <h2>Second factor</h2>
-      <p>
+    <Area title="Second factor">
+      <About>
         A time-based code from an authenticator app, asked for after the password. It is
         yours to enrol and yours to remove, and nothing is stored until the last step
         below — so an app you have now keeps working until the moment a new one takes
         over.
-      </p>
-      <p>
+      </About>
+      <About>
         Enrolling issues a fresh sheet of backup codes, and every change here{" "}
         <b>ends every other session</b>.
-      </p>
+      </About>
 
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
+      <Said problem={refusal} />
 
       {settled === "enrolled" && (
         <p className="quiet">
@@ -67,10 +71,10 @@ export function SecondFactor() {
       )}
 
       {enrolled === false && (
-        <p className="notice">
+        <Callout>
           There is no second factor on this account. A password is the only thing between
           the internet and everything this installation holds.
-        </p>
+        </Callout>
       )}
 
       {enrolled !== undefined && !turningOff && (
@@ -84,9 +88,9 @@ export function SecondFactor() {
       )}
 
       {enrolled === true && !turningOff && (
-        <button type="button" className="plain" onClick={() => setTurningOff(true)}>
+        <Button type="button" variant="link" size="sm" onClick={() => setTurningOff(true)}>
           Turn the second factor off
-        </button>
+        </Button>
       )}
 
       {turningOff && (
@@ -99,7 +103,7 @@ export function SecondFactor() {
           onKept={() => setTurningOff(false)}
         />
       )}
-    </section>
+    </Area>
   );
 }
 
@@ -162,39 +166,36 @@ function TurnOff({ onRemoved, onKept }: { onRemoved: () => void; onKept: () => v
   }
 
   return (
-    <form onSubmit={remove}>
-      <h3>Turn the second factor off</h3>
-      <p className="notice">
+    <form onSubmit={remove} className="grid max-w-md gap-3">
+      <h3 className="text-sm font-semibold">Turn the second factor off</h3>
+      <Callout>
         The authenticator and the backup codes go, and the password becomes the only
         credential on this account. Signing in will ask for nothing else.
-      </p>
+      </Callout>
 
-      <label>
-        Password
-        <input
+      <Field label="Password">
+        <Input
           type="password"
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           aria-invalid={problems.password !== undefined || undefined}
         />
-      </label>
-      {problems.password !== undefined && <p className="refusal">{problems.password}</p>}
+      </Field>
+      <Said problem={problems.password} />
 
       {usingBackupCode ? (
-        <label>
-          A backup code off the sheet
-          <input
+        <Field label="A backup code off the sheet">
+          <Input
             name="backup-code"
             autoComplete="off"
             value={backupCode}
             onChange={(e) => setBackupCode(e.target.value)}
           />
-        </label>
+        </Field>
       ) : (
-        <label>
-          The six digits from the authenticator
-          <input
+        <Field label="The six digits from the authenticator">
+          <Input
             id="current-code"
             name="current-code"
             inputMode="numeric"
@@ -204,28 +205,29 @@ function TurnOff({ onRemoved, onKept }: { onRemoved: () => void; onKept: () => v
             onChange={(e) => setSecondFactorCode(e.target.value)}
             aria-invalid={problems.secondFactorCode !== undefined || undefined}
           />
-        </label>
+        </Field>
       )}
       {problems.secondFactorCode !== undefined && (
-        <p className="refusal">{problems.secondFactorCode}</p>
+        <p className="refusal text-sm">{problems.secondFactorCode}</p>
       )}
 
-      <button
+      <Button
         type="button"
-        className="plain"
+        variant="link"
+        size="sm"
         onClick={() => setUsingBackupCode(!usingBackupCode)}
       >
         {usingBackupCode ? "Use the authenticator" : "Use a backup code instead"}
-      </button>
+      </Button>
 
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
+      <Said problem={refusal} />
 
-      <button type="submit" disabled={removing}>
+      <Button type="submit" disabled={removing} className="w-fit">
         Turn it off
-      </button>
-      <button type="button" className="plain" onClick={onKept}>
+      </Button>
+      <Button type="button" variant="link" size="sm" onClick={onKept}>
         Keep it
-      </button>
+      </Button>
     </form>
   );
 }

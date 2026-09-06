@@ -1,5 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { api, problemWith } from "../api/client";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
+import { Callout, Gate, PageTitle, Snippet } from "../components/Page";
 import { PASSWORD_MINIMUM } from "../session/password";
 import { formatTimestamp } from "../shared/time";
 
@@ -14,8 +18,8 @@ import { formatTimestamp } from "../shared/time";
  */
 export function CannotBeClaimed({ needsSecret }: { needsSecret: boolean }) {
   return (
-    <main>
-      <h1>This installation cannot be claimed</h1>
+    <Gate>
+      <PageTitle>This installation cannot be claimed</PageTitle>
       {needsSecret ? (
         <p>
           It is guarded by a claim secret and holds none, so there is nothing to present
@@ -27,14 +31,16 @@ export function CannotBeClaimed({ needsSecret }: { needsSecret: boolean }) {
           Claiming over the network is over, and a restart does not open it again.
         </p>
       )}
-      <p>Run this on the host the installation runs on, and reload this page:</p>
-      <pre>docker compose exec logaffe logaffe recover</pre>
-      <p>
+      <div className="grid gap-3">
+        <p>Run this on the host the installation runs on, and reload this page:</p>
+        <Snippet>docker compose exec logaffe logaffe recover</Snippet>
+      </div>
+      <p className="quiet">
         It returns the installation to unclaimed and opens the way in again — a fresh
         claim secret, or a fresh window. Projects, ingest tokens and log entries are
         untouched.
       </p>
-    </main>
+    </Gate>
   );
 }
 
@@ -110,84 +116,89 @@ export function ClaimScreen({
   }
 
   return (
-    <main>
-      <h1>Claim this installation</h1>
-      <p>
-        This installation belongs to nobody yet, and whoever finishes below is its
-        operator. There is one account and no second one afterwards.
-      </p>
-      {closesAt !== null && (
-        <p className="notice">
-          The claim window closes at{" "}
-          <time dateTime={closesAt}>{formatTimestamp(new Date(closesAt))}</time>. After
-          that it is opened again only from the host.
+    <Gate>
+      <div className="grid gap-3">
+        <PageTitle>Claim this installation</PageTitle>
+        <p>
+          This installation belongs to nobody yet, and whoever finishes below is its
+          operator. There is one account and no second one afterwards.
         </p>
-      )}
+        {closesAt !== null && (
+          <Callout>
+            The claim window closes at{" "}
+            <time dateTime={closesAt} className="font-mono">
+              {formatTimestamp(new Date(closesAt))}
+            </time>
+            . After that it is opened again only from the host.
+          </Callout>
+        )}
+      </div>
 
-      <form onSubmit={claim}>
+      <form onSubmit={claim} className="grid max-w-md gap-3">
         {needsSecret && (
-          <>
-            <label>
-              Claim secret
-              <input
-                name="claim-secret"
-                autoComplete="off"
-                value={secret}
-                onChange={(e) => setSecret(e.target.value)}
-                aria-invalid={problems.secret !== undefined || undefined}
-              />
-            </label>
-            <p className="quiet">
-              It is in <code>claim-secret.txt</code> on the installation's volume, or it
-              is the one its configuration names. Whoever installed this has it.
-            </p>
-            {problems.secret !== undefined && <p className="refusal">{problems.secret}</p>}
-          </>
+          <Field
+            label="Claim secret"
+            said={problems.secret}
+            hint={
+              <>
+                It is in <code className="font-mono">claim-secret.txt</code> on the
+                installation's volume, or it is the one its configuration names. Whoever
+                installed this has it.
+              </>
+            }
+          >
+            <Input
+              name="claim-secret"
+              autoComplete="off"
+              value={secret}
+              onChange={(e) => setSecret(e.target.value)}
+              aria-invalid={problems.secret !== undefined || undefined}
+            />
+          </Field>
         )}
 
-        <label>
-          Password
-          <input
+        <Field
+          label="Password"
+          hint={`At least ${PASSWORD_MINIMUM} characters, and nothing else is asked of it. Length is the property that matters — and until you enrol a second factor afterwards, it is the only credential on the account.`}
+          said={
+            tooShort
+              ? `A password is at least ${PASSWORD_MINIMUM} characters.`
+              : problems.password
+          }
+        >
+          <Input
             type="password"
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             aria-invalid={tooShort || problems.password !== undefined || undefined}
           />
-        </label>
-        <p className="quiet">
-          At least {PASSWORD_MINIMUM} characters, and nothing else is asked of it. Length
-          is the property that matters — and until you enrol a second factor afterwards,
-          it is the only credential on the account.
-        </p>
-        {tooShort && (
-          <p className="refusal">A password is at least {PASSWORD_MINIMUM} characters.</p>
-        )}
-        {problems.password !== undefined && <p className="refusal">{problems.password}</p>}
+        </Field>
 
         {/* Typed twice, which is furniture the product avoids everywhere else
             and earns here: there is no password reset over the network and no
             email to send one to (ADR 0015), so a typo at this step is answered
             by Host Recovery and nothing smaller. */}
-        <label>
-          Password again
-          <input
+        <Field
+          label="Password again"
+          said={mismatched ? "These two are not the same." : undefined}
+        >
+          <Input
             type="password"
             autoComplete="new-password"
             value={again}
             onChange={(e) => setAgain(e.target.value)}
             aria-invalid={mismatched || undefined}
           />
-        </label>
-        {mismatched && <p className="refusal">These two are not the same.</p>}
+        </Field>
 
-        {refusal !== undefined && <p className="refusal">{refusal}</p>}
+        {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
 
-        <button type="submit" disabled={claiming}>
+        <Button type="submit" disabled={claiming} className="mt-1 w-fit">
           Claim this installation
-        </button>
+        </Button>
       </form>
-    </main>
+    </Gate>
   );
 }
 

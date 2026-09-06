@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, whenSignedOut } from "./api/client";
+import { Gate, PageTitle } from "./components/Page";
 import { CannotBeClaimed, ClaimScreen } from "./claim/ClaimScreen";
 import { FirstRun } from "./claim/FirstRun";
 import { SignInScreen } from "./session/SignInScreen";
@@ -76,10 +77,10 @@ export function App() {
 
     case "unreachable":
       return (
-        <main>
-          <h1>logaffe</h1>
+        <Gate>
+          <PageTitle>logaffe</PageTitle>
           <p className="refusal">This installation did not answer. Reload to try again.</p>
-        </main>
+        </Gate>
       );
 
     case "unclaimed":
