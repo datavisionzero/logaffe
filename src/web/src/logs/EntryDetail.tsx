@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { api, asNumber } from "../api/client";
 import { copyToClipboard, whyNotCopied, type Copying } from "../shared/clipboard";
 import { formatTimestampWithOffset } from "../shared/time";
 import type { Filters, Level } from "./filters";
+import { cn } from "@/lib/utils";
+import { Button } from "../components/ui/button";
+import { Callout } from "../components/Page";
+import { chip } from "./Level";
 
 interface WholeEntry {
   id: number;
@@ -75,24 +79,28 @@ export function EntryDetail({
   }, [projectId, entryId]);
 
   return (
-    <aside className="detail" aria-label="Entry">
-      <div className="detail-head">
-        <button type="button" className="plain" onClick={onClose}>
+    <aside
+      className="max-w-[45vw] flex-[0_0_30rem] overflow-auto rounded-lg border px-3 py-2.5"
+      aria-label="Entry"
+    >
+      <div className="flex justify-between gap-4">
+        <Button type="button" variant="link" size="sm" onClick={onClose}>
           Close
-        </button>
+        </Button>
         {typeof entry === "object" && (
-          <button
+          <Button
             type="button"
-            className="plain"
+            variant="link"
+            size="sm"
             onClick={() => void copyToClipboard(asJson(entry)).then(setCopying)}
           >
             {copying === "copied" ? "Copied" : "Copy as JSON"}
-          </button>
+          </Button>
         )}
       </div>
 
       {whyNotCopied(copying) !== undefined && (
-        <p className="refusal">{whyNotCopied(copying)}</p>
+        <p className="refusal text-sm">{whyNotCopied(copying)}</p>
       )}
 
       {entry === "asking" && <p className="quiet">Reading the entry…</p>}
@@ -105,103 +113,109 @@ export function EntryDetail({
       )}
 
       {typeof entry === "object" && (
-        <dl className="detail-fields">
+        <dl className="mt-3 grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1.5">
           {/* Both timestamps, each named: the sender's clock and ours
               (ADR 0007). The offset is on them, so an instant copied out of
               here stands on its own. */}
-          <dt>Event time</dt>
-          <dd>
+          <Term>Event time</Term>
+          <Value>
             <time dateTime={entry.eventTime}>
               {formatTimestampWithOffset(new Date(entry.eventTime))}
             </time>
             <span className="quiet"> — the sender's clock</span>
-          </dd>
+          </Value>
 
-          <dt>Receipt time</dt>
-          <dd>
+          <Term>Receipt time</Term>
+          <Value>
             <time dateTime={entry.receiptTime}>
               {formatTimestampWithOffset(new Date(entry.receiptTime))}
             </time>
             <span className="quiet"> — ours</span>
-          </dd>
+          </Value>
 
-          <dt>Level</dt>
-          <dd>
+          <Term>Level</Term>
+          <Value>
             <button
               type="button"
-              className={`level level-${entry.level} narrows`}
+              className={cn(chip(entry.level), "underline decoration-dotted underline-offset-2")}
               onClick={() => onNarrow({ ...filters, minimumLevel: entry.level })}
             >
               {entry.level}
             </button>
-          </dd>
+          </Value>
 
-          <dt>Logger</dt>
-          <dd>
+          <Term>Logger</Term>
+          <Value>
             <Narrowing
               value={entry.loggerName}
               onNarrow={(value) => onNarrow({ ...filters, loggerName: value })}
             />
-          </dd>
+          </Value>
 
-          <dt>Instance</dt>
-          <dd>
+          <Term>Instance</Term>
+          <Value>
             <Narrowing
               value={entry.instance}
               onNarrow={(value) => onNarrow({ ...filters, instance: value })}
             />
-          </dd>
+          </Value>
 
-          <dt>Trace</dt>
-          <dd>
+          <Term>Trace</Term>
+          <Value>
             <Narrowing
               value={entry.trace}
               onNarrow={(value) => onNarrow({ ...filters, trace: value })}
             />
-          </dd>
+          </Value>
 
-          <dt>Span</dt>
-          <dd>{entry.span === null ? <span className="quiet">—</span> : <code>{entry.span}</code>}</dd>
+          <Term>Span</Term>
+          <Value>
+            {entry.span === null ? (
+              <span className="quiet">—</span>
+            ) : (
+              <code className="font-mono text-xs">{entry.span}</code>
+            )}
+          </Value>
 
           {/* The message template is not shown. It is stored for fidelity and
               never displayed (ADR 0005): the operator reads the sentence, not
               the shape it was made from. */}
-          <dt>Message</dt>
-          <dd>
-            <p className="detail-message">{entry.message}</p>
+          <Term>Message</Term>
+          <Value>
+            <p>{entry.message}</p>
             {entry.messageTruncated && (
-              <p className="notice">
+              <Callout>
                 This message was cut at its cap on the way in. What is above is not where
                 the sender stopped writing.
-              </p>
+              </Callout>
             )}
-          </dd>
+          </Value>
 
           {entry.exception !== null && (
             <>
-              <dt>Exception</dt>
-              <dd>
-                <pre>{entry.exception}</pre>
+              <Term>Exception</Term>
+              <Value>
+                <Trace>{entry.exception}</Trace>
                 {entry.exceptionTruncated && (
-                  <p className="notice">
+                  <Callout>
                     This exception was cut at its cap. The bottom of the stack trace is not
                     here rather than the exception ending where the text does.
-                  </p>
+                  </Callout>
                 )}
-              </dd>
+              </Value>
             </>
           )}
 
-          <dt>Properties</dt>
-          <dd>
+          <Term>Properties</Term>
+          <Value>
             {entry.properties === null || entry.properties === undefined ? (
               <span className="quiet">None</span>
             ) : (
               // As they were delivered. Nothing here reads inside them and
               // nothing renders them into a sentence (ADR 0012).
-              <pre>{JSON.stringify(entry.properties, null, 2)}</pre>
+              <Trace>{JSON.stringify(entry.properties, null, 2)}</Trace>
             )}
-          </dd>
+          </Value>
         </dl>
       )}
     </aside>
@@ -221,9 +235,36 @@ function Narrowing({
   }
 
   return (
-    <button type="button" className="plain narrows" onClick={() => onNarrow(value)}>
-      <code>{value}</code>
+    <button
+      type="button"
+      className="max-w-full overflow-hidden text-ellipsis underline decoration-dotted underline-offset-2"
+      onClick={() => onNarrow(value)}
+    >
+      <code className="font-mono text-xs">{value}</code>
     </button>
+  );
+}
+
+/** What a field is called, down the left of the pair. */
+function Term({ children }: { children: ReactNode }) {
+  return <dt className="text-xs text-muted-foreground">{children}</dt>;
+}
+
+/** The field itself, which is what the eye comes here for. */
+function Value({ children }: { children: ReactNode }) {
+  return <dd className="min-w-0">{children}</dd>;
+}
+
+/**
+ * A stack trace or a bag of properties, as they arrived. Nothing reads inside
+ * either of them and nothing renders them into a sentence (ADR 0012), so this
+ * is a box with a scrollbar and no cleverness.
+ */
+function Trace({ children }: { children: ReactNode }) {
+  return (
+    <pre className="max-h-88 overflow-auto rounded-md border bg-muted p-2 font-mono text-xs break-words whitespace-pre-wrap">
+      {children}
+    </pre>
   );
 }
 

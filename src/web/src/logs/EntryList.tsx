@@ -1,5 +1,7 @@
 import { formatTimestamp } from "../shared/time";
 import type { ListedEntry } from "./entries";
+import { cn } from "@/lib/utils";
+import { Level } from "./Level";
 
 /**
  * The entries a filter set leaves, newest first by event time.
@@ -24,7 +26,7 @@ export function EntryList({
   onNarrowToLogger: (loggerName: string) => void;
 }) {
   return (
-    <ul className="entries" role="listbox" aria-label="Entries">
+    <ul className="min-w-0" role="listbox" aria-label="Entries">
       {entries.map((entry) => (
         <EntryLine
           key={entry.id}
@@ -57,24 +59,28 @@ function EntryLine({
       role="option"
       aria-selected={selected}
       data-id={entry.id}
-      className={`entry${selected ? " selected" : ""}${justArrived ? " just-arrived" : ""}`}
+      className={cn(
+        "grid cursor-default grid-cols-[13.5rem_6.5rem_12rem_1fr_auto] items-baseline gap-2.5 whitespace-nowrap border-b border-border/50 px-2 py-0.5 font-mono text-[0.82rem]",
+        selected && "bg-muted outline-1 outline-border",
+        // Marked briefly wherever they land, so that something appearing out of
+        // eyeline is still something the operator sees appear.
+        justArrived && "animate-[just-arrived_4s_ease-out]",
+      )}
       onClick={onSelect}
     >
-      <time className="entry-time" dateTime={entry.eventTime.toISOString()}>
+      <time className="text-muted-foreground" dateTime={entry.eventTime.toISOString()}>
         {formatTimestamp(entry.eventTime)}
       </time>
 
-      {/* The level as a word with a colour behind it, and never as a colour
-          alone. */}
-      <span className={`level level-${entry.level}`}>{entry.level}</span>
+      <Level level={entry.level} />
 
-      <span className="entry-logger">
+      <span className="overflow-hidden text-ellipsis">
         {entry.loggerName === null ? (
           <span className="quiet">—</span>
         ) : (
           <button
             type="button"
-            className="plain"
+            className="max-w-full overflow-hidden text-ellipsis underline decoration-dotted underline-offset-2"
             title={entry.loggerName}
             onClick={(event) => {
               event.stopPropagation();
@@ -86,19 +92,18 @@ function EntryLine({
         )}
       </span>
 
-      <span className="entry-message">{entry.message}</span>
+      {/* Named for what it is rather than by a class: this is the one thing in
+          the interface a test reaches for by selector, and a hook that is not a
+          style survives the next time the row is redrawn. */}
+      <span data-slot="message" className="overflow-hidden text-ellipsis">
+        {entry.message}
+      </span>
 
-      <span className="entry-marks">
-        {entry.hasException && (
-          <span className="mark mark-exception" title="Carries an exception">
-            ⚠
-          </span>
-        )}
-        {entry.messageTruncated && (
-          <span className="mark mark-truncated" title="Truncated on the way in">
-            ✂
-          </span>
-        )}
+      {/* What the entry says about itself, and never about the application:
+          these are the level-warning colour and not the accent. */}
+      <span className="text-level-warning">
+        {entry.hasException && <span title="Carries an exception">⚠</span>}
+        {entry.messageTruncated && <span title="Truncated on the way in">✂</span>}
       </span>
     </li>
   );

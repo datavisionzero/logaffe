@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
+import { Button } from "../components/ui/button";
 import type { HeldProject } from "../projects/projects";
 import { CountPanel, ReadExpired } from "./CountPanel";
 import { EmptyProject } from "./EmptyProject";
@@ -115,7 +116,7 @@ export function LogView({ project }: { project: HeldProject }) {
   // range is set to yesterday.
   if (project.lastReceivedAt === null) {
     return (
-      <section className="logview">
+      <section className="flex min-h-0 flex-1 flex-col gap-1.5 px-4 py-2.5">
         <h1>{project.name}</h1>
         <EmptyProject projectId={project.id} />
       </section>
@@ -123,7 +124,7 @@ export function LogView({ project }: { project: HeldProject }) {
   }
 
   return (
-    <section className="logview">
+    <section className="flex min-h-0 flex-1 flex-col gap-1.5 px-4 py-2.5">
       <FilterBar
         filters={filters}
         onChange={narrow}
@@ -149,7 +150,7 @@ export function LogView({ project }: { project: HeldProject }) {
           that ran out three minutes before the first one. */}
       <HostBand hostId={project.hostId} filters={filters} />
 
-      <div className="logview-status">
+      <div className="flex flex-wrap items-center gap-3 py-1 text-sm">
         <span className="quiet">
           {keepsGrowing(filters)
             ? entries.following
@@ -159,30 +160,32 @@ export function LogView({ project }: { project: HeldProject }) {
         </span>
 
         {entries.behind && (
-          <span className="notice">
+          <span className="rounded-md border border-brand/30 bg-brand-soft px-2 py-0.5">
             Entries are arriving faster than this view is asking for them. Nothing is lost;
             the next poll resumes where this one stopped.
           </span>
         )}
 
         {entries.waiting > 0 && (
-          <button type="button" onClick={returnToTheTop}>
+          <Button type="button" size="xs" onClick={returnToTheTop}>
             {entries.waiting} new {entries.waiting === 1 ? "entry" : "entries"} — back to the
             top
-          </button>
+          </Button>
         )}
       </div>
 
-      <div className="logview-body">
+      <div className="flex min-h-0 flex-1 gap-3">
         <div
-          className="logview-entries"
+          className="min-w-0 flex-1 overflow-auto rounded-lg border"
           ref={scroller}
           onScroll={(event) => setAtTop(event.currentTarget.scrollTop < 8)}
         >
-          {entries.reading.status === "asking" && <p className="quiet">Reading…</p>}
+          {entries.reading.status === "asking" && (
+            <p className="quiet p-3 text-sm">Reading…</p>
+          )}
 
           {entries.reading.status === "unreachable" && (
-            <p className="refusal">This installation did not answer.</p>
+            <p className="refusal p-3 text-sm">This installation did not answer.</p>
           )}
 
           {entries.reading.status === "expired" && (
@@ -211,9 +214,16 @@ export function LogView({ project }: { project: HeldProject }) {
                   person reads is where scroll position stops being trustworthy
                   — and there is no total to scroll against anyway. */}
               {entries.older !== null && (
-                <button type="button" disabled={entries.loadingOlder} onClick={entries.loadOlder}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="m-3"
+                  disabled={entries.loadingOlder}
+                  onClick={entries.loadOlder}
+                >
                   {entries.loadingOlder ? "Loading…" : "Load older entries"}
-                </button>
+                </Button>
               )}
             </>
           )}
@@ -239,19 +249,19 @@ export function LogView({ project }: { project: HeldProject }) {
  */
 function NothingMatched({ filters, onClear }: { filters: Filters; onClear: () => void }) {
   return (
-    <div className="nothing-matched">
+    <div className="grid max-w-2xl gap-3 p-4">
       <p>No entries match these filters:</p>
-      <ul>
+      <ul className="list-inside list-disc text-muted-foreground">
         {namesOfSetFilters(filters).map((name) => (
           <li key={name}>{name}</li>
         ))}
       </ul>
-      <p className="quiet">
+      <p className="quiet text-sm">
         This project has received entries — these narrowings are what is leaving none.
       </p>
-      <button type="button" onClick={onClear}>
+      <Button type="button" variant="outline" className="w-fit" onClick={onClear}>
         Clear the filters
-      </button>
+      </Button>
     </div>
   );
 }

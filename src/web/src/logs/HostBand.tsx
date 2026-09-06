@@ -52,18 +52,18 @@ export function HostBand({ hostId, filters }: { hostId: string | null; filters: 
   }
 
   return (
-    <div className="band-holder">
-      {samples.status === "asking" && <p className="quiet">Reading the machine…</p>}
+    <div className="py-1">
+      {samples.status === "asking" && <p className="quiet text-sm">Reading the machine…</p>}
 
       {samples.status === "unreachable" && (
-        <p className="refusal">This installation did not answer for the machine.</p>
+        <p className="refusal text-sm">This installation did not answer for the machine.</p>
       )}
 
       {/* The host the project sits on was deleted from another browser. The
           entries are untouched by that and stay on the screen: a project on no
           host loses the band and nothing else. */}
       {samples.status === "gone" && (
-        <p className="quiet">
+        <p className="quiet text-sm">
           The host this project sat on is gone. It may have been deleted from another
           browser.
         </p>

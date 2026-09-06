@@ -74,6 +74,18 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  /* The six levels, and the only semantic colours in this interface beside the
+     accent. planaffe's `--status-*` sit in exactly this place and describe a
+     workflow logaffe does not have; these describe what an entry said about
+     itself. */
+  --color-level-verbose: var(--level-verbose);
+  --color-level-debug: var(--level-debug);
+  --color-level-information: var(--level-information);
+  --color-level-warning: var(--level-warning);
+  --color-level-error: var(--level-error);
+  --color-level-fatal: var(--level-fatal);
+  --color-level-fatal-foreground: var(--level-fatal-foreground);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -115,6 +127,19 @@
   --sidebar-accent-foreground: #1d1f1c;
   --sidebar-border: #e4e5e1;
   --sidebar-ring: #b9bcb5;
+
+  /* Verbose and Debug carry the muted grey's value and a name of their own:
+     they are levels rather than a quiet aside, and the day the greys move they
+     should not move with them. Error is deliberately not `--destructive` —
+     that colour belongs to acts that destroy data, and an entry at Error
+     destroys nothing. */
+  --level-verbose: #6b6f68;
+  --level-debug: #6b6f68;
+  --level-information: oklch(0.55 0.12 245);
+  --level-warning: oklch(0.55 0.13 75);
+  --level-error: oklch(0.55 0.18 25);
+  --level-fatal: oklch(0.45 0.2 20);
+  --level-fatal-foreground: #ffffff;
 }
 
 .dark {
@@ -148,6 +173,14 @@
   --sidebar-accent-foreground: #e8e9e4;
   --sidebar-border: #2c302c;
   --sidebar-ring: #585d58;
+
+  --level-verbose: #9a9e96;
+  --level-debug: #9a9e96;
+  --level-information: oklch(0.72 0.11 245);
+  --level-warning: oklch(0.76 0.12 75);
+  --level-error: oklch(0.7 0.16 25);
+  --level-fatal: oklch(0.62 0.19 20);
+  --level-fatal-foreground: #ffffff;
 }
 
 /*
@@ -178,6 +211,21 @@
   }
   body {
     @apply bg-background text-foreground text-sm;
+  }
+}
+
+/*
+ * The one moment of movement in this interface. An entry can arrive out of
+ * eyeline while the tail is running, so the row it lands on is marked for four
+ * seconds — it says "this is new" and not "look at this", which is why it wears
+ * the accent rather than a level's colour.
+ */
+@keyframes just-arrived {
+  from {
+    background: color-mix(in oklch, var(--brand) 20%, transparent);
+  }
+  to {
+    background: transparent;
   }
 }
 

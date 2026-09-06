@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { Button } from "../components/ui/button";
+import { Snippet } from "../components/Page";
 
 type Handover =
   | { status: "asking" }
@@ -97,13 +99,15 @@ export function EmptyProject({ projectId }: { projectId: string }) {
   }
 
   return (
-    <section className="empty">
-      <h2>Nothing has ever arrived here</h2>
+    <section className="grid max-w-2xl gap-3 p-4">
+      <h2 className="text-base font-semibold">Nothing has ever arrived here</h2>
 
-      {handover.status === "asking" && <p className="quiet">Reading the project's token…</p>}
+      {handover.status === "asking" && (
+        <p className="quiet text-sm">Reading the project's token…</p>
+      )}
 
       {handover.status === "unreachable" && (
-        <p className="refusal">This installation did not answer.</p>
+        <p className="refusal text-sm">This installation did not answer.</p>
       )}
 
       {handover.status === "closed" && (
@@ -112,9 +116,14 @@ export function EmptyProject({ projectId }: { projectId: string }) {
             This project holds no ingest token, so there is nothing to deliver with yet.
             Issuing one hands back the delivery to paste.
           </p>
-          <button type="button" disabled={issuing} onClick={() => void issue()}>
+          <Button
+            type="button"
+            className="w-fit"
+            disabled={issuing}
+            onClick={() => void issue()}
+          >
             Issue an ingest token
-          </button>
+          </Button>
         </>
       )}
 
@@ -124,16 +133,18 @@ export function EmptyProject({ projectId }: { projectId: string }) {
             Send this from the application, and the entry appears above. The address, the
             header and the token are already in it.
           </p>
-          <pre>{handover.snippet}</pre>
-          <button
+          <Snippet>{handover.snippet}</Snippet>
+          <Button
             type="button"
+            variant="outline"
+            className="w-fit"
             onClick={() => {
               void navigator.clipboard.writeText(handover.snippet);
               setCopied(true);
             }}
           >
             {copied ? "Copied" : "Copy the delivery"}
-          </button>
+          </Button>
         </>
       )}
     </section>
