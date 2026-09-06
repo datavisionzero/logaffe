@@ -122,6 +122,14 @@ produce the whole artifact and make Node a requirement of every backend build.
 Joining them in one place instead keeps the two toolchains ADR 0001 accepted from
 becoming one that always runs both.
 
+What that project is drawn with is
+[ADR 0051](./adr/0051-the-web-interface-is-tailwind-base-ui-and-planaffes-own-tokens.md):
+Tailwind CSS v4 as the token layer, Base UI as the primitive layer, and
+components generated once by the shadcn CLI into `src/web/src/components/ui/`
+and owned here. The token values are planaffe's, deliberately, so that the two
+products read as one family. Tailwind's own palette is switched off in the token
+layer, so a screen speaks that vocabulary or does not build.
+
 ## The HTTP contract is an artifact, not an intention
 
 ADR 0001 takes as its cost that the frontend cannot share types with the backend
