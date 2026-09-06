@@ -1,6 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { api, problemWith } from "../api/client";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Select } from "../components/ui/select";
+import { Field } from "../components/Field";
 import { useGroups } from "./groups";
 import { RETENTION_MAXIMUM, RETENTION_MINIMUM, RETENTION_OFFERED } from "./retention";
 
@@ -91,20 +95,17 @@ export function CreateProject({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <form onSubmit={create}>
-      <label>
-        Name
-        <input
+    <form onSubmit={create} className="grid max-w-md gap-3">
+      <Field label="Name" said={problems.name}>
+        <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
           aria-invalid={problems.name !== undefined || undefined}
         />
-      </label>
-      {problems.name !== undefined && <p className="refusal">{problems.name}</p>}
+      </Field>
 
-      <label>
-        Kept for
-        <input
+      <Field label="Kept for" after="days" said={problems.retentionDays}>
+        <Input
           type="number"
           min={RETENTION_MINIMUM}
           max={RETENTION_MAXIMUM}
@@ -112,17 +113,14 @@ export function CreateProject({ onCreated }: { onCreated: () => void }) {
           onChange={(e) => setRetentionDays(e.target.value)}
           aria-invalid={problems.retentionDays !== undefined || undefined}
         />
-        days
-      </label>
-      {problems.retentionDays !== undefined && <p className="refusal">{problems.retentionDays}</p>}
+      </Field>
 
       {/* Absent while the installation holds none: a select whose only option
           is "no group" asks the operator to decide something that has one
           possible answer. */}
       {groups.status === "held" && groups.groups.length > 0 && (
-        <label>
-          Group
-          <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+        <Field label="Group">
+          <Select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
             <option value={none}>No group</option>
             {[...groups.groups]
               .sort((one, other) => one.name.localeCompare(other.name))
@@ -131,15 +129,15 @@ export function CreateProject({ onCreated }: { onCreated: () => void }) {
                   {group.name}
                 </option>
               ))}
-          </select>
-        </label>
+          </Select>
+        </Field>
       )}
 
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
+      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
 
-      <button type="submit" disabled={creating}>
+      <Button type="submit" disabled={creating} className="w-fit">
         Create the project
-      </button>
+      </Button>
     </form>
   );
 }

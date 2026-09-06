@@ -150,6 +150,25 @@
   --sidebar-ring: #585d58;
 }
 
+/*
+ * Three text roles this product says over and over, as utilities rather than
+ * as a hundred repeated class strings. They are semantic and not decorative —
+ * `quiet` is a second sentence, `refusal` is what the installation said no
+ * with, and `closed` is a door that is shut — so they are named for what they
+ * mean and each has exactly one place to change.
+ */
+@utility quiet {
+  color: var(--muted-foreground);
+}
+
+@utility refusal {
+  color: var(--destructive);
+}
+
+@utility closed {
+  color: var(--destructive);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
