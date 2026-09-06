@@ -4,6 +4,7 @@ import { Button } from "../components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -37,10 +38,15 @@ export function AccountMenu({ onSignOut }: { onSignOut: () => void }) {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="min-w-56">
-        <DropdownMenuLabel className="font-normal">
-          <div className="font-medium">This installation</div>
-          <div className="text-xs text-muted-foreground">Times in {browserTimeZone()}</div>
-        </DropdownMenuLabel>
+        {/* The label is a group's label to Base UI, and a group part outside a
+            group throws rather than degrading — so the heading of this menu is
+            wrapped even though it is the only thing in its group. */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="font-normal">
+            <div className="font-medium">This installation</div>
+            <div className="text-xs text-muted-foreground">Times in {browserTimeZone()}</div>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
 
         <DropdownMenuSeparator />
 

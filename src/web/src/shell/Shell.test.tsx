@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { BrowserRouter } from "react-router";
 import { Shell } from "./Shell";
 import {
@@ -53,5 +54,28 @@ describe("an installation with no second factor", () => {
     await screen.findByRole("link", { name: "logaffe" });
 
     expect(screen.queryByText(/has no second factor/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("the account menu", () => {
+  /**
+   * It is the one part of the shell that is not on the screen until it is
+   * asked for, so it is the one part a screen rendering cleanly says nothing
+   * about — which is how it once shipped throwing on the first click.
+   */
+  it("opens on what belongs to the session, and says nothing about a person", async () => {
+    open({ "GET /second-factor": withSecondFactor });
+
+    const operator = userEvent.setup();
+
+    await operator.click(await screen.findByRole("button", { name: "Account" }));
+
+    expect(
+      await screen.findByRole("menuitem", { name: /installation settings/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /sign out/i })).toBeInTheDocument();
+
+    // There is one operator and no user model, so nothing here names anybody.
+    expect(screen.getByText(/this installation/i)).toBeInTheDocument();
   });
 });
