@@ -11,7 +11,7 @@ being simple to do and clearly documented.
 Two stores, and both are needed.
 
 - **The database** holds projects, hosts, tokens, entries, samples and the
-  operator's account.
+  identities — every user and every agent.
 - **The host volume** holds the configuration and the secrets — including the
   **encryption key** at `keys/token.key` that makes the stored tokens readable
   ([ADR 0022](./adr/0022-a-token-is-recoverable-and-encrypted-rather-than-hashed.md)),
@@ -132,7 +132,16 @@ artifact is worse than none, because it looks like one.
 startup, and there is no separate step and no sequence to follow between
 versions — an installation two years behind catches up in one start.
 
-Three things make that safe to promise:
+**One upgrade in this product's history is not silent, and it is the one to
+v0.8.0.** An installation that had an operator gains an email address for that
+account, and it cannot invent one: the first start after the upgrade reads
+`Logaffe__Bootstrap__Email` and **refuses to start without it**
+([Setup](./setup.md#upgrading-an-installation-that-had-an-operator)). Nothing
+else about that account changes — the password, the second factor, the backup
+codes and the sessions are all carried over — and the three claim variables that
+were in the compose file before can go.
+
+Three things make the rest safe to promise:
 
 - **Migrations take a lock.** Two containers starting at once — during an
   upgrade, or because something restarted them — do not migrate against each
@@ -201,10 +210,11 @@ nuget.org lists the packages, which it does some minutes after the run ends.
 ## Housekeeping that runs on a timer
 
 Some of what the product does is a job on an interval rather than an answer to a
-request. **Sessions that went thirty days untouched are removed once a day.**
-They admit nothing from the moment they expire — that is what refuses them, and
-it needs no job — so this is housekeeping: it keeps the table, and the list the
-operator reads for a browser that is not theirs, from filling with rows that
+request. **Sessions past either of their deadlines are removed once a day** —
+seven days without a use, or thirty days from the sign-in whatever happened in
+between. They admit nothing from the moment they expire — that is what refuses
+them, and it needs no job — so this is housekeeping: it keeps the table, and the
+list a person reads for a browser that is not theirs, from filling with rows that
 cannot act ([Signing in](./sign-in.md#sessions)).
 
 **A pass that fails does not end the job or the installation.** It is logged as
