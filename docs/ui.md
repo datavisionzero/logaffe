@@ -187,6 +187,14 @@ one four-line stack trace in the middle of the page destroys the rhythm that
 makes the other forty rows readable. The message that does not fit is one
 keystroke away in the detail.
 
+**Only the rows in front of the operator are in the DOM.** The log is the one
+list of this product that really grows — a page is a thousand entries and the
+tail keeps adding to them — so the list holds a window of rows and the full
+height of all of them, which is what the scrollbar describes. The row that is
+one line pays for itself twice here: where row nine thousand starts is then
+arithmetic rather than a measurement. Nothing about this is infinite scroll and
+nothing about it changes what is loaded — the next page is still asked for.
+
 ### The entry detail
 
 The detail opens beside the list without navigating anywhere; the list keeps its
@@ -216,6 +224,10 @@ Up and down move through the entries, `Enter` opens the detail and `Escape`
 closes it, and `/` puts the cursor in the search box. Scanning a list is a
 keyboard task, and reaching for the mouse for every next line is what makes a log
 viewer tiring to use.
+
+It walks the whole list rather than the part of it that is drawn: the selection
+is an entry and not an element, and a row the arrow keys reach is brought into
+view whether or not it was rendered a moment ago.
 
 ## Time is the browser's time
 

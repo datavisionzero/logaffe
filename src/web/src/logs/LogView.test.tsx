@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router";
 import type { HeldProject } from "../projects/projects";
@@ -85,6 +85,25 @@ async function lines() {
 
   return within(list).getAllByRole("option");
 }
+
+/** The box the list is scrolled in, which is what a window is measured against. */
+function scroller() {
+  return screen.getByRole("listbox", { name: "Entries" }).parentElement!;
+}
+
+/**
+ * A page long enough that no screen holds it, which is the ordinary size of a
+ * page here: the query surface answers a thousand entries and the tail keeps
+ * adding to them.
+ */
+const MANY = Array.from({ length: 400 }, (_, index) =>
+  anEntry({
+    id: 400 - index,
+    eventTime: new Date(Date.parse("2026-08-08T11:00:00.000Z") + (400 - index) * 1_000)
+      .toISOString(),
+    message: `Entry ${400 - index}`,
+  }),
+);
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -280,6 +299,29 @@ describe("the entry detail", () => {
   });
 });
 
+describe("the window over the entries", () => {
+  it("holds the rows in front of the operator and stays as tall as all of them", async () => {
+    anInstallationAnswering({
+      "GET /projects/p1/entries": { body: { entries: MANY, next: null } },
+      "GET /projects/p1/entries/tail": QUIET_TAIL,
+    });
+
+    open();
+
+    const rendered = await lines();
+
+    // A screenful and its overscan, out of four hundred: the DOM holds what is
+    // being read, and the scrollbar still describes the page that was answered.
+    expect(rendered.length).toBeGreaterThan(0);
+    expect(rendered.length).toBeLessThan(MANY.length / 4);
+    expect(within(rendered[0]!).getByText("Entry 400")).toBeInTheDocument();
+
+    expect(await screen.findByRole("listbox", { name: "Entries" })).toHaveStyle({
+      height: `${MANY.length * 25}px`,
+    });
+  });
+});
+
 describe("the keyboard", () => {
   it("walks the entries, opens the detail and closes it", async () => {
     anInstallationAnswering({
@@ -329,6 +371,50 @@ describe("the keyboard", () => {
     await waitFor(() =>
       expect(screen.queryByRole("complementary", { name: "Entry" })).toBeNull(),
     );
+  });
+
+  it("reaches a row that is not in the DOM", async () => {
+    anInstallationAnswering({
+      "GET /projects/p1/entries": { body: { entries: MANY, next: null } },
+      "GET /projects/p1/entries/tail": QUIET_TAIL,
+      "GET /projects/p1/entries/341": {
+        body: {
+          id: 341,
+          eventTime: "2026-08-08T11:00:00.000Z",
+          receiptTime: "2026-08-08T11:00:00.100Z",
+          level: "Information",
+          loggerName: null,
+          instance: null,
+          trace: null,
+          span: null,
+          messageTemplate: "x",
+          message: "Entry 341",
+          exception: null,
+          properties: null,
+          messageTruncated: false,
+          exceptionTruncated: false,
+        },
+      },
+    });
+
+    open();
+
+    const operator = userEvent.setup();
+
+    const list = await screen.findByRole("listbox", { name: "Entries" });
+
+    // Sixty rows down is past the screenful the window holds, and the walk does
+    // not stop at the edge of the DOM: the selection is an entry, not an
+    // element, and the row it landed on is fetched by the detail like any other.
+    await operator.keyboard("{ArrowDown>60/}");
+
+    expect(within(list).queryByText("Entry 341")).toBeNull();
+
+    await operator.keyboard("{Enter}");
+
+    const detail = await screen.findByRole("complementary", { name: "Entry" });
+
+    expect(within(detail).getByText("Entry 341")).toBeInTheDocument();
   });
 });
 
@@ -484,6 +570,73 @@ describe("the live tail", () => {
       // The cursor runs on receipt time and the list stays ordered by event
       // time, so what arrived last is not what is on top (ADR 0009).
       expect(messages).toEqual(["The newest", "Delivered late", "The oldest"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+
+  it("holds what arrives while the list is being read further down, and moves nothing", async () => {
+    vi.useFakeTimers();
+
+    try {
+      anInstallationAnswering({
+        "GET /projects/p1/entries": {
+          body: {
+            entries: [
+              anEntry({ id: 42, eventTime: "2026-08-08T11:59:08.000Z", message: "The newest" }),
+              anEntry({ id: 40, eventTime: "2026-08-08T11:59:06.000Z", message: "The oldest" }),
+            ],
+            next: null,
+          },
+        },
+        "GET /projects/p1/entries/tail": [
+          { body: { entries: [], next: "arrived-at-0", more: false } },
+          {
+            body: {
+              entries: [
+                anEntry({ id: 43, eventTime: "2026-08-08T11:59:09.000Z", message: "Arrived since" }),
+              ],
+              next: "arrived-at-1",
+              more: false,
+            },
+          },
+        ],
+      });
+
+      open();
+
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(0);
+
+      // Scrolled off the top, which is what pauses the tail.
+      const box = scroller();
+      box.scrollTop = 200;
+      fireEvent.scroll(box);
+
+      await vi.advanceTimersByTimeAsync(5_000);
+      await vi.advanceTimersByTimeAsync(0);
+
+      const list = screen.getByRole("listbox", { name: "Entries" });
+
+      // Nothing was inserted above what is being read: the list is still two
+      // rows tall, so every row is where the operator left it.
+      expect(within(list).queryByText("Arrived since")).toBeNull();
+      expect(list).toHaveStyle({ height: "50px" });
+
+      const back = screen.getByRole("button", { name: /1 new entry/ });
+
+      fireEvent.click(back);
+      await vi.advanceTimersByTimeAsync(0);
+
+      // And on the click, it takes its place at the top — the order is by event
+      // time, which is where this one belongs.
+      const messages = within(list)
+        .getAllByRole("option")
+        .map((line) => line.querySelector('[data-slot="message"]')?.textContent);
+
+      expect(messages).toEqual(["Arrived since", "The newest", "The oldest"]);
+      expect(list).toHaveStyle({ height: "75px" });
     } finally {
       vi.useRealTimers();
     }

@@ -11,6 +11,15 @@ afterEach(cleanup);
 Element.prototype.scrollIntoView ??= () => undefined;
 Element.prototype.scrollTo ??= () => undefined;
 
+// The same emptiness measured rather than called: jsdom answers every element's
+// width and height with zero. The entry list only renders the rows that fit in
+// its scroller, so a scroller of no height is a list of no rows — every test
+// that reads a line would be asserting about jsdom's missing layout engine
+// rather than about the list. A desktop-sized box is what they were all written
+// against, and it is the one thing this has to say for the rows to exist.
+Object.defineProperty(HTMLElement.prototype, "offsetWidth", { value: 800, configurable: true });
+Object.defineProperty(HTMLElement.prototype, "offsetHeight", { value: 600, configurable: true });
+
 // The same emptiness, one level up: the sidebar asks the viewport whether it is
 // a phone's, and the theme asks it which colour scheme the operating system
 // wants. Neither question has an answer in jsdom, and the false both get here

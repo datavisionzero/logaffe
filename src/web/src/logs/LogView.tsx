@@ -5,7 +5,7 @@ import type { HeldProject } from "../projects/projects";
 import { CountPanel, ReadExpired } from "./CountPanel";
 import { EmptyProject } from "./EmptyProject";
 import { EntryDetail } from "./EntryDetail";
-import { EntryList } from "./EntryList";
+import { EntryList, useEntryRows } from "./EntryList";
 import { FilterBar } from "./FilterBar";
 import { HostBand } from "./HostBand";
 import { useEntries } from "./entries";
@@ -39,6 +39,17 @@ export function LogView({ project }: { project: HeldProject }) {
   const searchBox = useRef<HTMLInputElement | null>(null);
 
   const entries = useEntries(project.id, filters, atTop);
+
+  // Only the rows in front of the operator are in the DOM. The window is opened
+  // here rather than inside the list, because the keyboard below moves it: a row
+  // the arrow keys reach may not be rendered at all, and asking the window to
+  // bring it in is what keeps the walk unbroken through a list of thousands.
+  const rows = useEntryRows(entries.entries, scroller);
+
+  // Read where the keyboard needs it rather than depended on, for the reason
+  // the effect that keeps the selected row in view states.
+  const entriesRef = useRef(entries.entries);
+  entriesRef.current = entries.entries;
 
   const narrow = useCallback(
     (next: Filters) => {
@@ -94,16 +105,23 @@ export function LogView({ project }: { project: HeldProject }) {
     return () => document.removeEventListener("keydown", press);
   }, [entries.entries, selected]);
 
-  // The selected row is kept in view as the keyboard walks it.
+  // The selected row is kept in view as the keyboard walks it — by index into
+  // the window, since the row it walked onto may not be in the DOM yet.
+  //
+  // On the selection and never on the entries: the tail changes that array
+  // every five seconds, and a list that scrolled back to the selected row on
+  // every poll would take the position away from whoever is reading.
   useEffect(() => {
     if (selected === null) {
       return;
     }
 
-    scroller.current
-      ?.querySelector(`[data-id="${selected}"]`)
-      ?.scrollIntoView({ block: "nearest" });
-  }, [selected]);
+    const at = entriesRef.current.findIndex((entry) => entry.id === selected);
+
+    if (at >= 0) {
+      rows.scrollToIndex(at, { align: "auto" });
+    }
+  }, [selected, rows]);
 
   function returnToTheTop() {
     entries.showWaiting();
@@ -200,6 +218,7 @@ export function LogView({ project }: { project: HeldProject }) {
             <>
               <EntryList
                 entries={entries.entries}
+                rows={rows}
                 selected={selected}
                 justArrived={entries.justArrived}
                 onSelect={(id) => {
