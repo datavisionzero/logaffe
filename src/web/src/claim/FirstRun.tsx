@@ -1,6 +1,10 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { api, problemWith } from "../api/client";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
+import { Gate, PageTitle, Snippet } from "../components/Page";
 import { RETENTION_MAXIMUM, RETENTION_MINIMUM, RETENTION_OFFERED } from "../projects/retention";
 import { copyToClipboard, whyNotCopied, type Copying } from "../shared/clipboard";
 import { EnrolSecondFactor } from "../session/EnrolSecondFactor";
@@ -51,13 +55,15 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <main>
-      <h1>This installation is yours</h1>
-      <p>
-        The account is made and you are signed in. What is left is a second factor,
-        somewhere for entries to arrive, and something to deliver them with — three
-        steps, and you can leave at any point.
-      </p>
+    <Gate>
+      <div className="grid gap-3">
+        <PageTitle>This installation is yours</PageTitle>
+        <p>
+          The account is made and you are signed in. What is left is a second factor,
+          somewhere for entries to arrive, and something to deliver them with — three
+          steps, and you can leave at any point.
+        </p>
+      </div>
 
       {step.at === "second-factor" ? (
         <TheSecondFactor onDone={() => setStep({ at: "project" })} />
@@ -81,7 +87,7 @@ export function FirstRun({ onDone }: { onDone: () => void }) {
           onDone={() => leave(step.projectId)}
         />
       )}
-    </main>
+    </Gate>
   );
 }
 
@@ -102,8 +108,7 @@ function TheSecondFactor({ onDone }: { onDone: () => void }) {
   const [enrolled, setEnrolled] = useState(false);
 
   return (
-    <section>
-      <h2>1. A second factor</h2>
+    <Step title="1. A second factor">
       <p>
         A code from an authenticator app, asked for after your password. This account can
         see and do everything in an installation reachable from the internet, and a
@@ -115,9 +120,9 @@ function TheSecondFactor({ onDone }: { onDone: () => void }) {
           <p className="quiet">
             Enrolled. Keep the backup codes somewhere that is not the phone.
           </p>
-          <button type="button" onClick={onDone}>
+          <Button type="button" onClick={onDone} className="w-fit">
             Continue
-          </button>
+          </Button>
         </>
       ) : (
         <>
@@ -128,12 +133,32 @@ function TheSecondFactor({ onDone }: { onDone: () => void }) {
             </p>
           </EnrolSecondFactor>
 
-          <button type="button" className="plain" onClick={onDone}>
-            Skip this
-          </button>
+          <Skip onClick={onDone} />
         </>
       )}
+    </Step>
+  );
+}
+
+/**
+ * One numbered step of the guide, which is a card rather than a run of prose:
+ * three acts in a column need the eye to be told where one of them ends.
+ */
+function Step({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="grid gap-3 rounded-lg border bg-card p-4">
+      <h2 className="text-base font-semibold">{title}</h2>
+      {children}
     </section>
+  );
+}
+
+/** Leaving a step, which is a decision and not a dare. */
+function Skip({ onClick }: { onClick: () => void }) {
+  return (
+    <Button type="button" variant="link" size="sm" className="w-fit px-0" onClick={onClick}>
+      Skip this
+    </Button>
   );
 }
 
@@ -197,46 +222,41 @@ function FirstProject({
   }
 
   return (
-    <form onSubmit={create}>
-      <h2>2. A project for the entries to arrive in</h2>
+    <Step title="2. A project for the entries to arrive in">
       <p>
         One per application is the usual shape. Nothing creates one implicitly, and there
         can be as many as you like afterwards.
       </p>
 
-      <label>
-        Name
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          aria-invalid={problems.name !== undefined || undefined}
-        />
-      </label>
-      {problems.name !== undefined && <p className="refusal">{problems.name}</p>}
+      <form onSubmit={create} className="grid max-w-md gap-3">
+        <Field label="Name" said={problems.name}>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            aria-invalid={problems.name !== undefined || undefined}
+          />
+        </Field>
 
-      <label>
-        Kept for
-        <input
-          type="number"
-          min={RETENTION_MINIMUM}
-          max={RETENTION_MAXIMUM}
-          value={retentionDays}
-          onChange={(e) => setRetentionDays(e.target.value)}
-          aria-invalid={problems.retentionDays !== undefined || undefined}
-        />
-        days
-      </label>
-      {problems.retentionDays !== undefined && <p className="refusal">{problems.retentionDays}</p>}
+        <Field label="Kept for" after="days" said={problems.retentionDays}>
+          <Input
+            type="number"
+            min={RETENTION_MINIMUM}
+            max={RETENTION_MAXIMUM}
+            value={retentionDays}
+            onChange={(e) => setRetentionDays(e.target.value)}
+            aria-invalid={problems.retentionDays !== undefined || undefined}
+          />
+        </Field>
 
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
+        {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
 
-      <button type="submit" disabled={creating}>
-        Create the project
-      </button>
-      <button type="button" className="plain" onClick={onSkipped}>
-        Skip this
-      </button>
-    </form>
+        <Button type="submit" disabled={creating} className="mt-1 w-fit">
+          Create the project
+        </Button>
+      </form>
+
+      <Skip onClick={onSkipped} />
+    </Step>
   );
 }
 
@@ -291,23 +311,20 @@ function FirstToken({
   }
 
   return (
-    <section>
-      <h2>3. A token to deliver with</h2>
+    <Step title="3. A token to deliver with">
       <p>
-        <strong>{name}</strong> exists. An ingest token is what an application presents to
-        write into it — it permits writing and grants no read access of any kind, and the
-        token is the project, so a delivery never names one.
+        <strong className="font-medium">{name}</strong> exists. An ingest token is what an
+        application presents to write into it — it permits writing and grants no read
+        access of any kind, and the token is the project, so a delivery never names one.
       </p>
 
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
+      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
 
-      <button type="button" disabled={issuing} onClick={() => void issue()}>
+      <Button type="button" disabled={issuing} onClick={() => void issue()} className="w-fit">
         Issue an ingest token
-      </button>
-      <button type="button" className="plain" onClick={onSkipped}>
-        Skip this
-      </button>
-    </section>
+      </Button>
+      <Skip onClick={onSkipped} />
+    </Step>
   );
 }
 
@@ -333,29 +350,30 @@ function TheDelivery({
   const [copying, setCopying] = useState<Copying>();
 
   return (
-    <section>
-      <h2>Send something to it</h2>
+    <Step title="Send something to it">
       <p>
         This is pointed at this installation with the token already in it. Run it, and the
-        entry is in <strong>{name}</strong>.
+        entry is in <strong className="font-medium">{name}</strong>.
       </p>
-      <pre>{snippet}</pre>
-      <button
+      <Snippet>{snippet}</Snippet>
+      <Button
         type="button"
+        variant="outline"
+        className="w-fit"
         onClick={() => void copyToClipboard(snippet).then(setCopying)}
       >
         {copying === "copied" ? "Copied" : "Copy the delivery"}
-      </button>
+      </Button>
       {whyNotCopied(copying) !== undefined && (
-        <p className="refusal">{whyNotCopied(copying)}</p>
+        <p className="refusal text-sm">{whyNotCopied(copying)}</p>
       )}
-      <p className="quiet">
+      <p className="quiet text-xs">
         The token can be read back at any time from the project's settings, so there is
         nothing here to write down.
       </p>
-      <button type="button" onClick={onDone}>
+      <Button type="button" onClick={onDone} className="w-fit">
         Take me to {name}
-      </button>
-    </section>
+      </Button>
+    </Step>
   );
 }

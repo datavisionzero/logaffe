@@ -1,5 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { api, problemWith } from "../api/client";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Field } from "../components/Field";
 import { ShowEnrolment, type Enrolment } from "./Enrolment";
 
 type Step =
@@ -61,12 +64,12 @@ export function EnrolSecondFactor({
 
   return (
     <>
-      {refusal !== undefined && <p className="refusal">{refusal}</p>}
+      {refusal !== undefined && <p className="refusal text-sm">{refusal}</p>}
 
       {step.at === "settled" && (
-        <button type="button" onClick={() => void draw()}>
+        <Button type="button" variant="outline" className="w-fit" onClick={() => void draw()}>
           {replacing ? "Replace the second factor" : "Enrol a second factor"}
-        </button>
+        </Button>
       )}
 
       {step.at === "drawing" && <p className="quiet">Drawing an enrolment…</p>}
@@ -184,35 +187,36 @@ function Confirm({
   }
 
   return (
-    <form onSubmit={enrol}>
-      <h3>{replacing ? "Confirm the replacement" : "Confirm the enrolment"}</h3>
+    <form onSubmit={enrol} className="grid max-w-md gap-3">
+      <h3 className="text-sm font-semibold">
+        {replacing ? "Confirm the replacement" : "Confirm the enrolment"}
+      </h3>
 
-      <label>
-        Password
-        <input
+      <Field label="Password" said={problems.password}>
+        <Input
           type="password"
           autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           aria-invalid={problems.password !== undefined || undefined}
         />
-      </label>
-      {problems.password !== undefined && <p className="refusal">{problems.password}</p>}
+      </Field>
 
       {replacing &&
         (usingBackupCode ? (
-          <label>
-            A backup code off the sheet you have now
-            <input
+          <Field label="A backup code off the sheet you have now">
+            <Input
               name="backup-code"
               autoComplete="off"
               value={backupCode}
               onChange={(e) => setBackupCode(e.target.value)}
             />
-          </label>
+          </Field>
         ) : (
-          <label>
-            The six digits from the authenticator you have now
+          <Field
+            label="The six digits from the authenticator you have now"
+            said={problems.secondFactorCode}
+          >
             {/* Neither code field here is offered to a password manager, and that
                 is deliberate -- it is the one screen that opts out.
 
@@ -230,7 +234,7 @@ function Confirm({
                 A manager that is right half the time is worse than none on the
                 screen where six wrong digits cost the operator their way in, and
                 they have both authenticators in front of them anyway. */}
-            <input
+            <Input
               id="current-code"
               name="current-code"
               inputMode="numeric"
@@ -240,30 +244,31 @@ function Confirm({
               onChange={(e) => setSecondFactorCode(e.target.value)}
               aria-invalid={problems.secondFactorCode !== undefined || undefined}
             />
-          </label>
+          </Field>
         ))}
-      {problems.secondFactorCode !== undefined && (
-        <p className="refusal">{problems.secondFactorCode}</p>
-      )}
 
       {/* The phone that is already gone is the case a replacement exists for, so
           the code that stands in for it is one click away rather than something
           to be found. */}
       {replacing && (
-        <button
+        <Button
           type="button"
-          className="plain"
+          variant="link"
+          size="sm"
+          className="w-fit px-0"
           onClick={() => setUsingBackupCode(!usingBackupCode)}
         >
           {usingBackupCode
             ? "Use the authenticator I have now"
             : "The old phone is gone — use a backup code"}
-        </button>
+        </Button>
       )}
 
-      <label>
-        The six digits from the authenticator you just enrolled
-        <input
+      <Field
+        label="The six digits from the authenticator you just enrolled"
+        said={problems.newSecondFactorCode}
+      >
+        <Input
           id="enrolled-code"
           name="enrolled-code"
           inputMode="numeric"
@@ -273,23 +278,26 @@ function Confirm({
           onChange={(e) => setNewSecondFactorCode(e.target.value)}
           aria-invalid={problems.newSecondFactorCode !== undefined || undefined}
         />
-      </label>
-      {problems.newSecondFactorCode !== undefined && (
-        <p className="refusal">{problems.newSecondFactorCode}</p>
-      )}
+      </Field>
 
       {refusal !== undefined && (
-        <p className="refusal">
+        <p className="refusal text-sm">
           {refusal}{" "}
-          <button type="button" className="plain" onClick={onStartAgain}>
+          <Button
+            type="button"
+            variant="link"
+            size="xs"
+            className="px-0 text-destructive"
+            onClick={onStartAgain}
+          >
             Draw a fresh enrolment
-          </button>
+          </Button>
         </p>
       )}
 
-      <button type="submit" disabled={enrolling}>
+      <Button type="submit" disabled={enrolling} className="mt-1 w-fit">
         {replacing ? "Replace it" : "Enrol it"}
-      </button>
+      </Button>
     </form>
   );
 }

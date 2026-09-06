@@ -12,12 +12,20 @@ import { Label } from "@/components/ui/label";
 export function Field({
   label,
   after,
+  hint,
   said,
   children,
 }: {
   label: ReactNode;
   /** What follows the control on the same line — a unit, usually. */
   after?: ReactNode;
+  /**
+   * What the operator has to know about the field, under it and **outside the
+   * label**: a label is what the control is called, and a paragraph folded into
+   * it would be read out as part of the name and would break every test that
+   * finds the field by it.
+   */
+  hint?: ReactNode;
   /** What the installation refused with, said under the field it is about. */
   said?: string;
   children: ReactNode;
@@ -35,6 +43,7 @@ export function Field({
           </span>
         )}
       </Label>
+      {hint !== undefined && <p className="quiet text-xs">{hint}</p>}
       {said !== undefined && <p className="refusal text-sm">{said}</p>}
     </div>
   );
